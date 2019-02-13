@@ -78,14 +78,12 @@ class TrafficArrays(object):
         self._parent = newparent
 
     def MakeParameterLists(self, keys):
-        """" Takes a list of keys and adds these to the object's 
-             parameter lists based on the key type to keep track
-             of all parameters. """
+        """ Takes a list of keys and adds these to the object's 
+             parameter tracking lists. """
 
-        # Objects of type list and numpy array are added to the respective 
-        # parameter lists to keep track of them. If an object of type 
-        # TrafficArrays is passed as key then this object is reparented to
-        # the current object's list of children.
+        # Keys for objects of type list and numpy array are added to the respective 
+        # parameter lists. If a key to an object of type TrafficArrays is passed
+        # then the object is added to the current object's list of children.
         for key in keys:
             if isinstance(self._Vars[key], list):
                 self._LstVars.append(key)
