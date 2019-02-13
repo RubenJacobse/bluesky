@@ -48,7 +48,7 @@ class TrafficArrays(object):
     @classmethod
     def SetRoot(cls, obj):
         """ This function is used to set the root of the tree for all 
-            TrafficArrays objects."""
+            TrafficArrays objects. """
         cls.root = obj
 
     def __init__(self):
@@ -71,7 +71,7 @@ class TrafficArrays(object):
 
     def reparent(self, newparent):
         """ Remove object from the parent's list of children, and add
-            it to the list of children of the new parent"""
+            it to the list of children of the new parent. """
 
         self._parent._children.pop(self._parent._children.index(self))
         newparent._children.append(self)
@@ -129,6 +129,7 @@ class TrafficArrays(object):
 
     def istrafarray(self, key):
         """ Checks if key is in one of the parameter tracking lists. """
+        
         return key in self._LstVars or key in self._ArrVars
 
     def create_children(self, n=1):
