@@ -37,8 +37,7 @@ class TrafficArrays(object):
     """ Base class that enables vectorization of traffic data using 
         arrays and lists but also offers object-like benefits to 
         simplify adding and deleting traffic elements for all 
-        parameters at once. Classes that inherit from the TrafficArrays
-        class can access these features. """
+        parameters at once. """
     
     # The TrafficArrays class keeps track of all of the constructed
     # TrafficArrays objects (the Traffic object takes this role when it
