@@ -114,14 +114,7 @@ class AreaRestrictions(TrafficArrays):
         # Keep track of all restricted areas in list and by ID (same order)
         self.areaList = []
         self.areaIDList = []
-
-        # Traffic parameters
-        self.ntraf = traf.ntraf
-        self.ac_lat = traf.lat
-        self.ac_lon = traf.lon
-        self.ac_trk = traf.trk
-        self.ac_gsnorth = traf.gsnorth
-        self.ac_gseast = traf.gseast
+        self.nareas = 0
 
     def create(self, n=1):
         """ Append n elements (aircraft) to all lists and arrays
@@ -129,6 +122,10 @@ class AreaRestrictions(TrafficArrays):
             Overrides TrafficArrays.create(n) method to allow
             handling of two dimensional numpy arrays
         """
+
+        # If no areas exist do nothing
+        if not self.nareas:
+            return
 
         # Same as in TrafficArrays (_LstVars remain one-dimensional)
         for v in self._LstVars:  # Lists (mostly used for strings)
@@ -152,9 +149,8 @@ class AreaRestrictions(TrafficArrays):
 
             # Get numpy dtype without byte length
             dtype_str = str(self._Vars[v].dtype)
-            for dtype in ["int", "float", "bool"]:
-                if dtype in dtype_str:
-                    vartype = dtype
+            for vartype in ["int", "float", "bool"]:
+                if vartype in dtype_str:
                     break
 
             # Get default value
@@ -163,11 +159,12 @@ class AreaRestrictions(TrafficArrays):
             else:
                 defaultvalue = [0.0]
 
-            # Create [nrows * n] array of defaultvalue and add to existing array
-            nrows, _ = np.shape(self._Vars[v])
-            new_entries = np.full((nrows, n), defaultvalue)
-
-            self._Vars[v] = np.concatenate((self._Vars[v], new_entries), 1)
+            # Create add n columns to existing array
+            new_cols = np.full((self.nareas, n), defaultvalue)
+            if not self._Vars[v].size:
+                self._Vars[v] = new_cols
+            else:
+                self._Vars[v] = np.concatenate((self._Vars[v], new_cols), 1)
 
     def delete(self, idx):
         """ Delete element (aircraft) idx from all lists and arrays
@@ -200,6 +197,7 @@ class AreaRestrictions(TrafficArrays):
         # Make sure areas are 
         for area in self.areaList:
             area.delete()
+            self.areaList.remove(area) # Probably redundant
 
         self.areaList = []
         self.areaIDList = []
@@ -212,18 +210,19 @@ class AreaRestrictions(TrafficArrays):
         """ Update the area positions before traf is updated. """
 
         for area in self.areaList:
-            area.update_pos()
+            area.update_pos(1.0)
 
-    def create_area(self, area_id, area_status, gs_north, gs_east, coords):
+    def create_area(self, area_id, area_status, gs_north, gs_east, *coords):
         """ Create a new restricted airspace area """
 
         if area_id in self.areaIDList:
             return False, "Error: Airspace restriction with name {} already exists".format(area_id)
 
         # Create new RestrictedAirspaceArea instance and add to internal lists
-        new_area = RestrictedAirspaceArea(area_id, area_status, gs_north, gs_east, coords)
+        new_area = RestrictedAirspaceArea(area_id, area_status, gs_north, gs_east, list(coords))
         self.areaList.append(new_area)
         self.areaIDList.append(area_id)
+        self.nareas += 1
 
         # Add row to all numpy arrays
         for v in self._ArrVars:
@@ -242,10 +241,12 @@ class AreaRestrictions(TrafficArrays):
                 defaultvalue = [0.0]
 
             # Adds row of defaultvalue to existing array
-            _ , ncols = np.shape(self._Vars[v])
-            newrow = np.full((1, ncols), defaultvalue)
+            newrow = np.full((1, traf.ntraf), defaultvalue)
 
-            self._Vars[v] = np.vstack(self._Vars[v], newrow)
+            if not self.nareas:
+                self._Vars[v] = newrow
+            else:
+                self._Vars[v] = np.vstack((self._Vars[v], newrow))
 
         return True, "Restricted Airspace Area {} is initialized".format(area_id)
 
@@ -264,6 +265,7 @@ class AreaRestrictions(TrafficArrays):
             # Delete from all lists and arrays
             del self.areaList[idx]
             del self.areaIDList[idx]
+            self.nareas -= 1
             
             # Delete row corresponding to area from all numpy arrays
             for v in self._ArrVars:
@@ -275,7 +277,7 @@ class AreaRestrictions(TrafficArrays):
 class RestrictedAirspaceArea():
     """ Class that represents a single Restricted Airspace Area """
 
-    def __init__(self, area_id, status, gs_north = 0, gs_east = 0, *coords):
+    def __init__(self, area_id, status, gs_north, gs_east, coords):
         
         # Initialize 
         self.area_id = area_id
@@ -291,6 +293,9 @@ class RestrictedAirspaceArea():
         
         # Update the border using self.coords
         self._update_border()
+
+        # Draw polygon on RadarWidget canvas
+        self._draw()
 
     def update_pos(self, dt):
         """ Update the position of the area (only if its velocity is
@@ -334,7 +339,7 @@ class RestrictedAirspaceArea():
 
         # Make sure the border is a closed ring (first and last coordinate pair should be the same)
         if (coords[0], coords[1]) != (coords[-2], coords[-1]):
-            coords = coords + (coords[0], coords[1])
+            coords = coords + [coords[0], coords[1]]
 
         # Check if the polygon is ccw, if not, then flip the coordinate order
         dir_sum = 0
