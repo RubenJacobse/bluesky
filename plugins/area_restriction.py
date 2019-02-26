@@ -32,7 +32,7 @@ def init_plugin():
     """Initialize the SUA plugin"""
 
     # Addtional initilisation code
-    areas = AreaRestrictions()
+    areas = AreaRestrictionManager()
 
     # Configuration parameters
     config = {
@@ -96,7 +96,7 @@ def init_plugin():
     return config, stackfunctions
 
 
-class AreaRestrictions(TrafficArrays):
+class AreaRestrictionManager(TrafficArrays):
     """ This class implements the avoidance of Restricted Airspace Areas. """
 
     def __init__(self):
@@ -109,18 +109,22 @@ class AreaRestrictions(TrafficArrays):
             self.vrel_east = np.array([])   # Relative velocity
             self.brg_l = np.array([])   # Bearing from ac to leftmost vertex
             self.brg_r = np.array([])   # Bearing from ac to rightmost vertex
-            self.in_conf = np.array([], dtype = bool) #
+            self.dist_l = np.array([])  # Distance from ac to leftmost vertex
+            self.dist_r = np.array([])  # Distance from ac to rightmost vertex
+            self.in_conf = np.array([], dtype = bool) # 
 
         # Keep track of all restricted areas in list and by ID (same order)
         self.areaList = []
         self.areaIDList = []
         self.nareas = 0
 
+        print(np.shape(traf.gseast))
+
     def create(self, n=1):
         """ Append n elements (aircraft) to all lists and arrays
 
             Overrides TrafficArrays.create(n) method to allow
-            handling of two dimensional numpy arrays
+            handling of two-dimensional numpy arrays
         """
 
         # If no areas exist do nothing
@@ -169,13 +173,14 @@ class AreaRestrictions(TrafficArrays):
     def delete(self, idx):
         """ Delete element (aircraft) idx from all lists and arrays
 
-            Overrides TrafficArrays.delete(n) method to allow
-            handling of two dimensional numpy arrays
+            Overrides TrafficArrays.delete(idx) method to allow
+            handling of two-dimensional numpy arrays
         """
 
         for child in self._children:
             child.delete(idx)
 
+        # Delete entire column idx from v (column = dimension 1)
         for v in self._ArrVars:
             self._Vars[v] = np.delete(self._Vars[v], idx, 1)
 
@@ -191,24 +196,33 @@ class AreaRestrictions(TrafficArrays):
     def reset(self):
         """ Reset state on simulator reset event """
         
-        # Call actual reset method
+        # Call actual reset method defined in TrafficArrays base class
         super().reset()
 
-        # Make sure areas are 
+        # Make sure areas are deleted
         for area in self.areaList:
             area.delete()
             self.areaList.remove(area) # Probably redundant
 
         self.areaList = []
         self.areaIDList = []
+        self.nareas = 0
 
     def update(self):
         """ Do calculations after traf has been updated. """
-        pass
+        
+        # 
+        for idx, area in enumerate(self.areaList):
+            # Calculate bearings and distance to the tangent vertices
+            self.brg_l[idx, :], self.brg_r[idx, :], self.dist_l[idx, :], self.dist_r[idx, :] = area.calc_tangents(traf.ntraf, traf.lat, traf.lon)
 
+            # Calculate area velocity components relative to each aircraft
+            self.vrel_east[idx, :], self.vrel_north[idx, :] = area.calc_vrel(traf.gseast, traf.gsnorth)
+        
     def preupdate(self):
         """ Update the area positions before traf is updated. """
 
+        # NOTE: Not sure if this should be part of preupdate() or update()
         for area in self.areaList:
             area.update_pos(1.0)
 
@@ -220,6 +234,7 @@ class AreaRestrictions(TrafficArrays):
 
         # Create new RestrictedAirspaceArea instance and add to internal lists
         new_area = RestrictedAirspaceArea(area_id, area_status, gs_north, gs_east, list(coords))
+        
         self.areaList.append(new_area)
         self.areaIDList.append(area_id)
         self.nareas += 1
@@ -266,7 +281,7 @@ class AreaRestrictions(TrafficArrays):
             del self.areaList[idx]
             del self.areaIDList[idx]
             self.nareas -= 1
-            
+
             # Delete row corresponding to area from all numpy arrays
             for v in self._ArrVars:
                 self._Vars[v] = np.delete(self._Vars[v], idx, 0)
@@ -278,8 +293,8 @@ class RestrictedAirspaceArea():
     """ Class that represents a single Restricted Airspace Area """
 
     def __init__(self, area_id, status, gs_north, gs_east, coords):
-        
-        # Initialize 
+
+        # Initialize
         self.area_id = area_id
         self.status = status
         self.gs_north = gs_north
@@ -374,71 +389,61 @@ class RestrictedAirspaceArea():
 
         areafilter.deleteArea(self.area_id)
 
-    def _point_poly_tangents(self, ac_pos, border):
+    # NOTE: How can this be vectorized further?
+    def calc_tangents(self, ntraf, ac_lat, ac_lon):
         """ For a given aircraft position find left- and rightmost courses
             that are tangent to a given polygon. """
 
-        # Start by assuming both tangents touch at polygon vertex with index 0
-        idx_l = 0
-        idx_r = 0
+        # Initialize arrays to store qdrs and distances
+        qdr_l = np.zeros(ntraf, dtype=float)
+        qdr_r = np.zeros(ntraf, dtype=float)
+        dist_l = np.zeros(ntraf, dtype=float)
+        dist_r = np.zeros(ntraf, dtype=float)
 
-        # Loop over vertices 1:n-1 and evaluate position of aircraft wrt the edges to find the 
-        # indices of the vertices at which the tangents touch the polygon
-        #
-        # Algorithm from: http://geomalgorithms.com/a15-_tangents.html
-        for i in range(1, len(border) - 1):
-            eprev = self.is_left(border[i - 1], border[i], ac_pos)
-            enext = self.is_left(border[i], border[i + 1], ac_pos)
+        border = self.border.vertices
 
-            if eprev <= 0 and enext > 0:
-                if not (self.is_left(ac_pos, border[i], border[idx_r]) < 0):
-                    idx_r = i
-            elif eprev > 0 and enext <= 0:
-                if not (self.is_left(ac_pos, border[i], border[idx_l]) > 0):
-                    idx_l = i
+        # Calculate qdrs and distances for each aircraft
+        for ii in range(ntraf):
+            ac_pos = [ac_lat[ii], ac_lon[ii]]
 
-        # Calculate tangent courses from aircraft to left- and rightmost vertices
-        qdr_l, dist_l = qdrdist(ac_pos[0], ac_pos[1], border[idx_l][0], border[idx_l][1])
-        qdr_r, dist_r = qdrdist(ac_pos[0], ac_pos[1], border[idx_r][0], border[idx_r][1])
+            # Start by assuming both tangents touch at polygon vertex with index 0
+            idx_l = 0
+            idx_r = 0
 
-        return qdr_l, qdr_r, dist_l, dist_r
+            # Loop over vertices 1:n-1 and evaluate position of aircraft wrt the edges to find the
+            # indices of the vertices at which the tangents touch the polygon
+            #
+            # Algorithm from: http://geomalgorithms.com/a15-_tangents.html
+            for jj in range(1, len(border) - 1):
+                eprev = self.is_left(border[jj - 1], border[jj], ac_pos)
+                enext = self.is_left(border[jj], border[jj + 1], ac_pos)
 
-    # NOTE: Can this be vectorized?
-    def _point_poly_tangents_vec(self, ac_lat, ac_lon, border):
-        """ For a given aircraft position find left- and rightmost courses
-            that are tangent to a given polygon. """
+                if eprev <= 0 and enext > 0:
+                    if not (self.is_left(ac_pos, border[jj], border[idx_r]) < 0):
+                        idx_r = jj
+                elif eprev > 0 and enext <= 0:
+                    if not (self.is_left(ac_pos, border[jj], border[idx_l]) > 0):
+                        idx_l = jj
 
-        ac_pos = [ac_lat, ac_lon]
-
-        # Start by assuming both tangents touch at polygon vertex with index 0
-        idx_l = 0
-        idx_r = 0
-
-        # Loop over vertices 1:n-1 and evaluate position of aircraft wrt the edges to find the 
-        # indices of the vertices at which the tangents touch the polygon
-        #
-        # Algorithm from: http://geomalgorithms.com/a15-_tangents.html
-        for i in range(1, len(border) - 1):
-            eprev = self.is_left(border[i - 1], border[i], ac_pos)
-            enext = self.is_left(border[i], border[i + 1], ac_pos)
-
-            if eprev <= 0 and enext > 0:
-                if not (self.is_left(ac_pos, border[i], border[idx_r]) < 0):
-                    idx_r = i
-            elif eprev > 0 and enext <= 0:
-                if not (self.is_left(ac_pos, border[i], border[idx_l]) > 0):
-                    idx_l = i
-
-        # Calculate tangent courses from aircraft to left- and rightmost vertices
-        qdr_l, dist_l = qdrdist(ac_lat, ac_lon, border[idx_l][0], border[idx_l][1])
-        qdr_r, dist_r = qdrdist(ac_lat, ac_lon, border[idx_r][0], border[idx_r][1])
+            # Calculate tangent courses from aircraft to left- and rightmost vertices
+            qdr_l[ii], dist_l[ii] = qdrdist(ac_pos[0], ac_pos[1], border[idx_l][0], border[idx_l][1])
+            qdr_r[ii], dist_r[ii] = qdrdist(ac_pos[0], ac_pos[1], border[idx_r][0], border[idx_r][1])
 
         return qdr_l, qdr_r, dist_l, dist_r
+
+    def calc_vrel(self, ac_gseast, ac_gsnorth):
+        """ Calculate the east and north components of the relative
+            velocity of the area with respect to all aircraft. """
+
+        vrel_east = self.gs_east - ac_gseast
+        vrel_north = self.gs_north - ac_gsnorth
+
+        return vrel_east, vrel_north
 
     # Copied from tools/areafilter.py and edited
     @staticmethod
     def is_inside(border, lat, lon):
-        """ Takes vectors with lat and lon and returns boolean list per point """
+        """ Takes vectors with lat and lon and returns boolean list per point. """
 
         points = np.vstack((lat, lon)).T
         inside = border.contains_points(points)
@@ -447,18 +452,19 @@ class RestrictedAirspaceArea():
 
     @staticmethod
     def crs_is_between(crs, crs_l, crs_r):
-        """ Check if a given course crs lies in between crs_l and crl_r (in clockwise direction) """
+        """ Check if a given course crs lies in between crs_l and crl_r
+            (in clockwise direction). """
 
         if ((crs_l > crs_r) and (crs > crs_l or crs < crs_r)) or ((crs_l < crs_r) and (crs > crs_l and crs < crs_r)):
             return True
-       
+
         return False
 
     @staticmethod
     def is_left(p0, p1, p2):
-        """  Check if point p2 lies to the left of the line through p0 and p1 
-        
-            Returns 
+        """  Check if point p2 lies to the left of the line through p0 and p1.
+
+            Returns:
                 > 0 if p2 lies on the left side of the line
                 = 0 if p2 lies exactly on the line
                 < 0 if p2 lies on the right side of the line
