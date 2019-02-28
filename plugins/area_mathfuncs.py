@@ -1,9 +1,11 @@
-# Based on 2016 NASA paper by Narkawicz and Hagen:
-#   "Algorithms for Collision Detection Between a Point and a Moving Polygon, 
-#    with Applications to Aircraft Weather Avoidance"
-#
-# Functions and variable names correspond to notation used in paper as much as possible.
-# © Ruben Jacobse, 2019
+"""
+    Based on 2016 NASA paper by Narkawicz and Hagen:
+    "Algorithms for Collision Detection Between a Point and a Moving Polygon,
+    with Applications to Aircraft Weather Avoidance"
+
+    Functions and variable names correspond to notation used in paper as much as possible.
+    © Ruben Jacobse, 2019
+"""
 
 import numpy as np
 
@@ -23,8 +25,8 @@ def quad_min_le_D(a, b, c, D):
         return True
     elif a > 0 and b <= 0 and -b <= 2*a and b**2 - 4*a*(c - D) > 0:
         return True
-    else:
-        return False
+
+    return False
 
 def quad2D(a, b, c, d, e, f, r, t):
     """ Evaluate bivariate quadratic in r and t:
@@ -66,7 +68,7 @@ def near_edge(p_i, p_j, s, BUFF):
 
     if np.linalg.norm(s - p_i)**2 < BUFF**2 or np.linalg.norm(s - p_j)**2 < BUFF**2:
         return True
-    elif p_i != p_j:
+    elif not np.array_equal(p_i, p_j):
         a = np.dot(p_j - p_i, p_j - p_i)
         b = 2 * np.dot(p_i - s, p_j - p_i)
         c = np.dot(p_i - s, p_i - s)
@@ -83,8 +85,8 @@ def num_cross(P, s):
     # Keep track of number of times the ray crosses the edges of the polygon
     crosscount = 0
 
-    # Requires P to have length and be two-dimensional
-    # Assumes P = [[x0, y0], [x1, y1], ..., [xn, yn]]
+    # Requires P to have __len__ and be two-dimensional
+    # Assumes P = np.array([[x0, y0], [x1, y1], ..., [xn, yn]])
     for ii in range(len(P) - 1):
         p_i = P[ii]
         p_j = P[ii + 1]
@@ -95,20 +97,24 @@ def num_cross(P, s):
         s_x = s[0]
 
         # Calculate vector perpendicular to (p_j-p_i)
-        p_i_perp = [p_iy, p_ix]
-        p_j_perp = [p_jy, p_jx]
-        p_ji_perp = (p_j_perp - p_i_perp)
-
+        # If p = [px, py] then p_perp = [-py, px] is its right perpendicular
+        p_i_perp = np.array([-p_iy, p_ix])
+        p_j_perp = np.array([-p_jy, p_jx])
+        p_ji_perp = np.subtract(p_j_perp, p_i_perp)
+        
         if p_ix >= s_x and p_jx >= s_x:
             continue
         if p_ix < s_x and p_jx < s_x:
             continue
         if p_ix == p_jx:
             continue
-        if (p_jx - p_ix) * (np.dot(s - p_i, p_ji_perp)) >= 0:
+        # Note: definition given in Narkawicz & Hagen paper is possibly wrong.... (by factor -1)
+        if -1 * (p_jx - p_ix) * (np.dot(s - p_i, p_ji_perp)) >= 0:
             crosscount += 1
         else:
             continue
+
+    return crosscount
 
 def definitely_outside(P, s, BUFF):
     """ Check that s is not inside P or less than distance
