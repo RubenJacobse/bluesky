@@ -35,6 +35,7 @@ def quad2D(a, b, c, d, e, f, r, t):
 
     return a * r**2 + b * t**2 + c*r*t + d*r + e*t + f
 
+# Theory behind this method is not explained; not sure how it works
 def quad_min_box_le_D(a, b, c, d, e, f, D):
     """ Determine if bivariate quadratic takes value less than D
         for r and t on interval [0,1] """
@@ -51,11 +52,13 @@ def quad_min_box_le_D(a, b, c, d, e, f, D):
         disc = c**2 - 4*a*b
         mx = 2*b*d - c*e
         my = 2*a*e - c*d
-        if 0 <= mx * disc <= disc**2:
-            return True
-        elif 0 <= my * disc <= disc**2:
-            return True
-        elif quad2D(a, b, c, d * disc, e * disc, f * disc**2, mx, my) < (D * disc**2):
+
+        # Test conditions that must all pass:
+        cond1 = 0 <= mx * disc <= disc**2
+        cond2 = 0 <= my * disc <= disc**2
+        cond3 = quad2D(a, b, c, d * disc, e * disc, f * disc**2, mx, my) < (D * disc**2)
+
+        if cond1 and cond2 and cond3:
             return True
 
     # Only reached when none of the criteria are met
@@ -80,7 +83,7 @@ def near_edge(p_i, p_j, s, BUFF):
 
 def num_cross(P, s):
     """ Count the number of times the infinite ray originating
-        at s crosses the edges of P. """
+        at s in positive y direction crosses the edges of P. """
 
     # Keep track of number of times the ray crosses the edges of the polygon
     crosscount = 0
@@ -101,7 +104,7 @@ def num_cross(P, s):
         p_i_perp = np.array([-p_iy, p_ix])
         p_j_perp = np.array([-p_jy, p_jx])
         p_ji_perp = np.subtract(p_j_perp, p_i_perp)
-        
+
         if p_ix >= s_x and p_jx >= s_x:
             continue
         if p_ix < s_x and p_jx < s_x:
@@ -126,14 +129,15 @@ def definitely_outside(P, s, BUFF):
 
         if near_edge(p_i, p_j, s, BUFF):
             return False
-        if num_cross(P, s) % 2 == 0:
-            return True
 
-    # If none of the above conditions are met s is inside
+    if num_cross(P, s) % 2 == 0:
+        return True
+
+    # If none of the above conditions are met s is inside P
     return False
 
 def segments_close(c, d, e, f, BUFF):
-    """ Check if two segments between points c-d and e-f are within 
+    """ Check if two segments between points c-d and e-f are within
         distance BUFF from each other. """
 
     if near_edge(e, f, c, BUFF) or near_edge(e, f, d , BUFF):
@@ -153,17 +157,17 @@ def segments_close(c, d, e, f, BUFF):
 def detect_same_2D(T, s, v, P, V, BUFF):
     """ Detect conflict between 2D point s moving at velocity v
         and polygon P moving with vertex velocities V in the time
-        interval [0,T] within margin BUFF 
-        
+        interval [0,T] within margin BUFF.
+
         s = [sx, sy]
         v = [vx, vy]
         P = [[x0, y0], [x1, y1], ..., [xn, yn]]
         V = [[v0, v0], [v1, v1], ..., [vn, vn]] """
-    
-    # If s inside P or s+T*v in P+T*V return true
-    if definitely_outside(P, s, BUFF):
+
+    # If s inside P or s+T*v inside P+T*V return true
+    if not definitely_outside(P, s, BUFF):
         return True
-    if definitely_outside(P + T*V, s + T*v, BUFF):
+    if not definitely_outside(P + T*V, s + T*v, BUFF):
         return True
 
     # Check for crossing of edges
@@ -174,7 +178,7 @@ def detect_same_2D(T, s, v, P, V, BUFF):
 
         if segments_close(s, s + T*(v - v_i), p_i, p_j, BUFF):
             return True
-    
-    # If none of the above criteria are met s will not conflict with P in
+
+    # If none of the above criteria are met s does not conflict with P in
     # time interval [0,T]
     return False
