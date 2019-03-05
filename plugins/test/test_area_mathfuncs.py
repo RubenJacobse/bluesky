@@ -1,8 +1,13 @@
+""" Test the functions of area_mathfuncs.py """
+
+# General imports
 import pytest
 import pdb
 
+# Third-party imports
 import numpy as np
 
+# Module imports
 from .. import area_mathfuncs as amf
 
 FLT_DIFF = 0.01 # Acceptable difference to assert "equality" of float variables
