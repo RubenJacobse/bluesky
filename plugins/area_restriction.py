@@ -15,7 +15,7 @@ except ImportError:
     from collections import Collection
 
 import numpy as np
-from matplotlib.path import Path
+import shapely.geometry as spgeom
 
 # BlueSky imports
 from bluesky import traf
@@ -24,12 +24,16 @@ from bluesky.tools.aero import Rearth
 from bluesky.tools.geo import qdrdist
 from bluesky.tools.trafficarrays import TrafficArrays, RegisterElementParameters
 
+# Area math
+import area_mathfuncs as amf
+
 # Module level variables
-VAR_DEFAULTS = {"float": 0.0, "int": 0, "bool": False, "S": "", "str": ""}
+VAR_DEFAULTS = {"float": 0.0, "int": 0, "bool": False, "S": "", "str": ""} # Default variable values for numpy arrays
+POLY_BUFF = 0.001 # Buffer used in polygon calculations
 
 # Initialize BlueSky plugin
 def init_plugin():
-    """Initialize the SUA plugin"""
+    """Initialize the RAA plugin"""
 
     # Addtional initilisation code
     areas = AreaRestrictionManager()
@@ -105,26 +109,27 @@ class AreaRestrictionManager(TrafficArrays):
 
         # Register all traffic parameters relevant for this class
         with RegisterElementParameters(self):
-            self.vrel_north = np.array([])   # Relative velocity
-            self.vrel_east = np.array([])   # Relative velocity
-            self.brg_l = np.array([])   # Bearing from ac to leftmost vertex
-            self.brg_r = np.array([])   # Bearing from ac to rightmost vertex
-            self.dist_l = np.array([])  # Distance from ac to leftmost vertex
-            self.dist_r = np.array([])  # Distance from ac to rightmost vertex
-            self.in_conf = np.array([], dtype = bool) # 
+            self.vrel_east = np.array([]) # East component of relative velocity
+            self.vrel_north = np.array([]) # North component of relative velocity
+            self.brg_l = np.array([]) # Bearing from ac to leftmost vertex
+            self.brg_r = np.array([]) # Bearing from ac to rightmost vertex
+            self.dist_l = np.array([]) # Distance from ac to leftmost vertex
+            self.dist_r = np.array([]) # Distance from ac to rightmost vertex
+            self.area_conf = np.array([], dtype = bool) # Conflict detection using shapely
+
+            # NOTE: Results currently stored in this variable are wrong!
+            self.area_amf_conf = np.array([], dtype = bool) # Conflict detection using area_mathfuncs module
 
         # Keep track of all restricted areas in list and by ID (same order)
         self.areaList = []
         self.areaIDList = []
         self.nareas = 0
 
-        print(np.shape(traf.gseast))
-
     def create(self, n=1):
-        """ Append n elements (aircraft) to all lists and arrays
+        """ Append n elements (aircraft) to all lists and arrays.
 
             Overrides TrafficArrays.create(n) method to allow
-            handling of two-dimensional numpy arrays
+            handling of two-dimensional numpy arrays.
         """
 
         # If no areas exist do nothing
@@ -171,10 +176,10 @@ class AreaRestrictionManager(TrafficArrays):
                 self._Vars[v] = np.concatenate((self._Vars[v], new_cols), 1)
 
     def delete(self, idx):
-        """ Delete element (aircraft) idx from all lists and arrays
+        """ Delete element (aircraft) idx from all lists and arrays.
 
             Overrides TrafficArrays.delete(idx) method to allow
-            handling of two-dimensional numpy arrays
+            handling of two-dimensional numpy arrays.
         """
 
         for child in self._children:
@@ -194,7 +199,7 @@ class AreaRestrictionManager(TrafficArrays):
                     del self._Vars[v][idx]
 
     def reset(self):
-        """ Reset state on simulator reset event """
+        """ Reset state on simulator reset event. """
         
         # Call actual reset method defined in TrafficArrays base class
         super().reset()
@@ -210,15 +215,30 @@ class AreaRestrictionManager(TrafficArrays):
 
     def update(self):
         """ Do calculations after traf has been updated. """
-        
-        # 
+
+        # Loop over all RestrictedAirspaceArea objects
         for idx, area in enumerate(self.areaList):
             # Calculate bearings and distance to the tangent vertices
             self.brg_l[idx, :], self.brg_r[idx, :], self.dist_l[idx, :], self.dist_r[idx, :] = area.calc_tangents(traf.ntraf, traf.lat, traf.lon)
 
             # Calculate area velocity components relative to each aircraft
             self.vrel_east[idx, :], self.vrel_north[idx, :] = area.calc_vrel(traf.gseast, traf.gsnorth)
-        
+
+            for ac_idx in range(traf.ntraf):
+                # Calculate position after
+                ac_pos = np.array([traf.lon[ac_idx], traf.lat[ac_idx]])
+                ac_gs = np.array([traf.gseast[ac_idx], traf.gsnorth[ac_idx]])
+
+                # Gives wrong result because vertexes are in degrees and velocities in m/s
+                self.area_amf_conf[idx, ac_idx] = amf.detect_same_2D(300, ac_pos, ac_gs, area.verts, area.gs_verts, POLY_BUFF)
+
+                # Use shapely to determine if the aircraft path in relative velocity space
+                # with respect to the area crosses the polygon ring. 
+                # self.area_conf[idx, ac_idx] = area.ring.intersects(ac_fut_path)
+
+                print("Aircraft {} is {} conflict with {}".format(traf.id[ac_idx], "in" if self.area_amf_conf[idx, ac_idx] else " not in ", area.area_id))
+            #self.area_shp_conf[idx, :] = None
+
     def preupdate(self):
         """ Update the area positions before traf is updated. """
 
@@ -233,8 +253,8 @@ class AreaRestrictionManager(TrafficArrays):
             return False, "Error: Airspace restriction with name {} already exists".format(area_id)
 
         # Create new RestrictedAirspaceArea instance and add to internal lists
-        new_area = RestrictedAirspaceArea(area_id, area_status, gs_north, gs_east, list(coords))
-        
+        new_area = RestrictedAirspaceArea(area_id, area_status, gs_east, gs_north, list(coords))
+
         self.areaList.append(new_area)
         self.areaIDList.append(area_id)
         self.nareas += 1
@@ -248,7 +268,7 @@ class AreaRestrictionManager(TrafficArrays):
                 if dtype in dtype_str:
                     vartype = dtype
                     break
-            
+
             # Get default value
             if vartype in VAR_DEFAULTS:
                 defaultvalue = [VAR_DEFAULTS[vartype]]
@@ -266,7 +286,7 @@ class AreaRestrictionManager(TrafficArrays):
         return True, "Restricted Airspace Area {} is initialized".format(area_id)
 
     def delete_area(self, area_id):
-        """ Delete an existing restricted airspace area """
+        """ Delete an existing restricted airspace area. """
 
         if area_id not in self.areaIDList:
             return False, "Error: Airspace restriction with name {} does not exist".format(area_id)
@@ -290,56 +310,65 @@ class AreaRestrictionManager(TrafficArrays):
 
 
 class RestrictedAirspaceArea():
-    """ Class that represents a single Restricted Airspace Area """
+    """ Class that represents a single Restricted Airspace Area. """
 
-    def __init__(self, area_id, status, gs_north, gs_east, coords):
+    def __init__(self, area_id, status, gs_east, gs_north, coords):
 
-        # Initialize
+        # Store input parameters as attributes
         self.area_id = area_id
         self.status = status
         self.gs_north = gs_north
         self.gs_east = gs_east
 
-        self.coords = []
-        self.border = None
+        # Enforce that the coordinate list defines a valid ring
+        coords = self._check_poly(coords)
 
-        # Ensure that the coordinates define a valid polygon
-        self.coords = self._check_poly(coords)
-        
-        # Update the border using self.coords
-        self._update_border()
+        # Area coordinates will be stored in three formats:
+        #  - self.verts  : numpy array containing [lon, lat] pairs per vertex
+        #  - self.ring   : Shapely LinearRing for geometric calculations (lon, lat order)
+        #  - self.coords : List of sequential lat,lon pairs for BlueSky functions
+        self.verts = self._coords2verts(coords)
+        self.ring = spgeom.LinearRing(self.verts)
+        self.coords = coords
 
-        # Draw polygon on RadarWidget canvas
+        # Numpy array with ground speed vector of each vertex
+        self.gs_verts = np.full(np.shape(self.verts), [self.gs_east, self.gs_north])
+
+        # Draw polygon on BlueSky RadarWidget canvas
         self._draw()
 
     def update_pos(self, dt):
-        """ Update the position of the area (only if its velocity is
-            nonzero). Recalculates the coordinates and updates the
+        """ Update the position of the area (only if its groundspeed
+            is nonzero). Recalculates the coordinates and updates the
             polygon position drawn in the RadarWidget. """
 
-        if self.gs_north == 0 and self.gs_east == 0:
-            pass
-        else:
-            new_coords = []
+        if self.gs_north or self.gs_east:
 
-            for ii in range(0, len(self.coords), 2):
-                newlat = self.coords[ii] + np.degrees(dt * self.gs_north / Rearth)
-                newcoslat = np.cos(np.deg2rad(newlat))
-                newlon = self.coords[ii + 1] + np.degrees(dt * self.gs_east / newcoslat / Rearth)
+            # Get lon and lat vectors from verts
+            curr_lon = self.verts[:, 0]
+            curr_lat = self.verts[:, 1]
 
-                new_coords.extend([newlat, newlon])
+            # Use groundspeed components and current coordinates to calculate new lon and lat vectors
+            newlat = curr_lat + np.degrees(dt * self.gs_north / Rearth)
+            newcoslat = np.cos(np.deg2rad(newlat))
+            newlon = curr_lon + np.degrees(dt * self.gs_east / newcoslat / Rearth)
 
-            self.coords = new_coords
-            self._update_border()
+            # Update vertices using new lat and lon vectors
+            self.verts = np.array([newlon, newlat]).T
 
-            # Undraw currently drawn object from canvas
+            # Update the other coordinate representations
+            self.ring = spgeom.LinearRing(self.verts)
+            self.coords = self._verts2coords(self.verts)
+
+            # Remove current drawing and redraw new position on BlueSky RadarWidget canvas
+            # NOTE: Can probably be improved by a lot!
             self._undraw()
-
-            # Redraw on canvas with new positions
             self._draw()
 
     def delete(self):
-        # Undraw from canvas
+        """ On deletion, remove the drawing of current area from the
+            BlueSky RadarWidget canvas """
+
         self._undraw()
 
     def _check_poly(self, coords):
@@ -349,7 +378,7 @@ class RestrictedAirspaceArea():
             - Vertices shall form a closed ring (first and last vertex are the same)
             - Vertices shall be ordered counterclockwise
 
-            If this is not already the case then 
+            If this is not already the case then create a valid polygon.
         """
 
         # Make sure the border is a closed ring (first and last coordinate pair should be the same)
@@ -369,13 +398,29 @@ class RestrictedAirspaceArea():
 
         return coords
 
-    def _update_border(self):
-        """ Use current value of self.coords to create a matplotlib Path
-            object to represent the border. """
+    def _coords2verts(self, coords):
+        """ Convert list with coords in lat,lon order to numpy array of
+            vertex pairs in lon,lat order.
 
-        # Reshape into array of (lat, lon) pairs
-        points = np.reshape(self.coords, (len(self.coords) // 2, 2))
-        self.border = Path(points, closed = True)
+            (Essentially the inverse operation of self._verts2coords). """
+
+        # Coords is a list with [lat_1, lon_1, ..., lat_n, lon_n]
+        verts_latlon = np.reshape(coords, (len(coords) // 2, 2))
+        verts_lonlat = np.flip(verts_latlon, 1)
+
+        return verts_lonlat
+
+    def _verts2coords(self, verts):
+        """ Convert numpy array of vertex coordinate pairs in lon,lat order to
+            a single list of lat,lon coords.
+
+            (Essentially the inverse operation of self._coords2verts). """
+
+        # Verts is np.ndarray([[lon_1, lat_1], ..., [lon_n, lat_n]])
+        verts_latlon = np.flip(verts, 1)
+        coords_latlon = list(verts_latlon.flatten("C"))
+
+        return coords_latlon
 
     def _draw(self):
         """ Draw the polygon corresponding to the current area in the
@@ -400,7 +445,8 @@ class RestrictedAirspaceArea():
         dist_l = np.zeros(ntraf, dtype=float)
         dist_r = np.zeros(ntraf, dtype=float)
 
-        border = self.border.vertices
+        # Create array containing [lat, lon] for each vertex
+        vertex = np.array(self.ring.coords.xy).T
 
         # Calculate qdrs and distances for each aircraft
         for ii in range(ntraf):
@@ -414,20 +460,20 @@ class RestrictedAirspaceArea():
             # indices of the vertices at which the tangents touch the polygon
             #
             # Algorithm from: http://geomalgorithms.com/a15-_tangents.html
-            for jj in range(1, len(border) - 1):
-                eprev = self.is_left(border[jj - 1], border[jj], ac_pos)
-                enext = self.is_left(border[jj], border[jj + 1], ac_pos)
+            for jj in range(1, len(vertex) - 1):
+                eprev = self.is_left(vertex[jj - 1], vertex[jj], ac_pos)
+                enext = self.is_left(vertex[jj], vertex[jj + 1], ac_pos)
 
                 if eprev <= 0 and enext > 0:
-                    if not (self.is_left(ac_pos, border[jj], border[idx_r]) < 0):
+                    if not self.is_left(ac_pos, vertex[jj], vertex[idx_r]) < 0:
                         idx_r = jj
                 elif eprev > 0 and enext <= 0:
-                    if not (self.is_left(ac_pos, border[jj], border[idx_l]) > 0):
+                    if not self.is_left(ac_pos, vertex[jj], vertex[idx_l]) > 0:
                         idx_l = jj
 
             # Calculate tangent courses from aircraft to left- and rightmost vertices
-            qdr_l[ii], dist_l[ii] = qdrdist(ac_pos[0], ac_pos[1], border[idx_l][0], border[idx_l][1])
-            qdr_r[ii], dist_r[ii] = qdrdist(ac_pos[0], ac_pos[1], border[idx_r][0], border[idx_r][1])
+            qdr_l[ii], dist_l[ii] = qdrdist(ac_pos[0], ac_pos[1], vertex[idx_l][0], vertex[idx_l][1])
+            qdr_r[ii], dist_r[ii] = qdrdist(ac_pos[0], ac_pos[1], vertex[idx_r][0], vertex[idx_r][1])
 
         return qdr_l, qdr_r, dist_l, dist_r
 
@@ -439,6 +485,17 @@ class RestrictedAirspaceArea():
         vrel_north = self.gs_north - ac_gsnorth
 
         return vrel_east, vrel_north
+
+    @staticmethod
+    def calc_future_ac_pos(dt, lat, lon, gs_e, gs_n):
+        """ Calculate future aircraft position after time dt based on
+            current position, velocity components"""
+
+        newlat = lat + np.degrees(dt * gs_n / Rearth)
+        newcoslat = np.cos(np.deg2rad(newlat))
+        newlon = lon + np.degrees(dt * gs_e / newcoslat / Rearth)
+
+        return newlat, newlon
 
     # Copied from tools/areafilter.py and edited
     @staticmethod
