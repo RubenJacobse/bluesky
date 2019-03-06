@@ -155,14 +155,14 @@ def segments_close(c, d, e, f, BUFF):
     return False
 
 def detect_same_2D(T, s, v, P, V, BUFF):
-    """ Detect conflict between 2D point s moving at velocity v
-        and polygon P moving with vertex velocities V in the time
-        interval [0,T] within margin BUFF.
+    """ Detect if conflict exists between 2D point s moving at velocity
+        v and polygon P moving with vertex velocities V in the time
+        interval [0,T] seconds within margin BUFF.
 
-        s = [sx, sy]
-        v = [vx, vy]
-        P = [[x0, y0], [x1, y1], ..., [xn, yn]]
-        V = [[v0, v0], [v1, v1], ..., [vn, vn]] """
+        s = np.array([sx, sy])
+        v = np.array([vx, vy])
+        P = np.array([[x0, y0], [x1, y1], ..., [xn, yn]])
+        V = np.array([[v0, v0], [v1, v1], ..., [vn, vn]]) """
 
     # If s inside P or s+T*v inside P+T*V return true
     if not definitely_outside(P, s, BUFF):
