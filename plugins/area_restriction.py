@@ -28,7 +28,6 @@ from bluesky.tools.trafficarrays import TrafficArrays, RegisterElementParameters
 
 # Module level variables
 VAR_DEFAULTS = {"float": 0.0, "int": 0, "bool": False, "S": "", "str": ""} # Default variable values for numpy arrays
-POLY_BUFF = 0.001 # Buffer used in polygon calculations
 
 # Initialize BlueSky plugin
 def init_plugin():
