@@ -14,6 +14,7 @@ except ImportError:
     # In python <3.3 collections.abc doesn't exist
     from collections import Collection
 
+# Third-party imports
 import numpy as np
 import shapely.geometry as spgeom
 
@@ -94,6 +95,19 @@ def init_plugin():
 
             # a longer help text of your function.
             'Delete a given restricted airspace area.']
+        ,
+        'RAACONF': [
+            # A short usage string. This will be printed if you type HELP <name> in the BlueSky console
+            'RAACONF t_lookahead',
+
+            # A list of the argument types your function accepts. For a description of this, see ...
+            'int',
+
+            # The name of your function in this plugin
+            areas.set_t_lookahead,
+
+            # a longer help text of your function.
+            'Set the lookahead time used for area avoidance in seconds.']
     }
 
     # init_plugin() should always return these two dicts.
@@ -109,13 +123,14 @@ class AreaRestrictionManager(TrafficArrays):
 
         # Register all traffic parameters relevant for this class
         with RegisterElementParameters(self):
-            self.vrel_east = np.array([]) # East component of relative velocity
-            self.vrel_north = np.array([]) # North component of relative velocity
+            self.vrel_east = np.array([]) # East component of relative velocity wrt area
+            self.vrel_north = np.array([]) # North component of relative velocity wrt area
             self.brg_l = np.array([]) # Bearing from ac to leftmost vertex
             self.brg_r = np.array([]) # Bearing from ac to rightmost vertex
             self.dist_l = np.array([]) # Distance from ac to leftmost vertex
             self.dist_r = np.array([]) # Distance from ac to rightmost vertex
-            self.area_conf = np.array([], dtype = bool) # Conflict detection using shapely
+            self.area_conf = np.array([], dtype = bool) # Aircraft-area conflict
+            self.area_tint = np.array([]) # Time to area intrusion
 
             # NOTE: Results currently stored in this variable are wrong!
             self.area_amf_conf = np.array([], dtype = bool) # Conflict detection using area_mathfuncs module
@@ -124,6 +139,9 @@ class AreaRestrictionManager(TrafficArrays):
         self.areaList = []
         self.areaIDList = []
         self.nareas = 0
+
+        # Look-ahead-time in seconds, used to detect area conflicts
+        self.t_lookahead = 300
 
     def create(self, n=1):
         """ Append n elements (aircraft) to all lists and arrays.
@@ -216,28 +234,43 @@ class AreaRestrictionManager(TrafficArrays):
     def update(self):
         """ Do calculations after traf has been updated. """
 
-        # Loop over all RestrictedAirspaceArea objects
+        # Loop over all existing areas
         for idx, area in enumerate(self.areaList):
-            # Calculate bearings and distance to the tangent vertices
-            self.brg_l[idx, :], self.brg_r[idx, :], self.dist_l[idx, :], self.dist_r[idx, :] = area.calc_tangents(traf.ntraf, traf.lat, traf.lon)
+            # Calculate bearings and distance to the tangent vertices of the area
+            self.brg_l[idx, :], self.brg_r[idx, :], self.dist_l[idx, :], self.dist_r[idx, :] = \
+                area.calc_tangents(traf.ntraf, traf.lat, traf.lon)
 
-            # Calculate area velocity components relative to each aircraft
-            self.vrel_east[idx, :], self.vrel_north[idx, :] = area.calc_vrel(traf.gseast, traf.gsnorth)
+            # Calculate velocity components of each aircraft relative to the area
+            self.vrel_east[idx, :] = traf.gseast - area.gs_east
+            self.vrel_north[idx, :] = traf.gsnorth - area.gs_north
+
+            # Calculate position of each aircraft relative to the area after look-ahead-time
+            ac_fut_rel_lon, ac_fut_rel_lat = \
+                self.calc_future_ac_pos(self.t_lookahead, traf.lon, traf.lat, self.vrel_east[idx, :], self.vrel_north[idx, :])
+
+            # Create shapely points for current and future relative position
+            # and use these to create a shapely LineString with the relative vector
+            ac_curr_pos = [spgeom.Point(lon, lat) for (lon, lat) in zip(traf.lon, traf.lat)] # NOTE: Can be moved outside of loop
+            ac_fut_rel_pos = [spgeom.Point(lon, lat) for (lon, lat) in zip(ac_fut_rel_lon, ac_fut_rel_lat)]
+            ac_rel_vec = [spgeom.LineString([curr, fut]) for (curr, fut) in zip(ac_curr_pos, ac_fut_rel_pos)]
 
             for ac_idx in range(traf.ntraf):
-                # Calculate position after
+                ############################## v WRONG v ##############################
+                # Calculate position after 
                 ac_pos = np.array([traf.lon[ac_idx], traf.lat[ac_idx]])
                 ac_gs = np.array([traf.gseast[ac_idx], traf.gsnorth[ac_idx]])
 
                 # Gives wrong result because vertexes are in degrees and velocities in m/s
-                self.area_amf_conf[idx, ac_idx] = amf.detect_same_2D(300, ac_pos, ac_gs, area.verts, area.gs_verts, POLY_BUFF)
+                self.area_amf_conf[idx, ac_idx] = amf.detect_same_2D(self.t_lookahead, ac_pos, ac_gs, area.verts, area.gs_verts, POLY_BUFF)
+                ############################## ^ WRONG ^ ##############################
 
                 # Use shapely to determine if the aircraft path in relative velocity space
                 # with respect to the area crosses the polygon ring. 
-                # self.area_conf[idx, ac_idx] = area.ring.intersects(ac_fut_path)
+                self.area_conf[idx, ac_idx] = area.ring.intersects(ac_rel_vec[ac_idx])
+                self.area_tint[idx, ac_idx] = area.ring.intersects(ac_rel_vec[ac_idx])
 
-                print("Aircraft {} is {} conflict with {}".format(traf.id[ac_idx], "in" if self.area_amf_conf[idx, ac_idx] else " not in ", area.area_id))
-            #self.area_shp_conf[idx, :] = None
+                #print("AMF: Aircraft {} is {}in conflict with {}".format(traf.id[ac_idx], "" if self.area_amf_conf[idx, ac_idx] else "not ", area.area_id))
+                print("SHP: Aircraft {} is {}in conflict with {}".format(traf.id[ac_idx], "" if self.area_conf[idx, ac_idx] else "not ", area.area_id))
 
     def preupdate(self):
         """ Update the area positions before traf is updated. """
@@ -308,6 +341,26 @@ class AreaRestrictionManager(TrafficArrays):
 
             return True, "Sucessfully deleted airspace restriction {}".format(area_id)
 
+    def set_t_lookahead(self, t):
+        """ Change the look-ahead-time used for aircraft-area conflict detection. """
+
+        if not type(t) is int:
+            return False, "Error: Look-ahead-time should be an integer value"
+        else:
+            self.t_lookahead = t
+            return True, "Sucessfully updated aircraft-area conflict look-ahead-time to {} seconds".format(t)
+
+    @staticmethod
+    def calc_future_ac_pos(dt, lon, lat, gs_e, gs_n):
+        """ Calculate future aircraft position after time dt based on
+            current position, velocity components"""
+
+        newlat = lat + np.degrees(dt * gs_n / Rearth)
+        newcoslat = np.cos(np.deg2rad(newlat))
+        newlon = lon + np.degrees(dt * gs_e / newcoslat / Rearth)
+
+        return newlon, newlat
+
 
 class RestrictedAirspaceArea():
     """ Class that represents a single Restricted Airspace Area. """
@@ -325,7 +378,7 @@ class RestrictedAirspaceArea():
 
         # Area coordinates will be stored in three formats:
         #  - self.verts  : numpy array containing [lon, lat] pairs per vertex
-        #  - self.ring   : Shapely LinearRing for geometric calculations (lon, lat order)
+        #  - self.ring   : Shapely LinearRing (in lon,lat order) for geometric calculations 
         #  - self.coords : List of sequential lat,lon pairs for BlueSky functions
         self.verts = self._coords2verts(coords)
         self.ring = spgeom.LinearRing(self.verts)
@@ -479,23 +532,12 @@ class RestrictedAirspaceArea():
 
     def calc_vrel(self, ac_gseast, ac_gsnorth):
         """ Calculate the east and north components of the relative
-            velocity of the area with respect to all aircraft. """
+            velocity vectors of the aircraft with respect to the area. """
 
         vrel_east = self.gs_east - ac_gseast
         vrel_north = self.gs_north - ac_gsnorth
 
         return vrel_east, vrel_north
-
-    @staticmethod
-    def calc_future_ac_pos(dt, lat, lon, gs_e, gs_n):
-        """ Calculate future aircraft position after time dt based on
-            current position, velocity components"""
-
-        newlat = lat + np.degrees(dt * gs_n / Rearth)
-        newcoslat = np.cos(np.deg2rad(newlat))
-        newlon = lon + np.degrees(dt * gs_e / newcoslat / Rearth)
-
-        return newlat, newlon
 
     # Copied from tools/areafilter.py and edited
     @staticmethod
