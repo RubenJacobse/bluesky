@@ -17,6 +17,7 @@ except ImportError:
 # Third-party imports
 import numpy as np
 import shapely.geometry as spgeom
+import shapely.ops as spops
 
 # BlueSky imports
 from bluesky import traf
@@ -129,7 +130,8 @@ class AreaRestrictionManager(TrafficArrays):
             self.brg_r = np.array([]) # Bearing from ac to rightmost vertex
             self.dist_l = np.array([]) # Distance from ac to leftmost vertex
             self.dist_r = np.array([]) # Distance from ac to rightmost vertex
-            self.area_conf = np.array([], dtype = bool) # Aircraft-area conflict
+            self.area_conf = np.array([], dtype = bool) # ac-area conflict
+            self.area_inside = np.array([], dtype = bool) # Is ac inside area
             self.area_tint = np.array([]) # Time to area intrusion
 
             # NOTE: Results currently stored in this variable are wrong!
@@ -233,8 +235,9 @@ class AreaRestrictionManager(TrafficArrays):
 
     def update(self):
         """ Do calculations after traf has been updated. """
-
+        
         # Loop over all existing areas
+        # NOTE: Could this be vectorized instead of looped over all aircraft-area combinations?
         for idx, area in enumerate(self.areaList):
             # Calculate bearings and distance to the tangent vertices of the area
             self.brg_l[idx, :], self.brg_r[idx, :], self.dist_l[idx, :], self.dist_r[idx, :] = \
@@ -267,10 +270,33 @@ class AreaRestrictionManager(TrafficArrays):
                 # Use shapely to determine if the aircraft path in relative velocity space
                 # with respect to the area crosses the polygon ring. 
                 self.area_conf[idx, ac_idx] = area.ring.intersects(ac_rel_vec[ac_idx])
-                self.area_tint[idx, ac_idx] = area.ring.intersects(ac_rel_vec[ac_idx])
+
+                # Check if the aircraft is inside the area
+                self.area_inside[idx, ac_idx] = ac_curr_pos[ac_idx].within(area.poly)
+
+                # Calculate time to intrusion for aircraft-area combination, takes following values:
+                #  -1 : for aircraft not in conflict with the area 
+                #  0  : for aircraft already inside the area
+                #  >0 : for aircraft that are in conflict
+                if self.area_inside[idx, ac_idx]:
+                    t_int = 0
+                elif self.area_conf[idx, ac_idx]:
+                    # Find points at which the relative vector intersects the area and calculate time to intersect
+                    # We cannot use shapely distance functions because all definitions are in degrees 
+                    intr_points = area.ring.intersection(ac_rel_vec[ac_idx])
+                    intr_closest = spops.nearest_points(ac_curr_pos[ac_idx], intr_points)[1]
+                    intr_closest_lat, intr_closest_lon = intr_closest.y, intr_closest.x
+                    _, intr_dist_nm = qdrdist(traf.lat[ac_idx], traf.lon[ac_idx], intr_closest_lat, intr_closest_lon)
+                    intr_dist_m = intr_dist_nm * 1852 # qdrdist returns distance in NM, convert to meter
+                    t_int = intr_dist_m / traf.gs[ac_idx]
+                else:
+                    t_int = -1
+                    
+                self.area_tint[idx, ac_idx] = t_int
 
                 #print("AMF: Aircraft {} is {}in conflict with {}".format(traf.id[ac_idx], "" if self.area_amf_conf[idx, ac_idx] else "not ", area.area_id))
                 print("SHP: Aircraft {} is {}in conflict with {}".format(traf.id[ac_idx], "" if self.area_conf[idx, ac_idx] else "not ", area.area_id))
+                print("ac {} time to conflict with {} is: {} seconds".format(traf.id[ac_idx], area.area_id, round(self.area_tint[idx, ac_idx]) ))
 
     def preupdate(self):
         """ Update the area positions before traf is updated. """
@@ -378,10 +404,12 @@ class RestrictedAirspaceArea():
 
         # Area coordinates will be stored in three formats:
         #  - self.verts  : numpy array containing [lon, lat] pairs per vertex
-        #  - self.ring   : Shapely LinearRing (in lon,lat order) for geometric calculations 
+        #  - self.ring   : Shapely LinearRing (in lon,lat order) for geometric calculations
+        #  - self.poly   : Shapely Polygon (in lon, lat order) for geometric calculations 
         #  - self.coords : List of sequential lat,lon pairs for BlueSky functions
         self.verts = self._coords2verts(coords)
         self.ring = spgeom.LinearRing(self.verts)
+        self.poly = spgeom.Polygon(self.verts)
         self.coords = coords
 
         # Numpy array with ground speed vector of each vertex
@@ -411,6 +439,7 @@ class RestrictedAirspaceArea():
 
             # Update the other coordinate representations
             self.ring = spgeom.LinearRing(self.verts)
+            self.poly = spgeom.Polygon(self.verts)
             self.coords = self._verts2coords(self.verts)
 
             # Remove current drawing and redraw new position on BlueSky RadarWidget canvas
