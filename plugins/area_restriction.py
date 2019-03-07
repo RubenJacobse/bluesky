@@ -26,9 +26,6 @@ from bluesky.tools.aero import Rearth
 from bluesky.tools.geo import qdrdist
 from bluesky.tools.trafficarrays import TrafficArrays, RegisterElementParameters
 
-# Area math
-import area_mathfuncs as amf
-
 # Module level variables
 VAR_DEFAULTS = {"float": 0.0, "int": 0, "bool": False, "S": "", "str": ""} # Default variable values for numpy arrays
 POLY_BUFF = 0.001 # Buffer used in polygon calculations
@@ -124,18 +121,15 @@ class AreaRestrictionManager(TrafficArrays):
 
         # Register all traffic parameters relevant for this class
         with RegisterElementParameters(self):
-            self.vrel_east = np.array([]) # East component of relative velocity wrt area
-            self.vrel_north = np.array([]) # North component of relative velocity wrt area
+            self.vrel_east = np.array([]) # East component of ac relative velocity wrt area
+            self.vrel_north = np.array([]) # North component of ac relative velocity wrt area
             self.brg_l = np.array([]) # Bearing from ac to leftmost vertex
             self.brg_r = np.array([]) # Bearing from ac to rightmost vertex
             self.dist_l = np.array([]) # Distance from ac to leftmost vertex
             self.dist_r = np.array([]) # Distance from ac to rightmost vertex
-            self.area_conf = np.array([], dtype = bool) # ac-area conflict
-            self.area_inside = np.array([], dtype = bool) # Is ac inside area
+            self.area_conf = np.array([], dtype = bool) # Stores wheter ac is in conflict with area
+            self.area_inside = np.array([], dtype = bool) # Stores whether ac is inside area
             self.area_tint = np.array([]) # Time to area intrusion
-
-            # NOTE: Results currently stored in this variable are wrong!
-            self.area_amf_conf = np.array([], dtype = bool) # Conflict detection using area_mathfuncs module
 
         # Keep track of all restricted areas in list and by ID (same order)
         self.areaList = []
@@ -258,15 +252,6 @@ class AreaRestrictionManager(TrafficArrays):
             ac_rel_vec = [spgeom.LineString([curr, fut]) for (curr, fut) in zip(ac_curr_pos, ac_fut_rel_pos)]
 
             for ac_idx in range(traf.ntraf):
-                ############################## v WRONG v ##############################
-                # Calculate position after 
-                ac_pos = np.array([traf.lon[ac_idx], traf.lat[ac_idx]])
-                ac_gs = np.array([traf.gseast[ac_idx], traf.gsnorth[ac_idx]])
-
-                # Gives wrong result because vertexes are in degrees and velocities in m/s
-                self.area_amf_conf[idx, ac_idx] = amf.detect_same_2D(self.t_lookahead, ac_pos, ac_gs, area.verts, area.gs_verts, POLY_BUFF)
-                ############################## ^ WRONG ^ ##############################
-
                 # Use shapely to determine if the aircraft path in relative velocity space
                 # with respect to the area crosses the polygon ring. 
                 self.area_conf[idx, ac_idx] = area.ring.intersects(ac_rel_vec[ac_idx])
@@ -291,11 +276,9 @@ class AreaRestrictionManager(TrafficArrays):
                     t_int = intr_dist_m / traf.gs[ac_idx]
                 else:
                     t_int = -1
-                    
                 self.area_tint[idx, ac_idx] = t_int
 
-                #print("AMF: Aircraft {} is {}in conflict with {}".format(traf.id[ac_idx], "" if self.area_amf_conf[idx, ac_idx] else "not ", area.area_id))
-                print("SHP: Aircraft {} is {}in conflict with {}".format(traf.id[ac_idx], "" if self.area_conf[idx, ac_idx] else "not ", area.area_id))
+                #print("SHP: Aircraft {} is {}in conflict with {}".format(traf.id[ac_idx], "" if self.area_conf[idx, ac_idx] else "not ", area.area_id))
                 print("ac {} time to conflict with {} is: {} seconds".format(traf.id[ac_idx], area.area_id, round(self.area_tint[idx, ac_idx]) ))
 
     def preupdate(self):
@@ -402,10 +385,10 @@ class RestrictedAirspaceArea():
         # Enforce that the coordinate list defines a valid ring
         coords = self._check_poly(coords)
 
-        # Area coordinates will be stored in three formats:
+        # Area coordinates will be stored in four formats:
         #  - self.verts  : numpy array containing [lon, lat] pairs per vertex
         #  - self.ring   : Shapely LinearRing (in lon,lat order) for geometric calculations
-        #  - self.poly   : Shapely Polygon (in lon, lat order) for geometric calculations 
+        #  - self.poly   : Shapely Polygon (in lon, lat order) for geometric calculations
         #  - self.coords : List of sequential lat,lon pairs for BlueSky functions
         self.verts = self._coords2verts(coords)
         self.ring = spgeom.LinearRing(self.verts)
