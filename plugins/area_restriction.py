@@ -20,14 +20,14 @@ import shapely.geometry as spgeom
 import shapely.ops as spops
 
 # BlueSky imports
-from bluesky import traf
+from bluesky import traf, sim
 from bluesky.tools import areafilter
 from bluesky.tools.aero import Rearth
 from bluesky.tools.geo import qdrdist
 from bluesky.tools.trafficarrays import TrafficArrays, RegisterElementParameters
 
-# Module level variables
-VAR_DEFAULTS = {"float": 0.0, "int": 0, "bool": False, "S": "", "str": ""} # Default variable values for numpy arrays
+# Default variable values for numpy arrays
+VAR_DEFAULTS = {"float": 0.0, "int": 0, "bool": False, "S": "", "str": ""}
 
 # Initialize BlueSky plugin
 def init_plugin():
@@ -78,8 +78,7 @@ def init_plugin():
             areas.create_area,
 
             # a longer help text of your function.
-            'Create restricted airspace areas that are to be avoided by all traffic.']
-        ,
+            'Create restricted airspace areas that are to be avoided by all traffic.'],
         'DELRAA': [
             # A short usage string. This will be printed if you type HELP <name> in the BlueSky console
             'DELRAA name',
@@ -91,8 +90,7 @@ def init_plugin():
             areas.delete_area,
 
             # a longer help text of your function.
-            'Delete a given restricted airspace area.']
-        ,
+            'Delete a given restricted airspace area.'],
         'RAACONF': [
             # A short usage string. This will be printed if you type HELP <name> in the BlueSky console
             'RAACONF t_lookahead',
@@ -138,7 +136,7 @@ class AreaRestrictionManager(TrafficArrays):
         # Look-ahead-time in seconds, used to detect area conflicts
         self.t_lookahead = 300
 
-    def create(self, n=1):
+    def create(self, n = 1):
         """ Append n elements (aircraft) to all lists and arrays.
 
             Overrides TrafficArrays.create(n) method to allow
@@ -149,13 +147,14 @@ class AreaRestrictionManager(TrafficArrays):
         if not self.nareas:
             return
 
-        # Same as in TrafficArrays (_LstVars remain one-dimensional)
+        # Same as in TrafficArrays (_LstVars remains one-dimensional)
         for v in self._LstVars:  # Lists (mostly used for strings)
 
             # Get type
             vartype = None
             lst = self.__dict__.get(v)
-            if len(lst) > 0:
+            if lst:
+            #if len(lst) > 0:
                 vartype = str(type(lst[0])).split("'")[1]
 
             if vartype in VAR_DEFAULTS:
@@ -213,7 +212,7 @@ class AreaRestrictionManager(TrafficArrays):
 
     def reset(self):
         """ Reset state on simulator reset event. """
-        
+
         # Call actual reset method defined in TrafficArrays base class
         super().reset()
 
@@ -226,9 +225,19 @@ class AreaRestrictionManager(TrafficArrays):
         self.areaIDList = []
         self.nareas = 0
 
+    def preupdate(self):
+        """ Update the area positions before traf is updated. """
+
+        # NOTE: Not sure if this should be part of preupdate() or update()
+        for area in self.areaList:
+            area.update_pos(1.0)
+
     def update(self):
         """ Do calculations after traf has been updated. """
-        
+
+        # Might be useful in debugging
+        print("Simulator time is: {} seconds ".format(sim.simt))
+
         # Loop over all existing areas
         # NOTE: Could this be vectorized instead of looped over all aircraft-area combinations?
         for idx, area in enumerate(self.areaList):
@@ -239,10 +248,10 @@ class AreaRestrictionManager(TrafficArrays):
             # Calculate velocity components of each aircraft relative to the area
             self.vrel_east[idx, :] = traf.gseast - area.gs_east
             self.vrel_north[idx, :] = traf.gsnorth - area.gs_north
+            self.vrel = np.sqrt(self.vrel_east[idx, :]**2 + self.vrel_north[idx, :]**2)
 
-            # Calculate position of each aircraft relative to the area after look-ahead-time
-            ac_fut_rel_lon, ac_fut_rel_lat = \
-                self.calc_future_ac_pos(self.t_lookahead, traf.lon, traf.lat, self.vrel_east[idx, :], self.vrel_north[idx, :])
+            # Calculate position of each aircraft relative to the area after t_lookahead
+            ac_fut_rel_lon, ac_fut_rel_lat = self.calc_future_ac_pos(self.t_lookahead, traf.lon, traf.lat, self.vrel_east[idx, :], self.vrel_north[idx, :])
 
             # Create shapely points for current and future relative position
             # and use these to create a shapely LineString with the relative vector
@@ -250,43 +259,63 @@ class AreaRestrictionManager(TrafficArrays):
             ac_fut_rel_pos = [spgeom.Point(lon, lat) for (lon, lat) in zip(ac_fut_rel_lon, ac_fut_rel_lat)]
             ac_rel_vec = [spgeom.LineString([curr, fut]) for (curr, fut) in zip(ac_curr_pos, ac_fut_rel_pos)]
 
+            # Find all aircraft-area conflicts
             for ac_idx in range(traf.ntraf):
                 # Use shapely to determine if the aircraft path in relative velocity space
-                # with respect to the area crosses the polygon ring. 
+                # with respect to the area crosses the polygon ring.
                 self.area_conf[idx, ac_idx] = area.ring.intersects(ac_rel_vec[ac_idx])
 
                 # Check if the aircraft is inside the area
                 self.area_inside[idx, ac_idx] = ac_curr_pos[ac_idx].within(area.poly)
 
                 # Calculate time to intrusion for aircraft-area combination, takes following values:
-                #  -1 : for aircraft not in conflict with the area 
+                #  -1 : for aircraft not in conflict with the area
                 #  0  : for aircraft already inside the area
                 #  >0 : for aircraft that are in conflict
                 if self.area_inside[idx, ac_idx]:
                     t_int = 0
                 elif self.area_conf[idx, ac_idx]:
-                    # Find points at which the relative vector intersects the area and calculate time to intersect
-                    # We cannot use shapely distance functions because all definitions are in degrees 
+                    # Find points at which the relative vector intersects the area and
+                    # calculate time to intersect. We cannot use shapely distance functions
+                    # because all definitions are in degrees.
                     intr_points = area.ring.intersection(ac_rel_vec[ac_idx])
                     intr_closest = spops.nearest_points(ac_curr_pos[ac_idx], intr_points)[1]
                     intr_closest_lat, intr_closest_lon = intr_closest.y, intr_closest.x
                     _, intr_dist_nm = qdrdist(traf.lat[ac_idx], traf.lon[ac_idx], intr_closest_lat, intr_closest_lon)
-                    intr_dist_m = intr_dist_nm * 1852 # qdrdist returns distance in NM, convert to meter
+                    intr_dist_m = intr_dist_nm * 1852 # qdrdist returns dist in NM, convert to m
                     t_int = intr_dist_m / traf.gs[ac_idx]
                 else:
                     t_int = -1
                 self.area_tint[idx, ac_idx] = t_int
 
-                #print("SHP: Aircraft {} is {}in conflict with {}".format(traf.id[ac_idx], "" if self.area_conf[idx, ac_idx] else "not ", area.area_id))
-                print("ac {} time to conflict with {} is: {} seconds".format(traf.id[ac_idx], area.area_id, round(self.area_tint[idx, ac_idx]) ))
+                # Print some messages that may be useful in debugging
+                dbg_str = "Aircraft {} time to conflict with area {} is: {} seconds"
+                t_int_s = round(self.area_tint[idx, ac_idx])
+                print(dbg_str.format(traf.id[ac_idx], area.area_id, t_int_s))
 
-    def preupdate(self):
-        """ Update the area positions before traf is updated. """
+            # Calculate resolution for aircraft that are in conflict
+            v_hdg_l = None  # Resolution by heading change only, turn to left
+            v_hdg_r = None  # Resolution by heading change only, turn to right
 
-        # NOTE: Not sure if this should be part of preupdate() or update()
-        for area in self.areaList:
-            area.update_pos(1.0)
+            # Components of unit vectors along VO edges
+            u_l_east = np.sin(np.radians(self.brg_l))
+            u_l_north = np.cos(np.radians(self.brg_l))
+            u_r_east = np.sin(np.radians(self.brg_r))
+            u_r_north = np.cos(np.radians(self.brg_r))
 
+            # Angle between -vrel and VO edges
+            beta_l = np.arccos(-1 * (u_l_east * self.vrel_east + u_l_north * self.vrel_north) / (self.vrel))
+            beta_r = np.arccos(-1 * (u_r_east * self.vrel_east + u_r_north * self.vrel_north) / (self.vrel))
+            beta_l_rad = np.radians(beta_l)
+            beta_r_rad = np.radians(beta_r)
+
+            # Relative resolution velocity component along the VO edges
+            vh_ul = self.vrel * np.cos(beta_l_rad) + traf.gs * np.cos(np.arcsin(self.vrel * np.sin(beta_l_rad) / traf.gs))
+            vh_ur = self.vrel * np.cos(beta_r_rad) + traf.gs * np.cos(np.arcsin(self.vrel * np.sin(beta_r_rad) / traf.gs))
+
+            beta_l
+
+            #
     def create_area(self, area_id, area_status, gs_north, gs_east, *coords):
         """ Create a new restricted airspace area """
 
@@ -352,11 +381,11 @@ class AreaRestrictionManager(TrafficArrays):
     def set_t_lookahead(self, t):
         """ Change the look-ahead-time used for aircraft-area conflict detection. """
 
-        if not type(t) is int:
+        if not isinstance(t, int):
             return False, "Error: Look-ahead-time should be an integer value"
         else:
             self.t_lookahead = t
-            return True, "Sucessfully updated aircraft-area conflict look-ahead-time to {} seconds".format(t)
+            return True, "Aircraft-area conflict look-ahead-time set to {} seconds".format(t)
 
     @staticmethod
     def calc_future_ac_pos(dt, lon, lat, gs_e, gs_n):
@@ -411,7 +440,7 @@ class RestrictedAirspaceArea():
             curr_lon = self.verts[:, 0]
             curr_lat = self.verts[:, 1]
 
-            # Use groundspeed components and current coordinates to calculate new lon and lat vectors
+            # Calculate new lon and lat values for all vertices
             newlat = curr_lat + np.degrees(dt * self.gs_north / Rearth)
             newcoslat = np.cos(np.deg2rad(newlat))
             newlon = curr_lon + np.degrees(dt * self.gs_east / newcoslat / Rearth)
@@ -431,7 +460,7 @@ class RestrictedAirspaceArea():
 
     def delete(self):
         """ On deletion, remove the drawing of current area from the
-            BlueSky RadarWidget canvas """
+            BlueSky RadarWidget canvas. """
 
         self._undraw()
 
@@ -442,8 +471,7 @@ class RestrictedAirspaceArea():
             - Vertices shall form a closed ring (first and last vertex are the same)
             - Vertices shall be ordered counterclockwise
 
-            If this is not already the case then create a valid polygon.
-        """
+            If this is not already the case then create a valid polygon. """
 
         # Make sure the border is a closed ring (first and last coordinate pair should be the same)
         if (coords[0], coords[1]) != (coords[-2], coords[-1]):
@@ -466,9 +494,11 @@ class RestrictedAirspaceArea():
         """ Convert list with coords in lat,lon order to numpy array of
             vertex pairs in lon,lat order.
 
+            coords = [lat_0, lon_0, ..., lat_n, lon_n]
+            verts = np.ndarray([[lon_0, lat_0], ... [lon_n, lat_n]])
+            
             (Essentially the inverse operation of self._verts2coords). """
 
-        # Coords is a list with [lat_1, lon_1, ..., lat_n, lon_n]
         verts_latlon = np.reshape(coords, (len(coords) // 2, 2))
         verts_lonlat = np.flip(verts_latlon, 1)
 
@@ -478,9 +508,11 @@ class RestrictedAirspaceArea():
         """ Convert numpy array of vertex coordinate pairs in lon,lat order to
             a single list of lat,lon coords.
 
+            verts = np.ndarray([[lon_0, lat_0], ... [lon_n, lat_n]])
+            coords = [lat_0, lon_0, ..., lat_n, lon_n]
+
             (Essentially the inverse operation of self._coords2verts). """
 
-        # Verts is np.ndarray([[lon_1, lat_1], ..., [lon_n, lat_n]])
         verts_latlon = np.flip(verts, 1)
         coords_latlon = list(verts_latlon.flatten("C"))
 
@@ -550,34 +582,48 @@ class RestrictedAirspaceArea():
 
         return vrel_east, vrel_north
 
-    # Copied from tools/areafilter.py and edited
-    @staticmethod
-    def is_inside(border, lat, lon):
-        """ Takes vectors with lat and lon and returns boolean list per point. """
+    # # Copied from tools/areafilter.py and edited
+    # @staticmethod
+    # def is_inside(border, lat, lon):
+    #     """ Takes vectors with lat and lon and returns boolean list per point. """
 
-        points = np.vstack((lat, lon)).T
-        inside = border.contains_points(points)
+    #     points = np.vstack((lat, lon)).T
+    #     inside = border.contains_points(points)
 
-        return inside
+    #     return inside
 
     @staticmethod
     def crs_is_between(crs, crs_l, crs_r):
         """ Check if a given course crs lies in between crs_l and crl_r
             (in clockwise direction). """
 
-        if ((crs_l > crs_r) and (crs > crs_l or crs < crs_r)) or ((crs_l < crs_r) and (crs > crs_l and crs < crs_r)):
+        if ((crs_l > crs_r) and (crs > crs_l or crs < crs_r)) or \
+             ((crs_l < crs_r) and (crs > crs_l and crs < crs_r)):
             return True
 
         return False
 
     @staticmethod
-    def is_left(p0, p1, p2):
-        """  Check if point p2 lies to the left of the line through p0 and p1.
+    def crs_mid(crs_l, crs_r):
+        """ Find the course that forms the bisector of the angle 
+            between crs_l and crs_r. """
+
+        if crs_l < crs_r:
+            crs_mid = 0.5 * (crs_l + crs_r)
+        elif crs_l > crs_r:
+            crs_mid = (crs_l + 0.5*(360 - crs_l + crs_r)) % 360
+        else:
+            crs_mid = crs_l
+
+        return crs_mid
+
+    @staticmethod
+    def is_left(p_0, p_1, p_2):
+        """  Check if point p_2 lies to the left of the line through p_0 and p_1.
 
             Returns:
-                > 0 if p2 lies on the left side of the line
-                = 0 if p2 lies exactly on the line
-                < 0 if p2 lies on the right side of the line
-        """
+                > 0 if p_2 lies on the left side of the line
+                = 0 if p_2 lies exactly on the line
+                < 0 if p_2 lies on the right side of the line """
 
-        return (p1[1] - p0[1]) * (p2[0] - p0[0]) - (p2[1] - p0[1]) * (p1[0] - p0[0])
+        return (p_1[1] - p_0[1]) * (p_2[0] - p_0[0]) - (p_2[1] - p_0[1]) * (p_1[0] - p_0[0])
