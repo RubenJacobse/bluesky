@@ -118,15 +118,16 @@ class AreaRestrictionManager(TrafficArrays):
 
         # Register all traffic parameters relevant for this class
         with RegisterElementParameters(self):
-            self.vrel_east = np.array([]) # East component of ac relative velocity wrt area
-            self.vrel_north = np.array([]) # North component of ac relative velocity wrt area
-            self.brg_l = np.array([]) # Bearing from ac to leftmost vertex
-            self.brg_r = np.array([]) # Bearing from ac to rightmost vertex
-            self.dist_l = np.array([]) # Distance from ac to leftmost vertex
-            self.dist_r = np.array([]) # Distance from ac to rightmost vertex
+            self.vrel_east = np.array([]) # [m/s] East component of ac relative velocity wrt area
+            self.vrel_north = np.array([]) # [m/s] North component of ac relative velocity wrt area
+            self.vrel = np.array([]) # [m/s] Magnitude of ac relative velocity wrt area
+            self.brg_l = np.array([]) # [deg] Bearing from ac to leftmost vertex
+            self.brg_r = np.array([]) # [deg] Bearing from ac to rightmost vertex
+            self.dist_l = np.array([]) # [m] Distance from ac to leftmost vertex
+            self.dist_r = np.array([]) # [m] Distance from ac to rightmost vertex
             self.area_conf = np.array([], dtype = bool) # Stores wheter ac is in conflict with area
             self.area_inside = np.array([], dtype = bool) # Stores whether ac is inside area
-            self.area_tint = np.array([]) # Time to area intrusion
+            self.area_tint = np.array([]) # [s] Time to area intrusion
 
         # Keep track of all restricted areas in list and by ID (same order)
         self.areaList = []
@@ -238,6 +239,10 @@ class AreaRestrictionManager(TrafficArrays):
         # Might be useful in debugging
         print("Simulator time is: {} seconds ".format(sim.simt))
 
+        # Calculate resolution for aircraft that are in conflict
+        v_hdg_l = None  # Resolution by heading change only, turn to left
+        v_hdg_r = None  # Resolution by heading change only, turn to right
+
         # Loop over all existing areas
         # NOTE: Could this be vectorized instead of looped over all aircraft-area combinations?
         for idx, area in enumerate(self.areaList):
@@ -268,16 +273,16 @@ class AreaRestrictionManager(TrafficArrays):
                 # Check if the aircraft is inside the area
                 self.area_inside[idx, ac_idx] = ac_curr_pos[ac_idx].within(area.poly)
 
-                # Calculate time to intrusion for aircraft-area combination, takes following values:
+                # Calculate time-to-intersection [s] for aircraft-area combination, takes following values:
                 #  -1 : for aircraft not in conflict with the area
                 #  0  : for aircraft already inside the area
                 #  >0 : for aircraft that are in conflict
                 if self.area_inside[idx, ac_idx]:
                     t_int = 0
                 elif self.area_conf[idx, ac_idx]:
-                    # Find points at which the relative vector intersects the area and
-                    # calculate time to intersect. We cannot use shapely distance functions
-                    # because all definitions are in degrees.
+                    # Find intersection points of the relative vector with the area and use the 
+                    # distance to the closest point to calculate time-to-intersection. (We cannot
+                    # use shapely distance functions because vertex definitions are in degrees).
                     intr_points = area.ring.intersection(ac_rel_vec[ac_idx])
                     intr_closest = spops.nearest_points(ac_curr_pos[ac_idx], intr_points)[1]
                     intr_closest_lat, intr_closest_lon = intr_closest.y, intr_closest.x
@@ -290,12 +295,8 @@ class AreaRestrictionManager(TrafficArrays):
 
                 # Print some messages that may be useful in debugging
                 dbg_str = "Aircraft {} time to conflict with area {} is: {} seconds"
-                t_int_s = round(self.area_tint[idx, ac_idx])
-                print(dbg_str.format(traf.id[ac_idx], area.area_id, t_int_s))
-
-            # Calculate resolution for aircraft that are in conflict
-            v_hdg_l = None  # Resolution by heading change only, turn to left
-            v_hdg_r = None  # Resolution by heading change only, turn to right
+                t_int_sec = round(self.area_tint[idx, ac_idx])
+                print(dbg_str.format(traf.id[ac_idx], area.area_id, t_int_sec))
 
             # Components of unit vectors along VO edges
             u_l_east = np.sin(np.radians(self.brg_l))
@@ -304,18 +305,15 @@ class AreaRestrictionManager(TrafficArrays):
             u_r_north = np.cos(np.radians(self.brg_r))
 
             # Angle between -vrel and VO edges
-            beta_l = np.arccos(-1 * (u_l_east * self.vrel_east + u_l_north * self.vrel_north) / (self.vrel))
-            beta_r = np.arccos(-1 * (u_r_east * self.vrel_east + u_r_north * self.vrel_north) / (self.vrel))
-            beta_l_rad = np.radians(beta_l)
-            beta_r_rad = np.radians(beta_r)
+            beta_l_rad = np.arccos(-1 * (u_l_east * self.vrel_east + u_l_north * self.vrel_north) / (self.vrel))
+            beta_r_rad = np.arccos(-1 * (u_r_east * self.vrel_east + u_r_north * self.vrel_north) / (self.vrel))
+            # beta_l_rad = np.radians(beta_l)
+            # beta_r_rad = np.radians(beta_r)
 
             # Relative resolution velocity component along the VO edges
             vh_ul = self.vrel * np.cos(beta_l_rad) + traf.gs * np.cos(np.arcsin(self.vrel * np.sin(beta_l_rad) / traf.gs))
             vh_ur = self.vrel * np.cos(beta_r_rad) + traf.gs * np.cos(np.arcsin(self.vrel * np.sin(beta_r_rad) / traf.gs))
 
-            beta_l
-
-            #
     def create_area(self, area_id, area_status, gs_north, gs_east, *coords):
         """ Create a new restricted airspace area """
 
@@ -484,8 +482,8 @@ class RestrictedAirspaceArea():
             dir_sum += edge
         if dir_sum >= 0:
             reordered = []
-            for ii in range(len(coords) - 1, -1, -2):
-                reordered.append([coords[ii], coords[ii + 1]])
+            for ii in range(0, len(coords) - 1, 2):
+                reordered = [coords[ii], coords[ii + 1]] + reordered
             coords = reordered
 
         return coords
@@ -494,9 +492,9 @@ class RestrictedAirspaceArea():
         """ Convert list with coords in lat,lon order to numpy array of
             vertex pairs in lon,lat order.
 
-            coords = [lat_0, lon_0, ..., lat_n, lon_n]
-            verts = np.ndarray([[lon_0, lat_0], ... [lon_n, lat_n]])
-            
+            coords = [lat_0, lon_0, ..., lat_n, lon_n] \n
+            verts = np.ndarray([[lon_0, lat_0], ..., [lon_n, lat_n]])
+
             (Essentially the inverse operation of self._verts2coords). """
 
         verts_latlon = np.reshape(coords, (len(coords) // 2, 2))
@@ -508,7 +506,7 @@ class RestrictedAirspaceArea():
         """ Convert numpy array of vertex coordinate pairs in lon,lat order to
             a single list of lat,lon coords.
 
-            verts = np.ndarray([[lon_0, lat_0], ... [lon_n, lat_n]])
+            verts = np.ndarray([[lon_0, lat_0], ..., [lon_n, lat_n]]) \n
             coords = [lat_0, lon_0, ..., lat_n, lon_n]
 
             (Essentially the inverse operation of self._coords2verts). """
@@ -533,7 +531,8 @@ class RestrictedAirspaceArea():
     # NOTE: How can this be vectorized further?
     def calc_tangents(self, ntraf, ac_lat, ac_lon):
         """ For a given aircraft position find left- and rightmost courses
-            that are tangent to a given polygon. """
+            that are tangent to a given polygon as well as the distance to
+            the corresponding vertices. """
 
         # Initialize arrays to store qdrs and distances
         qdr_l = np.zeros(ntraf, dtype=float)
@@ -541,12 +540,12 @@ class RestrictedAirspaceArea():
         dist_l = np.zeros(ntraf, dtype=float)
         dist_r = np.zeros(ntraf, dtype=float)
 
-        # Create array containing [lat, lon] for each vertex
+        # Create array containing [lon, lat] for each vertex
         vertex = np.array(self.ring.coords.xy).T
 
         # Calculate qdrs and distances for each aircraft
         for ii in range(ntraf):
-            ac_pos = [ac_lat[ii], ac_lon[ii]]
+            ac_pos = [ac_lon[ii], ac_lat[ii]]
 
             # Start by assuming both tangents touch at polygon vertex with index 0
             idx_l = 0
@@ -577,25 +576,15 @@ class RestrictedAirspaceArea():
         """ Calculate the east and north components of the relative
             velocity vectors of the aircraft with respect to the area. """
 
-        vrel_east = self.gs_east - ac_gseast
-        vrel_north = self.gs_north - ac_gsnorth
+        vrel_east = ac_gseast - self.gs_east #- ac_gseast
+        vrel_north = ac_gsnorth - self.gs_north #- ac_gsnorth
 
         return vrel_east, vrel_north
 
-    # # Copied from tools/areafilter.py and edited
-    # @staticmethod
-    # def is_inside(border, lat, lon):
-    #     """ Takes vectors with lat and lon and returns boolean list per point. """
-
-    #     points = np.vstack((lat, lon)).T
-    #     inside = border.contains_points(points)
-
-    #     return inside
-
     @staticmethod
     def crs_is_between(crs, crs_l, crs_r):
-        """ Check if a given course crs lies in between crs_l and crl_r
-            (in clockwise direction). """
+        """ Check if a given magnetic course crs on [0 .. 360] deg
+            lies in between crs_l and crl_r (in clockwise direction). """
 
         if ((crs_l > crs_r) and (crs > crs_l or crs < crs_r)) or \
              ((crs_l < crs_r) and (crs > crs_l and crs < crs_r)):
@@ -605,7 +594,7 @@ class RestrictedAirspaceArea():
 
     @staticmethod
     def crs_mid(crs_l, crs_r):
-        """ Find the course that forms the bisector of the angle 
+        """ Find the course that forms the bisector of the angle
             between crs_l and crs_r. """
 
         if crs_l < crs_r:
@@ -613,7 +602,8 @@ class RestrictedAirspaceArea():
         elif crs_l > crs_r:
             crs_mid = (crs_l + 0.5*(360 - crs_l + crs_r)) % 360
         else:
-            crs_mid = crs_l
+            # Ensure when crs_l,crs_r = 360 then crs_mid = 0
+            crs_mid = crs_l % 360
 
         return crs_mid
 
@@ -626,4 +616,4 @@ class RestrictedAirspaceArea():
                 = 0 if p_2 lies exactly on the line
                 < 0 if p_2 lies on the right side of the line """
 
-        return (p_1[1] - p_0[1]) * (p_2[0] - p_0[0]) - (p_2[1] - p_0[1]) * (p_1[0] - p_0[0])
+        return (p_1[0] - p_0[0]) * (p_2[1] - p_0[1]) - (p_2[0] - p_0[0]) * (p_1[1] - p_0[1])

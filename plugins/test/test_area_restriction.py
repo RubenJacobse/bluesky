@@ -1,11 +1,21 @@
 """ Test the area_restriction plugin. """
 
+import numpy as np
+import shapely.geometry as spgeom
 import area_restriction as ar
 from area_restriction import AreaRestrictionManager, RestrictedAirspaceArea
 
+# Error tolerances for floating point comparisons
+DIFF_DEG = 0.1 # [deg] Error tolerance for angle comparison
+DIFF_DIST = 0.1 # [NM] Error tolerance for distance comparison
+DIFF_VEL = 0.1 # [m/s] Error tolerance for velocity comparison
+
+# Conversion factors
+NM_TO_KM = 1.852 # Conversion factor from nautical miles to kilometers
+KM_TO_NM = 1/1.852 # Conversion factor from kilometers to nautical miles
 
 def test_plugin_init():
-    """ Check if the methods specified in init_plugin are member functions of the SuaArray class """
+    """ Check if the methods specified in init_plugin are member functions of the SuaArray class. """
 
     # Run the init_plugin function to see if it executes properly
     config, stackfunctions = ar.init_plugin()
@@ -14,7 +24,159 @@ def test_plugin_init():
     assert "update" in config and "preupdate" in config and "reset" in config
     assert len(stackfunctions) == 3
 
-def test_RAA_is_left(areafilter_):
+def test_raa_init(areafilter_):
+    """ Tests if the RestrictedAirspaceArea class is initialized correctly. """
+
+    test_id = "RAA_01"
+    test_status = True
+    test_gseast = 10
+    test_gsnorth = -30
+    test_coords = [-1, -1, 1, -1, 1, 1, 1, -1, -1, -1]
+
+    raa = RestrictedAirspaceArea(test_id, test_status, test_gseast, test_gsnorth, test_coords)
+
+    assert raa.area_id == test_id
+    assert raa.status == test_status
+    assert raa.gs_east == test_gseast
+    assert raa.gs_north == test_gsnorth
+    assert raa.coords == test_coords
+
+    assert isinstance(raa.ring, spgeom.LinearRing)
+    assert [raa.ring.coords.xy[0][0], raa.ring.coords.xy[1][0]]  == [test_coords[0], test_coords[1]]
+    assert isinstance(raa.poly, spgeom.Polygon)
+    assert [raa.poly.exterior.coords.xy[0][0], raa.poly.exterior.coords.xy[1][0]]  == [test_coords[0], test_coords[1]]
+
+def test_raa_update_pos(areafilter_):
+    """ Test the function that calculates the new coordinates of a moving
+        area. """
+
+    # Create a moving and a non-moving area with the same initial coordinates
+    raa_0 = RestrictedAirspaceArea("RAA0", True, 0, 0, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
+    raa_1 = RestrictedAirspaceArea("RAA1", True, -50, 50, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
+
+    # Check that non-moving polygon does indeed not move
+    raa_0_coords_orig = raa_0.coords 
+    raa_0.update_pos(10)
+    assert raa_0.coords == raa_0_coords_orig
+
+    # Check that moving polygon is indeed moving 
+    raa_1_coords_orig = raa_1.coords
+    raa_1.update_pos(10)
+    assert raa_1.coords != raa_1_coords_orig
+    # NOTE: Verification of correctness of movement to be added
+
+def test_raa_check_poly(areafilter_):
+    """ Test the function that ensure a user-entered polygon is defined by a
+        counterclockwise closed ring. """
+
+    # Create an area
+    raa = RestrictedAirspaceArea("RAA", True, 0, 0, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
+
+    # Test some coordinate lists
+    coords0_in = [0, 0, 1, 0, 1, 1, 0, 1]  # Not a closed ring
+    coords1_in = [0, 0, 0, 1, 1, 1, 1, 0, 0, 0]    # Not counter-clockwise
+    coords2_in = [0, 0, 1, 0, 1, 1, 0, 1, 0, 0]    # Correct
+
+    # All three above lists should result in the same output:
+    coords_out = [0, 0, 1, 0, 1, 1, 0, 1, 0, 0]
+
+    assert raa._check_poly(coords0_in) == coords_out
+    assert raa._check_poly(coords1_in) == coords_out
+    assert raa._check_poly(coords2_in) == coords_out
+
+def test_raa_delete(areafilter_):
+    """ Test the delete function. """
+
+    # Create an area
+    raa = RestrictedAirspaceArea("RAA", True, 0, 0, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
+
+    raa.delete()
+
+def test_raa_coords2verts(areafilter_):
+    """ Test the correctness of the function that transforms an array of vertices in
+        lon,lat order into a list of coordinates in lat, lon order. """
+
+    # Create an area
+    raa = RestrictedAirspaceArea("RAA", True, 0, 0, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
+
+    coords = [1.1, 2.0, 1.0, -2.2, -1.5, 2.2]
+    verts = np.array([[2.0, 1.1], [-2.2, 1.0], [2.2, -1.5]])
+
+    assert np.array_equal(raa._coords2verts(coords), verts)
+
+def test_raa_verts2coords(areafilter_):
+    """ Test the correctness of the function that transforms a coordinate list in 
+        lat,lon order to an array of vertices in lon,lat order. """
+
+    # Create an area
+    raa = RestrictedAirspaceArea("RAA", True, 0, 0, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
+
+    verts = np.array([[2.0, 1.1], [-2.2, 1.0], [2.2, -1.5]])
+    coords = [1.1, 2.0, 1.0, -2.2, -1.5, 2.2]
+
+    assert raa._verts2coords(verts) == coords
+
+def test_raa_calc_tangents(areafilter_):
+    """ Test the correctness of the function that calculates the bearing
+        and distance from aircraft positions to the tangent points of the
+        area. """
+
+    # Create an area with vertices at (lon,lat): {(-1, -1), (1, -1), (1, 1), (-1, 1)}
+    raa = RestrictedAirspaceArea("RAA", True, 0, 0, [-1, -1, -1, 1, 1, 1, 1, -1, -1, -1])
+
+    # Create four aircraft at (lon,lat): {(0,2),(2,0),(0, -2),(-2, 0)}
+    ntraf = 4
+    ac_lon = np.array([0, 2, 0, -2])
+    ac_lat = np.array([2, 0, -2, 0])
+
+    # Correct qdr (defined as [-180 .. 180] degrees East-North-Up)
+    qdr_cor_l = np.array([-45, -135, 135, 45]) # Headings 135, 225, 315, 45 in North-East-Down
+    qdr_cor_r = np.array([-135, 135, 45, -45]) # Headings 225, 315, 45, 135 in North-East-Down
+    # Correct distances in NM
+    dist_cor_l = np.array([157.402, 157.426, 157.402, 157.426]) * KM_TO_NM
+    dist_cor_r = np.array([157.402, 157.426, 157.402, 157.426]) * KM_TO_NM
+
+    # Perform calculation
+    qdr_res_l, qdr_res_r, dist_res_l, dist_res_r = raa.calc_tangents(ntraf, ac_lat, ac_lon)
+
+    # Check that the results are within margin from the correct values
+    assert np.allclose(qdr_res_l, qdr_cor_l, DIFF_DEG)
+    assert np.allclose(qdr_res_r, qdr_cor_r, DIFF_DEG)
+    assert np.allclose(dist_res_l, dist_cor_l, DIFF_DIST)
+    assert np.allclose(dist_res_r, dist_cor_r, DIFF_DIST)
+
+def test_raa_calc_vrel(areafilter_):
+    """ Test the correcness of the function that determines the relative velocities
+        of a set of aircraft with respect to an area. """
+
+    # Create some areas with different ground speeds
+    raa_0 = RestrictedAirspaceArea("RAA0", True, 0, 0, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
+    raa_1 = RestrictedAirspaceArea("RAA1", True, 10, 10, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
+    raa_2 = RestrictedAirspaceArea("RAA2", True, -50, -30, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
+
+    # Aircraft velocity components
+    ac_gseast = np.array([100, 90, 80])
+    ac_gsnorth = np.array([100, 90, 80])
+
+    # Aircraft relative velocity components wrt the areas
+    vrel_east_0 = np.array([100, 90, 80])
+    vrel_north_0 = np.array([100, 90, 80])
+    vrel_east_1 = np.array([90, 80, 70])
+    vrel_north_1 = np.array([90, 80, 70])
+    vrel_east_2 = np.array([150, 140, 130])
+    vrel_north_2 = np.array([130, 120, 110])
+
+    # Check that results are within error margin
+    vrel_east, vrel_north = raa_0.calc_vrel(ac_gseast, ac_gsnorth)
+    assert np.allclose(vrel_east, vrel_east_0, DIFF_VEL) and np.allclose(vrel_north, vrel_north_0, DIFF_VEL)
+
+    vrel_east, vrel_north = raa_1.calc_vrel(ac_gseast, ac_gsnorth)
+    assert np.allclose(vrel_east, vrel_east_1, DIFF_VEL) and np.allclose(vrel_north, vrel_north_1, DIFF_VEL)
+
+    vrel_east, vrel_north = raa_2.calc_vrel(ac_gseast, ac_gsnorth)
+    assert np.allclose(vrel_east, vrel_east_2, DIFF_VEL) and np.allclose(vrel_north, vrel_north_2, DIFF_VEL)
+
+def test_raa_is_left(areafilter_):
     """ Test the correctness of the function that determines whether a point lies
         to the left of a given linepiece. """
 
@@ -41,7 +203,7 @@ def test_RAA_is_left(areafilter_):
     assert raa.is_left([0, 0], [1, 0], [0, 1]) > 0
     assert raa.is_left([1, 0], [0, 0], [0, -0.1]) > 0
 
-def test_RAA_crs_mid(areafilter_):
+def test_raa_crs_mid(areafilter_):
     """ Test the crs_mid function that returns the bisector course
         dividing the angle between two courses in half. """
 
@@ -57,7 +219,11 @@ def test_RAA_crs_mid(areafilter_):
     assert raa.crs_mid(330, 0) == 345
     assert raa.crs_mid(340, 40) == 10
 
-def test_RAA_crs_is_between(areafilter_):
+    # Test rsult when crs_l = crs_r
+    assert raa.crs_mid(220, 220) == 220
+    assert raa.crs_mid(360, 360) == 0
+
+def test_raa_crs_is_between(areafilter_):
     """ Test the crs_is_between function that checks if a given course
         lies between a left and right most course. """
 
@@ -75,3 +241,4 @@ def test_RAA_crs_is_between(areafilter_):
     assert not raa.crs_is_between(22, 33.4, 359.1)
     assert not raa.crs_is_between(220, 220, 220)
     assert not raa.crs_is_between(180, 181, 179)
+
