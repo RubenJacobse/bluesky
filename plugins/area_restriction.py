@@ -1,7 +1,7 @@
 """ Restricted Airspace Area Plugin
 
-    Uses the AreaRestrictionManager class to keep track of restricted 
-    areas wich are themselves are represented by instances of the 
+    Uses the AreaRestrictionManager class to keep track of restricted
+    areas wich are themselves are represented by instances of the
     RestrictedAirspaceArea class.
 
     Current implementation is heavily work-in-progress and unstable.
@@ -328,7 +328,7 @@ class AreaRestrictionManager(TrafficArrays):
 
         self.areaList.append(new_area)
         self.areaIDList.append(area_id)
-        self.nareas += 1
+        # self.nareas += 1
 
         # Add row to all numpy arrays
         for v in self._ArrVars:
@@ -353,6 +353,8 @@ class AreaRestrictionManager(TrafficArrays):
                 self._Vars[v] = newrow
             else:
                 self._Vars[v] = np.vstack((self._Vars[v], newrow))
+
+        self.nareas += 1
 
         return True, "Restricted Airspace Area {} is initialized".format(area_id)
 
