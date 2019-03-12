@@ -18,7 +18,7 @@ KM_TO_NM = 1/1.852 # Conversion factor from kilometers to nautical miles
 ##################################################################################################
 # Test that plugin correctly returns config and stackfunctions variables to BlueSky
 ##################################################################################################
-def test_plugin_init():
+def test_plugin_init(MockTraf_):
     """ Check if the methods specified in init_plugin are member functions
         of the SuaArray class. """
 
@@ -29,48 +29,101 @@ def test_plugin_init():
     assert "update" in config and "preupdate" in config and "reset" in config
     assert len(stackfunctions) == 3
 
+
 ##################################################################################################
 # Tests for AreaRestrictionManager class
 ##################################################################################################
-def test_arm_init(AreaRestrictionManager_, areafilter_, mocktraf_):
+def test_arm_init(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
     """ Verify that the AreaRestrictionManager initializes correctly. """
 
+    # Check that root element exists (MockTraf in these tests)
+    assert AreaRestrictionManager_.root is MockTraf_
+    assert AreaRestrictionManager_._parent is MockTraf_
+    assert AreaRestrictionManager_ in MockTraf_._children
+
+    # Check that other variables are initialized to their default values
     assert AreaRestrictionManager_.areaList == []
     assert AreaRestrictionManager_.areaIDList == []
     assert AreaRestrictionManager_.nareas == 0
-
-    # Test the t_lookahead setter method
-    assert AreaRestrictionManager_.t_lookahead == 300   # Default value
-    AreaRestrictionManager_.set_t_lookahead(600)
-    assert AreaRestrictionManager_.t_lookahead == 600
-    AreaRestrictionManager_.set_t_lookahead(300) # Reset to default value
     assert AreaRestrictionManager_.t_lookahead == 300
 
-def test_arm_create_area(AreaRestrictionManager_, areafilter_, mocktraf_):
-    """ Verify that the creat_area function works correctly """
-    AreaRestrictionManager_.create_area("RAA_1", True, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0)
+    # Check that all traffic variables have been registered properly
+    arrVarList = ["vrel_east", "vrel_north", "vrel", "brg_l", "brg_r", "dist_l", "dist_r",\
+                   "area_conf", "area_inside", "area_tint"]
+    lstVarList = []
+    assert all(x in AreaRestrictionManager_._ArrVars for x in arrVarList)
+    assert all(x in AreaRestrictionManager_._LstVars for x in lstVarList)
 
+def test_set_t_lookahead(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
+    """ Test the t_lookahead setter method. """
+
+    assert AreaRestrictionManager_.t_lookahead == 300
+
+    # Set new value
+    AreaRestrictionManager_.set_t_lookahead(600)
+    assert AreaRestrictionManager_.t_lookahead == 600
+
+    # Give non-integer value, should return 'False'
+    result, _ = AreaRestrictionManager_.set_t_lookahead(600.0)
+    assert not result
+
+    # Reset to default value
+    AreaRestrictionManager_.set_t_lookahead(300)
+    assert AreaRestrictionManager_.t_lookahead == 300
+
+def test_arm_create_area(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
+    """ Verify that the create_area function works correctly """
+
+    # Add first area
+    AreaRestrictionManager_.create_area("RAA_1", True, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0)
     assert AreaRestrictionManager_.nareas == 1
     assert "RAA_1" in AreaRestrictionManager_.areaIDList
 
+    # Add another area (this will be deleted in next test)
+    AreaRestrictionManager_.create_area("RAA_2", True, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0)
+    assert AreaRestrictionManager_.nareas == 2
+    assert "RAA_2" in AreaRestrictionManager_.areaIDList
 
-def test_arm_carry_state(AreaRestrictionManager_, areafilter_, mocktraf_):
-    """ Verify that the AreaRestrictionManager_ object does carry state
-        between test functions. """
+    # Attempt to add an area with an id that already exists
+    success, _ = AreaRestrictionManager_.create_area("RAA_1", True, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0)
+    assert AreaRestrictionManager_.nareas == 2
+    assert not success
+
+def test_arm_delete_area(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
+    """ Verify that the delete_area function works correctly """
+
+    # Test deletion of an existing area
+    success, _ = AreaRestrictionManager_.delete_area("RAA_2")
+    assert success
     assert AreaRestrictionManager_.nareas == 1
 
-def test_arm_reset(AreaRestrictionManager_, areafilter_, mocktraf_):
+    # Test deletion of non-existing area
+    success, _ = AreaRestrictionManager_.delete_area("RAA_3")
+    assert not success
+    assert AreaRestrictionManager_.nareas == 1
+
+def test_arm_create(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
+    pass
+
+def test_arm_delete(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
+    pass
+
+def test_arm_reset(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
     """ Verify that the reset() method results in the initial state
         with empty variable lists. """
 
+    # Create some fake traffic
+    MockTraf_.fake_traf()
+
     # Check that variables have values before reset
     for var in AreaRestrictionManager_._LstVars:
-        assert var == []
+        assert AreaRestrictionManager_._Vars[var]
     for var in AreaRestrictionManager_._ArrVars:
-        assert np.shape(var) == ()
+        assert np.size(AreaRestrictionManager_._Vars[var])
+
+    # Check that all traffic related variables are emptied after reset
     AreaRestrictionManager_.reset()
 
-    # Check that all traffic related variables are emptied
     for var in AreaRestrictionManager_._LstVars:
         assert var == []
     for var in AreaRestrictionManager_._ArrVars:

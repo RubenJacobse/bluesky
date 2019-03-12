@@ -27,6 +27,27 @@ class MockTraf(TrafficArrays):
             self.gsnorth = np.array([])
             self.gs = np.array([])
 
+    def create(self, n = 1):
+        super().create(n)
+        self.ntraf += n
+        for child in self._children:
+            child.create(n)
+
+    def fake_traf(self):
+        """ Create 4 fake traffic elements """
+
+        # Ensure that the create
+        self.create(4)
+
+        # Set some variables that would be present in bs.traf and that are required by
+        # the functions that are being tested
+        self.id = ["AC001", "AC002", "AC003", "AC004"]
+        self.lon = np.array([0.0, 2.0, 0.0, -2.0])
+        self.lat = np.array([2.0, 0.0, -2.0, 0.0])
+        self.gseast = np.array([0, -250, 0, 250])
+        self.gsnorth = np.array([-250, 0, 250, 0])
+        self.gs = np.array([250, 250, 250, 250])
+
 def mockfun(*args):
     """ Take any number of arguments and do nothing """
     pass
@@ -58,23 +79,10 @@ def areafilter_(monkeypatch):
     monkeypatch.setattr(areafilter, "deleteArea", mock_deleteArea)
 
 @pytest.fixture
-def mocktraf_(monkeypatch):
+def mocktraf_(monkeypatch, MockTraf_):
     """ Fixture for all test functions naming bs.traf in their parameter lists. """
 
-    MockTraf_ = MockTraf()
-
-    # Create some traffic elements
-    MockTraf_.create(4)
-
-    # Set some variables that would be present in bs.traf and that are required by
-    # the functions that are being tested
-    MockTraf_.lon = np.array([0.0, 2.0, 0.0, -2.0])
-    MockTraf_.lat = np.array([2.0, 0.0, -2.0, 0.0])
-    MockTraf_.gseast = np.array([0, -250, 0, 250])
-    MockTraf_.gsnorth = np.array([-250, 0, 250, 0])
-    MockTraf_.gs = np.array([250, 250, 250, 250])
-
-    # Replace subsequent calls to bs.traf with calls to the MockTraf_ class
+    # Replace subsequent calls to bs.traf with calls to the MockTraf class
     monkeypatch.setattr(bs, "traf", MockTraf_)
 
 @pytest.fixture(scope = 'module')
@@ -84,9 +92,9 @@ def AreaRestrictionManager_():
 
     yield AreaRestrictionManager()
 
-# @pytest.fixture(scope = 'module')
-# def MockTraf_():
-#     """ Fixture that yields an instance of the MockTraf
-#         class that carries state between test functions. """
+@pytest.fixture(scope = 'module')
+def MockTraf_():
+    """ Fixture that yields an instance of the MockTraf
+        class that carries state between test functions. """
 
-#     yield MockTraf()
+    yield MockTraf()
