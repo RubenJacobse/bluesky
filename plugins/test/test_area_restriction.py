@@ -14,8 +14,13 @@ DIFF_VEL = 0.1 # [m/s] Error tolerance for velocity comparison
 NM_TO_KM = 1.852 # Conversion factor from nautical miles to kilometers
 KM_TO_NM = 1/1.852 # Conversion factor from kilometers to nautical miles
 
+
+##################################################################################################
+# Test that plugin correctly returns config and stackfunctions variables to BlueSky
+##################################################################################################
 def test_plugin_init():
-    """ Check if the methods specified in init_plugin are member functions of the SuaArray class. """
+    """ Check if the methods specified in init_plugin are member functions
+        of the SuaArray class. """
 
     # Run the init_plugin function to see if it executes properly
     config, stackfunctions = ar.init_plugin()
@@ -24,6 +29,62 @@ def test_plugin_init():
     assert "update" in config and "preupdate" in config and "reset" in config
     assert len(stackfunctions) == 3
 
+##################################################################################################
+# Tests for AreaRestrictionManager class
+##################################################################################################
+def test_arm_init(AreaRestrictionManager_, areafilter_, mocktraf_):
+    """ Verify that the AreaRestrictionManager initializes correctly. """
+
+    assert AreaRestrictionManager_.areaList == []
+    assert AreaRestrictionManager_.areaIDList == []
+    assert AreaRestrictionManager_.nareas == 0
+
+    # Test the t_lookahead setter method
+    assert AreaRestrictionManager_.t_lookahead == 300   # Default value
+    AreaRestrictionManager_.set_t_lookahead(600)
+    assert AreaRestrictionManager_.t_lookahead == 600
+    AreaRestrictionManager_.set_t_lookahead(300) # Reset to default value
+    assert AreaRestrictionManager_.t_lookahead == 300
+
+def test_arm_create_area(AreaRestrictionManager_, areafilter_, mocktraf_):
+    """ Verify that the creat_area function works correctly """
+    AreaRestrictionManager_.create_area("RAA_1", True, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0)
+
+    assert AreaRestrictionManager_.nareas == 1
+    assert "RAA_1" in AreaRestrictionManager_.areaIDList
+
+
+def test_arm_carry_state(AreaRestrictionManager_, areafilter_, mocktraf_):
+    """ Verify that the AreaRestrictionManager_ object does carry state
+        between test functions. """
+    assert AreaRestrictionManager_.nareas == 1
+
+def test_arm_reset(AreaRestrictionManager_, areafilter_, mocktraf_):
+    """ Verify that the reset() method results in the initial state
+        with empty variable lists. """
+
+    # Check that variables have values before reset
+    for var in AreaRestrictionManager_._LstVars:
+        assert var == []
+    for var in AreaRestrictionManager_._ArrVars:
+        assert np.shape(var) == ()
+    AreaRestrictionManager_.reset()
+
+    # Check that all traffic related variables are emptied
+    for var in AreaRestrictionManager_._LstVars:
+        assert var == []
+    for var in AreaRestrictionManager_._ArrVars:
+        assert np.shape(var) == ()
+
+    # Check that all areas have been deleted
+    assert AreaRestrictionManager_.areaList == []
+    assert AreaRestrictionManager_.areaIDList == []
+    assert AreaRestrictionManager_.nareas == 0
+    assert AreaRestrictionManager_.t_lookahead == 300
+
+##################################################################################################
+# Tests for methods of RestrictedAirspaceArea class
+##################################################################################################
 def test_raa_init(areafilter_):
     """ Tests if the RestrictedAirspaceArea class is initialized correctly. """
 
@@ -42,9 +103,9 @@ def test_raa_init(areafilter_):
     assert raa.coords == test_coords
 
     assert isinstance(raa.ring, spgeom.LinearRing)
-    assert [raa.ring.coords.xy[0][0], raa.ring.coords.xy[1][0]]  == [test_coords[0], test_coords[1]]
+    assert [raa.ring.coords.xy[0][0], raa.ring.coords.xy[1][0]] == [test_coords[0], test_coords[1]]
     assert isinstance(raa.poly, spgeom.Polygon)
-    assert [raa.poly.exterior.coords.xy[0][0], raa.poly.exterior.coords.xy[1][0]]  == [test_coords[0], test_coords[1]]
+    assert [raa.poly.exterior.coords.xy[0][0], raa.poly.exterior.coords.xy[1][0]] == [test_coords[0], test_coords[1]]
 
 def test_raa_update_pos(areafilter_):
     """ Test the function that calculates the new coordinates of a moving

@@ -1,6 +1,8 @@
 """ Restricted Airspace Area Plugin
 
-    Uses the AreaRestrictions class to represent areas that are restricted to all traffic.
+    Uses the AreaRestrictionManager class to keep track of restricted 
+    areas wich are themselves are represented by instances of the 
+    RestrictedAirspaceArea class.
 
     Current implementation is heavily work-in-progress and unstable.
 
@@ -20,7 +22,7 @@ import shapely.geometry as spgeom
 import shapely.ops as spops
 
 # BlueSky imports
-from bluesky import traf, sim
+import bluesky as bs
 from bluesky.tools import areafilter
 from bluesky.tools.aero import Rearth
 from bluesky.tools.geo import qdrdist
@@ -134,7 +136,7 @@ class AreaRestrictionManager(TrafficArrays):
         self.areaIDList = []
         self.nareas = 0
 
-        # Look-ahead-time in seconds, used to detect area conflicts
+        # Default look-ahead-time in seconds, used to detect aircraft-area conflicts
         self.t_lookahead = 300
 
     def create(self, n = 1):
@@ -225,6 +227,7 @@ class AreaRestrictionManager(TrafficArrays):
         self.areaList = []
         self.areaIDList = []
         self.nareas = 0
+        self.t_lookahead = 300
 
     def preupdate(self):
         """ Update the area positions before traf is updated. """
@@ -237,7 +240,7 @@ class AreaRestrictionManager(TrafficArrays):
         """ Do calculations after traf has been updated. """
 
         # Might be useful in debugging
-        print("Simulator time is: {} seconds ".format(sim.simt))
+        # print("Simulator time is: {} seconds ".format(bs.sim.simt))
 
         # Calculate resolution for aircraft that are in conflict
         v_hdg_l = None  # Resolution by heading change only, turn to left
@@ -248,24 +251,24 @@ class AreaRestrictionManager(TrafficArrays):
         for idx, area in enumerate(self.areaList):
             # Calculate bearings and distance to the tangent vertices of the area
             self.brg_l[idx, :], self.brg_r[idx, :], self.dist_l[idx, :], self.dist_r[idx, :] = \
-                area.calc_tangents(traf.ntraf, traf.lat, traf.lon)
+                area.calc_tangents(bs.traf.ntraf, bs.traf.lat, bs.traf.lon)
 
             # Calculate velocity components of each aircraft relative to the area
-            self.vrel_east[idx, :] = traf.gseast - area.gs_east
-            self.vrel_north[idx, :] = traf.gsnorth - area.gs_north
+            self.vrel_east[idx, :] = bs.traf.gseast - area.gs_east
+            self.vrel_north[idx, :] = bs.traf.gsnorth - area.gs_north
             self.vrel = np.sqrt(self.vrel_east[idx, :]**2 + self.vrel_north[idx, :]**2)
 
             # Calculate position of each aircraft relative to the area after t_lookahead
-            ac_fut_rel_lon, ac_fut_rel_lat = self.calc_future_ac_pos(self.t_lookahead, traf.lon, traf.lat, self.vrel_east[idx, :], self.vrel_north[idx, :])
+            ac_fut_rel_lon, ac_fut_rel_lat = self.calc_future_ac_pos(self.t_lookahead, bs.traf.lon, bs.traf.lat, self.vrel_east[idx, :], self.vrel_north[idx, :])
 
             # Create shapely points for current and future relative position
             # and use these to create a shapely LineString with the relative vector
-            ac_curr_pos = [spgeom.Point(lon, lat) for (lon, lat) in zip(traf.lon, traf.lat)] # NOTE: Can be moved outside of loop
+            ac_curr_pos = [spgeom.Point(lon, lat) for (lon, lat) in zip(bs.traf.lon, bs.traf.lat)] # NOTE: Can be moved outside of loop
             ac_fut_rel_pos = [spgeom.Point(lon, lat) for (lon, lat) in zip(ac_fut_rel_lon, ac_fut_rel_lat)]
             ac_rel_vec = [spgeom.LineString([curr, fut]) for (curr, fut) in zip(ac_curr_pos, ac_fut_rel_pos)]
 
             # Find all aircraft-area conflicts
-            for ac_idx in range(traf.ntraf):
+            for ac_idx in range(bs.traf.ntraf):
                 # Use shapely to determine if the aircraft path in relative velocity space
                 # with respect to the area crosses the polygon ring.
                 self.area_conf[idx, ac_idx] = area.ring.intersects(ac_rel_vec[ac_idx])
@@ -286,9 +289,9 @@ class AreaRestrictionManager(TrafficArrays):
                     intr_points = area.ring.intersection(ac_rel_vec[ac_idx])
                     intr_closest = spops.nearest_points(ac_curr_pos[ac_idx], intr_points)[1]
                     intr_closest_lat, intr_closest_lon = intr_closest.y, intr_closest.x
-                    _, intr_dist_nm = qdrdist(traf.lat[ac_idx], traf.lon[ac_idx], intr_closest_lat, intr_closest_lon)
+                    _, intr_dist_nm = qdrdist(bs.traf.lat[ac_idx], bs.traf.lon[ac_idx], intr_closest_lat, intr_closest_lon)
                     intr_dist_m = intr_dist_nm * 1852 # qdrdist returns dist in NM, convert to m
-                    t_int = intr_dist_m / traf.gs[ac_idx]
+                    t_int = intr_dist_m / bs.traf.gs[ac_idx]
                 else:
                     t_int = -1
                 self.area_tint[idx, ac_idx] = t_int
@@ -296,7 +299,7 @@ class AreaRestrictionManager(TrafficArrays):
                 # Print some messages that may be useful in debugging
                 dbg_str = "Aircraft {} time to conflict with area {} is: {} seconds"
                 t_int_sec = round(self.area_tint[idx, ac_idx])
-                print(dbg_str.format(traf.id[ac_idx], area.area_id, t_int_sec))
+                print(dbg_str.format(bs.traf.id[ac_idx], area.area_id, t_int_sec))
 
             # Components of unit vectors along VO edges
             u_l_east = np.sin(np.radians(self.brg_l))
@@ -311,8 +314,8 @@ class AreaRestrictionManager(TrafficArrays):
             # beta_r_rad = np.radians(beta_r)
 
             # Relative resolution velocity component along the VO edges
-            vh_ul = self.vrel * np.cos(beta_l_rad) + traf.gs * np.cos(np.arcsin(self.vrel * np.sin(beta_l_rad) / traf.gs))
-            vh_ur = self.vrel * np.cos(beta_r_rad) + traf.gs * np.cos(np.arcsin(self.vrel * np.sin(beta_r_rad) / traf.gs))
+            vh_ul = self.vrel * np.cos(beta_l_rad) + bs.traf.gs * np.cos(np.arcsin(self.vrel * np.sin(beta_l_rad) / bs.traf.gs))
+            vh_ur = self.vrel * np.cos(beta_r_rad) + bs.traf.gs * np.cos(np.arcsin(self.vrel * np.sin(beta_r_rad) / bs.traf.gs))
 
     def create_area(self, area_id, area_status, gs_north, gs_east, *coords):
         """ Create a new restricted airspace area """
@@ -344,7 +347,7 @@ class AreaRestrictionManager(TrafficArrays):
                 defaultvalue = [0.0]
 
             # Adds row of defaultvalue to existing array
-            newrow = np.full((1, traf.ntraf), defaultvalue)
+            newrow = np.full((1, bs.traf.ntraf), defaultvalue)
 
             if not self.nareas:
                 self._Vars[v] = newrow
