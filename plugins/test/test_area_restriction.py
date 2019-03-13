@@ -14,30 +14,27 @@ DIFF_VEL = 0.1 # [m/s] Error tolerance for velocity comparison
 NM_TO_KM = 1.852 # Conversion factor from nautical miles to kilometers
 KM_TO_NM = 1/1.852 # Conversion factor from kilometers to nautical miles
 
+# NOTE: Code below commented out because it creates a second (unwanted) instance of the 
+# AreaRestrictionManager class in the TrafficArrays tree. - To be fixed
 
-##################################################################################################
-# Test that plugin correctly returns config and stackfunctions variables to BlueSky
-##################################################################################################
-def test_plugin_init():
-    """ Check if the methods specified in init_plugin are member functions
-        of the SuaArray class. """
+# ##################################################################################################
+# # Test that plugin correctly returns config and stackfunctions variables to BlueSky
+# ##################################################################################################
+# def test_plugin_init(MockTraf_, AreaRestrictionManager_, mocktraf_, areafilter_, mockarm_):
+#     """ Check if the methods specified in init_plugin are member functions
+#         of the SuaArray class. """
 
-    # Run the init_plugin function to see if it executes properly
-    config, stackfunctions = ar.init_plugin()
+#     # Run the init_plugin function to see if it executes properly
+#     config, stackfunctions = ar.init_plugin()
 
-    assert len(config) == 6
-    assert "update" in config and "preupdate" in config and "reset" in config
-    assert len(stackfunctions) == 3
-
-def test_traf_init(MockTraf_):
-    """ Ensure that the MockTraf_ object emulating bs.traf is instantiated before
-        the AreaRestrictionManager object. """
-    pass
+#     assert len(config) == 6
+#     assert "update" in config and "preupdate" in config and "reset" in config
+#     assert len(stackfunctions) == 3
 
 ##################################################################################################
 # Tests for AreaRestrictionManager class
 ##################################################################################################
-def test_arm_init(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
+def test_arm_init(MockTraf_, AreaRestrictionManager_, areafilter_, mocktraf_):
     """ Verify that the AreaRestrictionManager initializes correctly. """
 
     # Check that root element exists (MockTraf in these tests) and
@@ -128,18 +125,22 @@ def test_arm_create(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
 def test_arm_delete(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
     """ Verify that the delete() method works correctly. """
 
+    # Check that there are 4 aircraft
     assert AreaRestrictionManager_.nareas == 1
+    assert AreaRestrictionManager_.ntraf == 4
     assert MockTraf_.ntraf == 4
     for var in AreaRestrictionManager_._ArrVars:
-        # print("{} : {}".format(var, AreaRestrictionManager_._Vars[var]))
         assert np.size(AreaRestrictionManager_._Vars[var]) == 4
 
-    # AreaRestrictionManager_.delete(3)
+    # In BlueSky aircraft will be deleted using traf.delete(), verify its working
     assert MockTraf_.delete(3)
     assert MockTraf_.ntraf == 3
+    assert AreaRestrictionManager_.ntraf == 3
 
-    assert MockTraf_.delete(2)
+    # Delete another aircraft and verify the result
+    assert MockTraf_.delete(1)
     assert MockTraf_.ntraf == 2
+    assert AreaRestrictionManager_.ntraf == 2
 
 def test_arm_reset(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
     """ Verify that the reset() method results in the initial state
@@ -152,18 +153,35 @@ def test_arm_reset(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
         assert np.size(AreaRestrictionManager_._Vars[var])
 
     # Check that all traffic related variables are emptied after reset
-    AreaRestrictionManager_.reset()
-
+    MockTraf_.reset()
+    
     for var in AreaRestrictionManager_._LstVars:
         assert AreaRestrictionManager_._Vars[var] == []
     for var in AreaRestrictionManager_._ArrVars:
-        assert np.shape(AreaRestrictionManager_._Vars[var]) == (0,)
+        assert np.size(AreaRestrictionManager_._Vars[var]) == 0
 
     # Check that all areas have been deleted
     assert AreaRestrictionManager_.areaList == []
     assert AreaRestrictionManager_.areaIDList == []
     assert AreaRestrictionManager_.nareas == 0
     assert AreaRestrictionManager_.t_lookahead == 300
+
+def test_arm_preupdate(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
+    """ Test the preupdate() method. """
+
+    # Previous test called reset(), create area and traffic
+    AreaRestrictionManager_.create_area("RAA_1", True, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0)
+    assert MockTraf_.ntraf == 0
+    MockTraf_.fake_traf()
+
+    # Continue with tests
+    AreaRestrictionManager_.preupdate()
+
+def test_arm_update(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
+
+    # print(AreaRestrictionManager_.brg_l)
+    AreaRestrictionManager_.update()
+
 
 ##################################################################################################
 # Tests for methods of RestrictedAirspaceArea class

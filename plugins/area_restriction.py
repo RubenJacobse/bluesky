@@ -136,6 +136,7 @@ class AreaRestrictionManager(TrafficArrays):
         self.areaList = []
         self.areaIDList = []
         self.nareas = 0
+        self.ntraf = 0
 
         # Default look-ahead-time in seconds, used to detect aircraft-area conflicts
         self.t_lookahead = 300
@@ -190,12 +191,13 @@ class AreaRestrictionManager(TrafficArrays):
             else:
                 self._Vars[v] = np.concatenate((self._Vars[v], new_cols), 1)
 
+        self.ntraf += n
+
     def delete(self, idx):
         """ Delete element (aircraft) idx from all lists and arrays.
 
             Overrides TrafficArrays.delete(idx) method to allow
-            handling of two-dimensional numpy arrays.
-        """
+            handling of two-dimensional numpy arrays. """
 
         for child in self._children:
             child.delete(idx)
@@ -213,13 +215,21 @@ class AreaRestrictionManager(TrafficArrays):
                 for v in self._LstVars:
                     del self._Vars[v][idx]
 
+        self.ntraf -= 1 # Will give problems with multiple simultaneous deletions
+
         return True
 
     def reset(self):
         """ Reset state on simulator reset event. """
 
-        # Call actual reset method defined in TrafficArrays base class
-        super().reset()
+        # Pass reset call to child elements
+        for child in self._children:
+            child.reset()
+
+        # Clear all variables by deleting the last element
+        # until no aircraft remain
+        while self.ntraf:
+            self.delete(self.ntraf - 1) # Decrements self.ntraf after each deletion
 
         # Make sure areas are deleted
         for area in self.areaList:
@@ -301,7 +311,7 @@ class AreaRestrictionManager(TrafficArrays):
                 # Print some messages that may be useful in debugging
                 dbg_str = "Aircraft {} time to conflict with area {} is: {} seconds"
                 t_int_sec = round(self.area_tint[idx, ac_idx])
-                print(dbg_str.format(bs.traf.id[ac_idx], area.area_id, t_int_sec))
+                # print(dbg_str.format(bs.traf.id[ac_idx], area.area_id, t_int_sec))
 
             # Components of unit vectors along VO edges
             u_l_east = np.sin(np.radians(self.brg_l))
@@ -312,8 +322,8 @@ class AreaRestrictionManager(TrafficArrays):
             # Angle between -vrel and VO edges
             beta_l_rad = np.arccos(-1 * (u_l_east * self.vrel_east + u_l_north * self.vrel_north) / (self.vrel))
             beta_r_rad = np.arccos(-1 * (u_r_east * self.vrel_east + u_r_north * self.vrel_north) / (self.vrel))
-            # beta_l_rad = np.radians(beta_l)
-            # beta_r_rad = np.radians(beta_r)
+            beta_l = np.degrees(beta_l_rad)
+            beta_r = np.degrees(beta_r_rad)
 
             # Relative resolution velocity component along the VO edges
             vh_ul = self.vrel * np.cos(beta_l_rad) + bs.traf.gs * np.cos(np.arcsin(self.vrel * np.sin(beta_l_rad) / bs.traf.gs))

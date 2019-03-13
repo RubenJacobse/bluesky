@@ -28,20 +28,33 @@ class MockTraf(TrafficArrays):
             self.gs = np.array([])
 
     def create(self, n = 1):
+        """ Create n new aircraft and add elements to variables. """
+
+        # Call actual create() method
         super().create(n)
         self.ntraf += n
         for child in self._children:
             child.create(n)
 
     def delete(self, idx):
+        """ Delete aircraft at index idx from all variables. """
+
+        # Call actual delete() method
         super().delete(idx)
-        self.ntraf -= 1
+        self.ntraf -= 1 # Will cause error for multiple deletions at once
         return True
+
+    def reset(self):
+        """ Delete all aircraft and clear variables """
+
+        # Call actual delete() method in TrafficArrays class
+        super().reset()
+        self.ntraf = 0
 
     def fake_traf(self):
         """ Create 4 fake traffic elements """
 
-        # Ensure that the create
+        # Ensure that the create command is executed in all children as well
         self.create(4)
 
         # Set some variables that would be present in bs.traf and that are required by
