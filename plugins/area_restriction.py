@@ -271,7 +271,8 @@ class AreaRestrictionManager(TrafficArrays):
             self.vrel = np.sqrt(self.vrel_east[idx, :]**2 + self.vrel_north[idx, :]**2)
 
             # Calculate position of each aircraft relative to the area after t_lookahead
-            ac_fut_rel_lon, ac_fut_rel_lat = self.calc_future_ac_pos(self.t_lookahead, bs.traf.lon, bs.traf.lat, self.vrel_east[idx, :], self.vrel_north[idx, :])
+            ac_fut_rel_lon, ac_fut_rel_lat = calc_future_pos(self.t_lookahead, bs.traf.lon, bs.traf.lat, \
+                                                             self.vrel_east[idx, :], self.vrel_north[idx, :])
 
             # Create shapely points for current and future relative position
             # and use these to create a shapely LineString with the relative vector
@@ -402,18 +403,6 @@ class AreaRestrictionManager(TrafficArrays):
             self.t_lookahead = t
             return True, "Aircraft-area conflict look-ahead-time set to {} seconds".format(t)
 
-    @staticmethod
-    def calc_future_ac_pos(dt, lon, lat, gs_e, gs_n):
-        """ Calculate future aircraft position after time dt based on
-            current position, velocity components"""
-
-        newlat = lat + np.degrees(dt * gs_n / Rearth)
-        newcoslat = np.cos(np.deg2rad(newlat))
-        newlon = lon + np.degrees(dt * gs_e / newcoslat / Rearth)
-
-        return newlon, newlat
-
-
 class RestrictedAirspaceArea():
     """ Class that represents a single Restricted Airspace Area. """
 
@@ -456,9 +445,7 @@ class RestrictedAirspaceArea():
             curr_lat = self.verts[:, 1]
 
             # Calculate new lon and lat values for all vertices
-            newlat = curr_lat + np.degrees(dt * self.gs_north / Rearth)
-            newcoslat = np.cos(np.deg2rad(newlat))
-            newlon = curr_lon + np.degrees(dt * self.gs_east / newcoslat / Rearth)
+            newlon, newlat = calc_future_pos(dt, curr_lon, curr_lat, self.gs_east, self.gs_north)
 
             # Update vertices using new lat and lon vectors
             self.verts = np.array([newlon, newlat]).T
@@ -634,3 +621,14 @@ class RestrictedAirspaceArea():
                 < 0 if p_2 lies on the right side of the line """
 
         return (p_1[0] - p_0[0]) * (p_2[1] - p_0[1]) - (p_2[0] - p_0[0]) * (p_1[1] - p_0[1])
+
+
+def calc_future_pos(dt, lon, lat, gs_e, gs_n):
+    """ Calculate future lon and lat vectors after time dt based on
+        current position, velocity vector"""
+
+    newlat = lat + np.degrees(dt * gs_n / Rearth)
+    newcoslat = np.cos(np.deg2rad(newlat))
+    newlon = lon + np.degrees(dt * gs_e / newcoslat / Rearth)
+
+    return newlon, newlat
