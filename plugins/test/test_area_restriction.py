@@ -154,7 +154,7 @@ def test_arm_reset(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
 
     # Check that all traffic related variables are emptied after reset
     MockTraf_.reset()
-    
+
     for var in AreaRestrictionManager_._LstVars:
         assert AreaRestrictionManager_._Vars[var] == []
     for var in AreaRestrictionManager_._ArrVars:
@@ -170,18 +170,89 @@ def test_arm_preupdate(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf
     """ Test the preupdate() method. """
 
     # Previous test called reset(), create area and traffic
+    assert AreaRestrictionManager_.nareas == 0
     AreaRestrictionManager_.create_area("RAA_1", True, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0)
+    AreaRestrictionManager_.create_area("RAA_2", True, 20., -10., 0, 0, 1, 0, 1, 1, 0, 1, 0, 0)
     assert MockTraf_.ntraf == 0
     MockTraf_.fake_traf()
+    assert MockTraf_.ntraf == 4
+    assert AreaRestrictionManager_.ntraf == 4
 
-    # Continue with tests
+    # Verify that vertices of non-moving area RAA_1 have not changed
+    verts0_before = AreaRestrictionManager_.areaList[0].verts
+    coords0_before = AreaRestrictionManager_.areaList[0].coords
     AreaRestrictionManager_.preupdate()
+    verts0_after = AreaRestrictionManager_.areaList[0].verts
+    coords0_after = AreaRestrictionManager_.areaList[0].coords
+
+    assert np.allclose(verts0_before, verts0_after)
+    assert coords0_before == coords0_after
+
+    # Verify that vertices of moving area RAA_2 have changed
+    # Actual verification of the position update correctness is done in test_raa_update_pos()
+    verts1_before = AreaRestrictionManager_.areaList[1].verts
+    coords1_before = AreaRestrictionManager_.areaList[1].coords
+    AreaRestrictionManager_.preupdate()
+    verts1_after = AreaRestrictionManager_.areaList[1].verts
+    coords1_after = AreaRestrictionManager_.areaList[1].coords
+
+    assert not np.allclose(verts1_before, verts1_after)
+    assert not coords1_before == coords1_after
 
 def test_arm_update(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
+    """ Test the update() method. """
 
-    # print(AreaRestrictionManager_.brg_l)
+    # Reset the objects
+    MockTraf_.reset()
+
+    # Create area and fake traffic
+    AreaRestrictionManager_.create_area("RAA_1", True, 0, 0, -1, -1, 1, -1, 1, 1, -1, 1, -1, -1)
+    MockTraf_.fake_traf()
     AreaRestrictionManager_.update()
+    
+    assert np.array_equal(AreaRestrictionManager_.area_conf, np.array([[False, True, True, True]]))
+    assert np.array_equal(AreaRestrictionManager_.area_inside, np.array([[False, False, False, True]]))
 
+def test_arm_area_notraf(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
+    """ Tests whether area can be created without any traffic existing. """
+
+    # Delete any existing traffic and areas
+    MockTraf_.reset()
+    assert MockTraf_._children
+    assert not AreaRestrictionManager_.areaList
+
+    # Create fake traffic
+    MockTraf_.fake_traf()
+
+def test_arm_traf_noarea(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
+    """ Tests whether traffic can be created without any areas existing. """
+
+    # Delete any existing traffic and areas
+    MockTraf_.reset()
+    assert MockTraf_._children
+    assert not AreaRestrictionManager_.areaList
+
+    # Create fake traffic
+    MockTraf_.fake_traf()
+
+def test_arm_multi_delete(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
+    """ Test the deletion of multiple aircraft at the same time """
+
+    MockTraf_.reset()
+
+    # Creat the four fake aircraft and then delete the middle two
+    AreaRestrictionManager_.create_area("RAA_1", True, 0, 0, -1, -1, 1, -1, 1, 1, -1, 1, -1, -1)
+    MockTraf_.fake_traf()
+    MockTraf_.delete([1,2])
+
+    # Verify AC002 and AC003 were deleted
+    assert [x in MockTraf_.id for x in ["AC001", "AC004"]]
+
+    # Verify all vars have only 2 aircraft elements remaining
+    for var in AreaRestrictionManager_._LstVars:
+        assert len(AreaRestrictionManager_._Vars[var]) == 2
+    for var in AreaRestrictionManager_._ArrVars:
+        assert AreaRestrictionManager_._Vars[var].shape[1] == 2
 
 ##################################################################################################
 # Tests for methods of RestrictedAirspaceArea class

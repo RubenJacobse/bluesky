@@ -60,11 +60,11 @@ class MockTraf(TrafficArrays):
         # Set some variables that would be present in bs.traf and that are required by
         # the functions that are being tested
         self.id = ["AC001", "AC002", "AC003", "AC004"]
-        self.lon = np.array([0.0, 2.0, 0.0, -2.0])
+        self.lon = np.array([0.0, 2.0, 0.0, 0.0])
         self.lat = np.array([2.0, 0.0, -2.0, 0.0])
-        self.gseast = np.array([0, -250, 0, 250])
-        self.gsnorth = np.array([-250, 0, 250, 0])
-        self.gs = np.array([250, 250, 250, 250])
+        self.gseast = np.array([0, -450, 0, 450])
+        self.gsnorth = np.array([450, 0, 450, 0])
+        self.gs = np.array([450, 450, 450, 450])
 
 def mockfun(*args):
     """ Take any number of arguments and do nothing """
