@@ -18,7 +18,7 @@ KM_TO_NM = 1/1.852 # Conversion factor from kilometers to nautical miles
 ##################################################################################################
 # Test that plugin correctly returns config and stackfunctions variables to BlueSky
 ##################################################################################################
-def test_plugin_init(MockTraf_):
+def test_plugin_init():
     """ Check if the methods specified in init_plugin are member functions
         of the SuaArray class. """
 
@@ -29,6 +29,10 @@ def test_plugin_init(MockTraf_):
     assert "update" in config and "preupdate" in config and "reset" in config
     assert len(stackfunctions) == 3
 
+def test_traf_init(MockTraf_):
+    """ Ensure that the MockTraf_ object emulating bs.traf is instantiated before
+        the AreaRestrictionManager object. """
+    pass
 
 ##################################################################################################
 # Tests for AreaRestrictionManager class
@@ -36,7 +40,8 @@ def test_plugin_init(MockTraf_):
 def test_arm_init(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
     """ Verify that the AreaRestrictionManager initializes correctly. """
 
-    # Check that root element exists (MockTraf in these tests)
+    # Check that root element exists (MockTraf in these tests) and
+    # that the child-parent relationship is properly initialized
     assert AreaRestrictionManager_.root is MockTraf_
     assert AreaRestrictionManager_._parent is MockTraf_
     assert AreaRestrictionManager_ in MockTraf_._children
@@ -48,14 +53,14 @@ def test_arm_init(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
     assert AreaRestrictionManager_.t_lookahead == 300
 
     # Check that all traffic variables have been registered properly
-    arrVarList = ["vrel_east", "vrel_north", "vrel", "brg_l", "brg_r", "dist_l", "dist_r",\
+    arrVarList = ["vrel_east", "vrel_north", "brg_l", "brg_r", "dist_l", "dist_r",\
                    "area_conf", "area_inside", "area_tint"]
-    lstVarList = []
+    lstVarList = ["unused"]
     assert all(x in AreaRestrictionManager_._ArrVars for x in arrVarList)
     assert all(x in AreaRestrictionManager_._LstVars for x in lstVarList)
 
-def test_set_t_lookahead(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
-    """ Test the t_lookahead setter method. """
+def test_arm_set_t_lookahead(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
+    """ Test the set_t_lookahead() setter method. """
 
     assert AreaRestrictionManager_.t_lookahead == 300
 
@@ -72,7 +77,7 @@ def test_set_t_lookahead(AreaRestrictionManager_, MockTraf_, areafilter_, mocktr
     assert AreaRestrictionManager_.t_lookahead == 300
 
 def test_arm_create_area(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
-    """ Verify that the create_area function works correctly """
+    """ Verify that the create_area() method works correctly """
 
     # Add first area
     AreaRestrictionManager_.create_area("RAA_1", True, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0)
@@ -90,7 +95,7 @@ def test_arm_create_area(AreaRestrictionManager_, MockTraf_, areafilter_, mocktr
     assert not success
 
 def test_arm_delete_area(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
-    """ Verify that the delete_area function works correctly """
+    """ Verify that the delete_area() method works correctly. """
 
     # Test deletion of an existing area
     success, _ = AreaRestrictionManager_.delete_area("RAA_2")
@@ -103,17 +108,42 @@ def test_arm_delete_area(AreaRestrictionManager_, MockTraf_, areafilter_, mocktr
     assert AreaRestrictionManager_.nareas == 1
 
 def test_arm_create(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
-    pass
+    """ Verify that the create() method works correctly. """
+
+    # Create some fake traffic
+    MockTraf_.fake_traf()
+    nareas = AreaRestrictionManager_.nareas
+    ntraf = MockTraf_.ntraf
+
+    assert nareas == 1
+    assert ntraf == 4
+
+    # Check that list variables have an entry for each aircraft and that
+    # array variables have an entry for each area,aircraft combination
+    for var in AreaRestrictionManager_._LstVars:
+        assert len(AreaRestrictionManager_._Vars[var]) == ntraf
+    for var in AreaRestrictionManager_._ArrVars:
+        assert np.shape(AreaRestrictionManager_._Vars[var]) == (nareas, ntraf)
 
 def test_arm_delete(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
-    pass
+    """ Verify that the delete() method works correctly. """
+
+    assert AreaRestrictionManager_.nareas == 1
+    assert MockTraf_.ntraf == 4
+    for var in AreaRestrictionManager_._ArrVars:
+        # print("{} : {}".format(var, AreaRestrictionManager_._Vars[var]))
+        assert np.size(AreaRestrictionManager_._Vars[var]) == 4
+
+    # AreaRestrictionManager_.delete(3)
+    assert MockTraf_.delete(3)
+    assert MockTraf_.ntraf == 3
+
+    assert MockTraf_.delete(2)
+    assert MockTraf_.ntraf == 2
 
 def test_arm_reset(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
     """ Verify that the reset() method results in the initial state
         with empty variable lists. """
-
-    # Create some fake traffic
-    MockTraf_.fake_traf()
 
     # Check that variables have values before reset
     for var in AreaRestrictionManager_._LstVars:
@@ -125,9 +155,9 @@ def test_arm_reset(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
     AreaRestrictionManager_.reset()
 
     for var in AreaRestrictionManager_._LstVars:
-        assert var == []
+        assert AreaRestrictionManager_._Vars[var] == []
     for var in AreaRestrictionManager_._ArrVars:
-        assert np.shape(var) == ()
+        assert np.shape(AreaRestrictionManager_._Vars[var]) == (0,)
 
     # Check that all areas have been deleted
     assert AreaRestrictionManager_.areaList == []
@@ -180,7 +210,7 @@ def test_raa_update_pos(areafilter_):
     # NOTE: Verification of correctness of movement to be added
 
 def test_raa_check_poly(areafilter_):
-    """ Test the function that ensure a user-entered polygon is defined by a
+    """ Test the function that ensures a user-entered polygon is defined by a
         counterclockwise closed ring. """
 
     # Create an area
@@ -219,7 +249,7 @@ def test_raa_coords2verts(areafilter_):
     assert np.array_equal(raa._coords2verts(coords), verts)
 
 def test_raa_verts2coords(areafilter_):
-    """ Test the correctness of the function that transforms a coordinate list in 
+    """ Test the correctness of the function that transforms a coordinate list in
         lat,lon order to an array of vertices in lon,lat order. """
 
     # Create an area

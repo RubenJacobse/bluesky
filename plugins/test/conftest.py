@@ -33,6 +33,11 @@ class MockTraf(TrafficArrays):
         for child in self._children:
             child.create(n)
 
+    def delete(self, idx):
+        super().delete(idx)
+        self.ntraf -= 1
+        return True
+
     def fake_traf(self):
         """ Create 4 fake traffic elements """
 

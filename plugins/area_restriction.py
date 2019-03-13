@@ -29,7 +29,7 @@ from bluesky.tools.geo import qdrdist
 from bluesky.tools.trafficarrays import TrafficArrays, RegisterElementParameters
 
 # Default variable values for numpy arrays
-VAR_DEFAULTS = {"float": 0.0, "int": 0, "bool": False, "S": "", "str": ""}
+VAR_DEFAULTS = {"float": 0.0, "int": 0, "bool": False, "S": None, "str": None}
 
 # Initialize BlueSky plugin
 def init_plugin():
@@ -120,16 +120,17 @@ class AreaRestrictionManager(TrafficArrays):
 
         # Register all traffic parameters relevant for this class
         with RegisterElementParameters(self):
-            self.vrel_east = np.array([]) # [m/s] East component of ac relative velocity wrt area
-            self.vrel_north = np.array([]) # [m/s] North component of ac relative velocity wrt area
-            self.vrel = np.array([]) # [m/s] Magnitude of ac relative velocity wrt area
-            self.brg_l = np.array([]) # [deg] Bearing from ac to leftmost vertex
-            self.brg_r = np.array([]) # [deg] Bearing from ac to rightmost vertex
-            self.dist_l = np.array([]) # [m] Distance from ac to leftmost vertex
-            self.dist_r = np.array([]) # [m] Distance from ac to rightmost vertex
-            self.area_conf = np.array([], dtype = bool) # Stores wheter ac is in conflict with area
-            self.area_inside = np.array([], dtype = bool) # Stores whether ac is inside area
-            self.area_tint = np.array([]) # [s] Time to area intrusion
+            self.vrel_east = np.array([[]]) # [m/s] East component of ac relative velocity wrt area
+            self.vrel_north = np.array([[]]) # [m/s] North component of ac relative velocity wrt area
+            self.vrel = np.array([[]]) # [m/s] Magnitude of ac relative velocity wrt area
+            self.brg_l = np.array([[]]) # [deg] Bearing from ac to leftmost vertex
+            self.brg_r = np.array([[]]) # [deg] Bearing from ac to rightmost vertex
+            self.dist_l = np.array([[]]) # [m] Distance from ac to leftmost vertex
+            self.dist_r = np.array([[]]) # [m] Distance from ac to rightmost vertex
+            self.area_conf = np.array([[]], dtype = bool) # Stores wheter ac is in conflict with area
+            self.area_inside = np.array([[]], dtype = bool) # Stores whether ac is inside area
+            self.area_tint = np.array([[]]) # [s] Time to area intrusion
+            self.unused = [] # Only used for testing
 
         # Keep track of all restricted areas in list and by ID (same order)
         self.areaList = []
@@ -157,13 +158,12 @@ class AreaRestrictionManager(TrafficArrays):
             vartype = None
             lst = self.__dict__.get(v)
             if lst:
-            #if len(lst) > 0:
                 vartype = str(type(lst[0])).split("'")[1]
 
             if vartype in VAR_DEFAULTS:
                 defaultvalue = [VAR_DEFAULTS[vartype]] * n
             else:
-                defaultvalue = [""] * n
+                defaultvalue = [None] * n
 
             self._Vars[v].extend(defaultvalue)
 
@@ -212,6 +212,8 @@ class AreaRestrictionManager(TrafficArrays):
             else:
                 for v in self._LstVars:
                     del self._Vars[v][idx]
+
+        return True
 
     def reset(self):
         """ Reset state on simulator reset event. """
