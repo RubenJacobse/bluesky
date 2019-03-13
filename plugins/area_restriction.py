@@ -268,7 +268,7 @@ class AreaRestrictionManager(TrafficArrays):
             # Calculate velocity components of each aircraft relative to the area
             self.vrel_east[idx, :] = bs.traf.gseast - area.gs_east
             self.vrel_north[idx, :] = bs.traf.gsnorth - area.gs_north
-            self.vrel = np.sqrt(self.vrel_east[idx, :]**2 + self.vrel_north[idx, :]**2)
+            self.vrel[idx, :] = np.sqrt(self.vrel_east[idx, :]**2 + self.vrel_north[idx, :]**2)
 
             # Calculate position of each aircraft relative to the area after t_lookahead
             ac_fut_rel_lon, ac_fut_rel_lat = calc_future_pos(self.t_lookahead, bs.traf.lon, bs.traf.lat, \
