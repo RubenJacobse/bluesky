@@ -281,39 +281,8 @@ class AreaRestrictionManager(TrafficArrays):
             ac_fut_rel_pos = [spgeom.Point(lon, lat) for (lon, lat) in zip(ac_fut_rel_lon, ac_fut_rel_lat)]
             ac_rel_vec = [spgeom.LineString([curr, fut]) for (curr, fut) in zip(ac_curr_pos, ac_fut_rel_pos)]
 
-            # Find all aircraft-area conflicts
-            for ac_idx in range(bs.traf.ntraf):
-                # Use shapely to determine if the aircraft path in relative velocity space
-                # with respect to the area crosses the polygon ring.
-                self.area_conf[idx, ac_idx] = area.ring.intersects(ac_rel_vec[ac_idx])
-
-                # Check if the aircraft is inside the area
-                self.area_inside[idx, ac_idx] = ac_curr_pos[ac_idx].within(area.poly)
-
-                # Calculate time-to-intersection [s] for aircraft-area combination, takes following values:
-                #  -1 : for aircraft not in conflict with the area
-                #  0  : for aircraft already inside the area
-                #  >0 : for aircraft that are in conflict
-                if self.area_inside[idx, ac_idx]:
-                    t_int = 0
-                elif self.area_conf[idx, ac_idx]:
-                    # Find intersection points of the relative vector with the area and use the
-                    # distance to the closest point to calculate time-to-intersection. (We cannot
-                    # use shapely distance functions because vertex definitions are in degrees).
-                    intr_points = area.ring.intersection(ac_rel_vec[ac_idx])
-                    intr_closest = spops.nearest_points(ac_curr_pos[ac_idx], intr_points)[1]
-                    intr_closest_lat, intr_closest_lon = intr_closest.y, intr_closest.x
-                    _, intr_dist_nm = qdrdist(bs.traf.lat[ac_idx], bs.traf.lon[ac_idx], intr_closest_lat, intr_closest_lon)
-                    intr_dist_m = intr_dist_nm * 1852 # qdrdist returns dist in NM, convert to m
-                    t_int = intr_dist_m / bs.traf.gs[ac_idx]
-                else:
-                    t_int = -1
-                self.area_tint[idx, ac_idx] = t_int
-
-                # Print some messages that may be useful in debugging
-                dbg_str = "Aircraft {} time to conflict with area {} is: {} seconds"
-                t_int_sec = round(self.area_tint[idx, ac_idx])
-                # print(dbg_str.format(bs.traf.id[ac_idx], area.area_id, t_int_sec))
+            # Find aircraft-area conflicts and intrusions
+            self.area_conflicts(idx, area, ac_curr_pos, ac_rel_vec)
 
             # Components of unit vectors along VO edges
             u_l_east = np.sin(np.radians(self.brg_l))
@@ -327,9 +296,14 @@ class AreaRestrictionManager(TrafficArrays):
             beta_l = np.degrees(beta_l_rad)
             beta_r = np.degrees(beta_r_rad)
 
+            crs_l = enu2crs(beta_l)
+            crs_r = enu2crs(beta_r)
+
             # Relative resolution velocity component along the VO edges
             vh_ul = self.vrel * np.cos(beta_l_rad) + bs.traf.gs * np.cos(np.arcsin(self.vrel * np.sin(beta_l_rad) / bs.traf.gs))
             vh_ur = self.vrel * np.cos(beta_r_rad) + bs.traf.gs * np.cos(np.arcsin(self.vrel * np.sin(beta_r_rad) / bs.traf.gs))
+
+            print("")
 
     def create_area(self, area_id, area_status, gs_north, gs_east, *coords):
         """ Create a new restricted airspace area """
@@ -419,6 +393,44 @@ class AreaRestrictionManager(TrafficArrays):
         else:
             self.t_lookahead = t
             return True, "Aircraft-area conflict look-ahead-time set to {} seconds".format(t)
+
+    def area_conflicts(self, idx, area, ac_curr_pos, ac_rel_vec):
+        """" Find all aircraft-area conflicts for RestrictedAispaceArea area
+             at row idx. """
+
+        for ac_idx in range(self.ntraf):
+            # Use shapely to determine if the aircraft path in relative velocity space
+            # with respect to the area crosses the polygon ring.
+            self.area_conf[idx, ac_idx] = area.ring.intersects(ac_rel_vec[ac_idx])
+
+            # Check if the aircraft is inside the area
+            self.area_inside[idx, ac_idx] = ac_curr_pos[ac_idx].within(area.poly)
+
+            # Calculate time-to-intersection [s] for aircraft-area combination, takes following values:
+            #  -1 : for aircraft not in conflict with the area
+            #  0  : for aircraft already inside the area
+            #  >0 : for aircraft that are in conflict
+            if self.area_inside[idx, ac_idx]:
+                t_int = 0
+            elif self.area_conf[idx, ac_idx]:
+                # Find intersection points of the relative vector with the area and use the
+                # distance to the closest point to calculate time-to-intersection. (We cannot
+                # use shapely distance functions because vertex definitions are in degrees).
+                intr_points = area.ring.intersection(ac_rel_vec[ac_idx])
+                intr_closest = spops.nearest_points(ac_curr_pos[ac_idx], intr_points)[1]
+                intr_closest_lat, intr_closest_lon = intr_closest.y, intr_closest.x
+                _, intr_dist_nm = qdrdist(bs.traf.lat[ac_idx], bs.traf.lon[ac_idx], intr_closest_lat, intr_closest_lon)
+                intr_dist_m = intr_dist_nm * 1852 # qdrdist returns dist in NM, convert to m
+                t_int = intr_dist_m / bs.traf.gs[ac_idx]
+            else:
+                t_int = -1
+            self.area_tint[idx, ac_idx] = t_int
+
+            # Print some messages that may be useful in debugging
+            dbg_str = "Aircraft {} time to conflict with area {} is: {} seconds"
+            t_int_sec = round(self.area_tint[idx, ac_idx])
+            # print(dbg_str.format(bs.traf.id[ac_idx], area.area_id, t_int_sec))
+
 
 class RestrictedAirspaceArea():
     """ Class that represents a single Restricted Airspace Area. """
@@ -649,3 +661,11 @@ def calc_future_pos(dt, lon, lat, gs_e, gs_n):
     newlon = lon + np.degrees(dt * gs_e / newcoslat / Rearth)
 
     return newlon, newlat
+
+def enu2crs(enu):
+    """ Convert an array of angles defined in East-North-Up on
+        [-180,180] degrees to compass angles on [0,360]. """
+
+    crs = ((90 - enu) + 360 ) % 360
+
+    return crs
