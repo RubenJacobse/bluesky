@@ -3,6 +3,7 @@
 import pytest
 import numpy as np
 import bluesky as bs
+from collections.abc import Collection
 from bluesky.tools import areafilter, TrafficArrays, RegisterElementParameters
 from area_restriction import AreaRestrictionManager
 
@@ -38,10 +39,18 @@ class MockTraf(TrafficArrays):
 
     def delete(self, idx):
         """ Delete aircraft at index idx from all variables. """
+        
+        if isinstance(idx, Collection):
+            idx.sort()
+            dec = len(idx)
+        else:
+            dec = 1
 
         # Call actual delete() method
         super().delete(idx)
-        self.ntraf -= 1 # Will cause error for multiple deletions at once
+        
+        self.ntraf -= dec
+
         return True
 
     def reset(self):

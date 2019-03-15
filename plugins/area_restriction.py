@@ -29,7 +29,7 @@ from bluesky.tools.geo import qdrdist
 from bluesky.tools.trafficarrays import TrafficArrays, RegisterElementParameters
 
 # Default variable values for numpy arrays
-VAR_DEFAULTS = {"float": 0.0, "int": 0, "bool": False, "S": None, "str": None}
+VAR_DEFAULTS = {"float": 0.0, "int": 0, "bool": False, "S": "", "str": ""}
 
 # Initialize BlueSky plugin
 def init_plugin():
@@ -148,23 +148,24 @@ class AreaRestrictionManager(TrafficArrays):
             handling of two-dimensional numpy arrays.
         """
 
+        self.ntraf += n
+
         # If no areas exist do nothing
         if not self.nareas:
             return
 
-        # Same as in TrafficArrays (_LstVars remains one-dimensional)
         for v in self._LstVars:  # Lists (mostly used for strings)
 
             # Get type
             vartype = None
             lst = self.__dict__.get(v)
-            if lst:
+            if len(lst) > 0:
                 vartype = str(type(lst[0])).split("'")[1]
 
             if vartype in VAR_DEFAULTS:
                 defaultvalue = [VAR_DEFAULTS[vartype]] * n
             else:
-                defaultvalue = [None] * n
+                defaultvalue = [""] * n
 
             self._Vars[v].extend(defaultvalue)
 
@@ -191,13 +192,17 @@ class AreaRestrictionManager(TrafficArrays):
             else:
                 self._Vars[v] = np.concatenate((self._Vars[v], new_cols), 1)
 
-        self.ntraf += n
-
     def delete(self, idx):
         """ Delete element (aircraft) idx from all lists and arrays.
 
             Overrides TrafficArrays.delete(idx) method to allow
             handling of two-dimensional numpy arrays. """
+
+        if isinstance(idx, Collection):
+            idx.sort()
+            dec = len(idx)
+        else:
+            dec = 1
 
         for child in self._children:
             child.delete(idx)
@@ -215,7 +220,7 @@ class AreaRestrictionManager(TrafficArrays):
                 for v in self._LstVars:
                     del self._Vars[v][idx]
 
-        self.ntraf -= 1 # Will give problems with multiple simultaneous deletions
+        self.ntraf -= dec
 
         return True
 
@@ -296,7 +301,7 @@ class AreaRestrictionManager(TrafficArrays):
                 if self.area_inside[idx, ac_idx]:
                     t_int = 0
                 elif self.area_conf[idx, ac_idx]:
-                    # Find intersection points of the relative vector with the area and use the 
+                    # Find intersection points of the relative vector with the area and use the
                     # distance to the closest point to calculate time-to-intersection. (We cannot
                     # use shapely distance functions because vertex definitions are in degrees).
                     intr_points = area.ring.intersection(ac_rel_vec[ac_idx])
@@ -341,7 +346,22 @@ class AreaRestrictionManager(TrafficArrays):
 
         self.areaList.append(new_area)
         self.areaIDList.append(area_id)
-        # self.nareas += 1
+
+        for v in self._LstVars:  # Lists (mostly used for strings)
+
+            # Get type
+            vartype = None
+            lst = self.__dict__.get(v)
+            if lst:
+                vartype = str(type(lst[0])).split("'")[1]
+
+            if vartype in VAR_DEFAULTS:
+                defaultvalue = [VAR_DEFAULTS[vartype]] * bs.traf.ntraf
+            else:
+                defaultvalue = [""] * bs.traf.ntraf
+
+            if not self._Vars[v]:
+                self._Vars[v] = defaultvalue
 
         # Add row to all numpy arrays
         for v in self._ArrVars:
@@ -367,6 +387,7 @@ class AreaRestrictionManager(TrafficArrays):
             else:
                 self._Vars[v] = np.vstack((self._Vars[v], newrow))
 
+        # Increment after adding variable elements
         self.nareas += 1
 
         return True, "Restricted Airspace Area {} is initialized".format(area_id)

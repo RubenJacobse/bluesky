@@ -1,5 +1,6 @@
 """ Test the area_restriction plugin. """
 
+import pytest
 import numpy as np
 import shapely.geometry as spgeom
 import area_restriction as ar
@@ -206,34 +207,39 @@ def test_arm_update(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
     MockTraf_.reset()
 
     # Create area and fake traffic
-    AreaRestrictionManager_.create_area("RAA_1", True, 0, 0, -1, -1, 1, -1, 1, 1, -1, 1, -1, -1)
+    AreaRestrictionManager_.create_area("RAA_4", True, 0, 0, -1, -1, 1, -1, 1, 1, -1, 1, -1, -1)
     MockTraf_.fake_traf()
     AreaRestrictionManager_.update()
-    
+
+    # Verify that conflicts / inside conditions are evaluated correctly
     assert np.array_equal(AreaRestrictionManager_.area_conf, np.array([[False, True, True, True]]))
     assert np.array_equal(AreaRestrictionManager_.area_inside, np.array([[False, False, False, True]]))
 
-def test_arm_area_notraf(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
-    """ Tests whether area can be created without any traffic existing. """
+    # Add extra tests to verify avoidance vector calculations
 
-    # Delete any existing traffic and areas
-    MockTraf_.reset()
-    assert MockTraf_._children
-    assert not AreaRestrictionManager_.areaList
-
-    # Create fake traffic
-    MockTraf_.fake_traf()
-
+@pytest.mark.xfail
 def test_arm_traf_noarea(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
-    """ Tests whether traffic can be created without any areas existing. """
+    """ Tests whether traffic can be created before area creation """
 
     # Delete any existing traffic and areas
     MockTraf_.reset()
     assert MockTraf_._children
     assert not AreaRestrictionManager_.areaList
+    assert not MockTraf_.ntraf
 
-    # Create fake traffic
+    # Create fake traffic and then create area
     MockTraf_.fake_traf()
+
+    AreaRestrictionManager_.create_area("RAA_4", True, 0, 0, -1, -1, 1, -1, 1, 1, -1, 1, -1, -1)
+    AreaRestrictionManager_.create_area("RAA_5", True, 0, 0, -1, -1, 1, -1, 1, 1, -1, 1, -1, -1)
+
+    assert AreaRestrictionManager_.ntraf == 4
+
+    # Verify all vars have 4 aircraft elements
+    for var in AreaRestrictionManager_._LstVars:
+        assert len(AreaRestrictionManager_._Vars[var]) == 4
+    for var in AreaRestrictionManager_._ArrVars:
+        assert AreaRestrictionManager_._Vars[var].shape == (2, 4)
 
 def test_arm_multi_delete(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
     """ Test the deletion of multiple aircraft at the same time """
@@ -243,12 +249,22 @@ def test_arm_multi_delete(AreaRestrictionManager_, MockTraf_, areafilter_, mockt
     # Creat the four fake aircraft and then delete the middle two
     AreaRestrictionManager_.create_area("RAA_1", True, 0, 0, -1, -1, 1, -1, 1, 1, -1, 1, -1, -1)
     MockTraf_.fake_traf()
+    assert MockTraf_.ntraf == 4
+    assert AreaRestrictionManager_.ntraf == 4
     MockTraf_.delete([1,2])
+    assert MockTraf_.ntraf == 2
+    assert AreaRestrictionManager_.ntraf == 2
 
     # Verify AC002 and AC003 were deleted
     assert [x in MockTraf_.id for x in ["AC001", "AC004"]]
 
-    # Verify all vars have only 2 aircraft elements remaining
+    # Verify all aircraft variables in MockTraf_ have only 2 elements remaining
+    for var in MockTraf_._LstVars:
+        assert len(MockTraf_._Vars[var]) == 2
+    for var in MockTraf_._ArrVars:
+        assert len(MockTraf_._Vars[var]) == 2
+
+    # Verify all aircraft variables in AreaRestrictionManager_ have only 2 elements for each area
     for var in AreaRestrictionManager_._LstVars:
         assert len(AreaRestrictionManager_._Vars[var]) == 2
     for var in AreaRestrictionManager_._ArrVars:
@@ -322,7 +338,7 @@ def test_raa_delete(areafilter_):
 
     # Create an area
     raa = RestrictedAirspaceArea("RAA", True, 0, 0, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
-
+    
     raa.delete()
 
 def test_raa_coords2verts(areafilter_):
