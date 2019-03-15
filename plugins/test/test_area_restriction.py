@@ -491,3 +491,13 @@ def test_raa_crs_is_between(areafilter_):
     assert not raa.crs_is_between(220, 220, 220)
     assert not raa.crs_is_between(180, 181, 179)
 
+##################################################################################################
+# Tests for other functions
+##################################################################################################
+def test_enu2crs():
+    """ Test the function that converts ENU angles to compass angles. """
+    enu = np.array([-180, -135, -90, -45, 0, 45, 90, 135, 180])
+    crs_corr = np.array([270, 225, 180, 135, 90, 45, 0, 315, 270])
+    crs = ar.enu2crs(enu)
+
+    assert np.array_equal(crs, crs_corr)
