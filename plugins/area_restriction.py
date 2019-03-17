@@ -264,7 +264,7 @@ class AreaRestrictionManager(TrafficArrays):
         for idx, area in enumerate(self.areaList):
             # Calculate bearings and distance to the tangent vertices of the area
             self.brg_l[idx, :], self.brg_r[idx, :], self.dist_l[idx, :], self.dist_r[idx, :] = \
-                area.calc_tangents(bs.traf.ntraf, bs.traf.lat, bs.traf.lon)
+                area.calc_tangents(bs.traf.ntraf, bs.traf.lon, bs.traf.lat)
 
             # Calculate velocity components of each aircraft relative to the area
             self.vrel_east[idx, :] = bs.traf.gseast - area.gs_east
@@ -508,12 +508,8 @@ class RestrictedAirspaceArea():
         if (coords[0], coords[1]) != (coords[-2], coords[-1]):
             coords = coords + [coords[0], coords[1]]
 
-        # Check if the polygon is ccw, if not, then flip the coordinate order
-        dir_sum = 0
-        for ii in range(0, len(coords) - 2, 2): # ii = 0,2,4,...
-            edge = (coords[ii + 2] - coords[ii]) * (coords[ii + 1] + coords[ii + 3])
-            dir_sum += edge
-        if dir_sum >= 0:
+        # If the coordinates are not ordered in ccw direction, then rearrange the coords
+        if not self.is_ccw(coords):
             reordered = []
             for ii in range(0, len(coords) - 1, 2):
                 reordered = [coords[ii], coords[ii + 1]] + reordered
@@ -562,7 +558,7 @@ class RestrictedAirspaceArea():
         areafilter.deleteArea(self.area_id)
 
     # NOTE: How can this be vectorized further?
-    def calc_tangents(self, ntraf, ac_lat, ac_lon):
+    def calc_tangents(self, ntraf, ac_lon, ac_lat):
         """ For a given aircraft position find left- and rightmost courses
             that are tangent to a given polygon as well as the distance to
             the corresponding vertices. """
@@ -600,8 +596,8 @@ class RestrictedAirspaceArea():
                         idx_l = jj
 
             # Calculate tangent courses from aircraft to left- and rightmost vertices
-            qdr_l[ii], dist_l[ii] = qdrdist(ac_pos[0], ac_pos[1], vertex[idx_l][0], vertex[idx_l][1])
-            qdr_r[ii], dist_r[ii] = qdrdist(ac_pos[0], ac_pos[1], vertex[idx_r][0], vertex[idx_r][1])
+            qdr_l[ii], dist_l[ii] = qdrdist(ac_pos[1], ac_pos[0], vertex[idx_l][1], vertex[idx_l][0])
+            qdr_r[ii], dist_r[ii] = qdrdist(ac_pos[1], ac_pos[0], vertex[idx_r][1], vertex[idx_r][0])
 
         return qdr_l, qdr_r, dist_l, dist_r
 
@@ -651,6 +647,21 @@ class RestrictedAirspaceArea():
 
         return (p_1[0] - p_0[0]) * (p_2[1] - p_0[1]) - (p_2[0] - p_0[0]) * (p_1[1] - p_0[1])
 
+    @staticmethod
+    def is_ccw(coords):
+        """ Check if a list of lat,lon coordinates is defined in
+            counterclockwise order. """
+
+        dir_sum = 0
+        for ii in range(0, len(coords) - 2, 2): # ii = 0,2,4,...
+            # edge = (coords[ii + 2] - coords[ii]) * (coords[ii + 1] + coords[ii + 3])
+            edge = (coords[ii + 3] - coords[ii + 1]) * (coords[ii] + coords[ii + 2])
+            print("Edge {}: {}".format(ii, edge))
+            dir_sum += edge
+
+        print("{}".format(dir_sum))
+
+        return False if dir_sum > 0 else True
 
 def calc_future_pos(dt, lon, lat, gs_e, gs_n):
     """ Calculate future lon and lat vectors after time dt based on
