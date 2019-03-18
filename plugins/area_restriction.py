@@ -119,8 +119,10 @@ class AreaRestrictionManager(TrafficArrays):
             self.vrel_east = np.array([[]]) # [m/s] East component of ac relative velocity wrt area
             self.vrel_north = np.array([[]]) # [m/s] North component of ac relative velocity wrt area
             self.vrel = np.array([[]]) # [m/s] Magnitude of ac relative velocity wrt area
-            self.brg_l = np.array([[]]) # [deg] Bearing from ac to leftmost vertex
-            self.brg_r = np.array([[]]) # [deg] Bearing from ac to rightmost vertex
+            self.brg_l = np.array([[]]) # [deg] Bearing from ac to leftmost vertex in N-E-D [-180..180]
+            self.brg_r = np.array([[]]) # [deg] Bearing from ac to rightmost vertex in N-E-D [-180..180]
+            self.crs_l = np.array([[]]) # [deg] Compass course from ac to leftmost vertex in N-E-D [0..360]
+            self.crs_r = np.array([[]]) # [deg] Compass course from ac to rightmost vertex in N-E-D [0..360]
             self.dist_l = np.array([[]]) # [m] Distance from ac to leftmost vertex
             self.dist_r = np.array([[]]) # [m] Distance from ac to rightmost vertex
             self.area_conf = np.array([[]], dtype = bool) # Stores wheter ac is in conflict with area
@@ -266,6 +268,10 @@ class AreaRestrictionManager(TrafficArrays):
             self.brg_l[idx, :], self.brg_r[idx, :], self.dist_l[idx, :], self.dist_r[idx, :] = \
                 area.calc_tangents(bs.traf.ntraf, bs.traf.lon, bs.traf.lat)
 
+            # Compass courses tangent to current area for each aircraft
+            self.crs_l[idx, :] = ned2crs(self.brg_l[idx, :])
+            self.crs_r[idx, :] = ned2crs(self.brg_r[idx, :])
+
             # Calculate velocity components of each aircraft relative to the area
             self.vrel_east[idx, :] = bs.traf.gseast - area.gs_east
             self.vrel_north[idx, :] = bs.traf.gsnorth - area.gs_north
@@ -296,12 +302,9 @@ class AreaRestrictionManager(TrafficArrays):
             beta_l = np.degrees(beta_l_rad)
             beta_r = np.degrees(beta_r_rad)
 
-            crs_l = enu2crs(beta_l)
-            crs_r = enu2crs(beta_r)
-
             # Relative resolution velocity component along the VO edges
-            vh_ul = self.vrel * np.cos(beta_l_rad) + bs.traf.gs * np.cos(np.arcsin(self.vrel * np.sin(beta_l_rad) / bs.traf.gs))
-            vh_ur = self.vrel * np.cos(beta_r_rad) + bs.traf.gs * np.cos(np.arcsin(self.vrel * np.sin(beta_r_rad) / bs.traf.gs))
+            v_ul = self.vrel * np.cos(beta_l_rad) + bs.traf.gs * np.cos(np.arcsin(self.vrel * np.sin(beta_l_rad) / bs.traf.gs))
+            v_ur = self.vrel * np.cos(beta_r_rad) + bs.traf.gs * np.cos(np.arcsin(self.vrel * np.sin(beta_r_rad) / bs.traf.gs))
 
             print("")
 
@@ -678,5 +681,13 @@ def enu2crs(enu):
         [-180,180] degrees to compass angles on [0,360]. """
 
     crs = ((90 - enu) + 360 ) % 360
+
+    return crs
+
+def ned2crs(ned):
+    """ Convert an array of angles defined in North-East-Down on
+    [-180,180] degrees to compass angles on [0,360]. """
+
+    crs = (ned + 360 ) % 360
 
     return crs

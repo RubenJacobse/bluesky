@@ -17,7 +17,6 @@ KM_TO_NM = 1/1.852 # Conversion factor from kilometers to nautical miles
 
 # NOTE: Code below commented out because it creates a second (unwanted) instance of the 
 # AreaRestrictionManager class in the TrafficArrays tree. - To be fixed
-
 # ##################################################################################################
 # # Test that plugin correctly returns config and stackfunctions variables to BlueSky
 # ##################################################################################################
@@ -280,7 +279,9 @@ def test_raa_init(areafilter_):
     test_status = True
     test_gseast = 10
     test_gsnorth = -30
-    test_coords = [-1, -1, 1, -1, 1, 1, 1, -1, -1, -1]
+
+    # Vertices in ccw order (lon,lat): (-1,-1), (1,-1), (1,1), (-1,1), (-1,-1)
+    test_coords = [-1, -1, -1, 1, 1, 1, 1, -1, -1, -1]
 
     raa = RestrictedAirspaceArea(test_id, test_status, test_gseast, test_gsnorth, test_coords)
 
@@ -290,10 +291,11 @@ def test_raa_init(areafilter_):
     assert raa.gs_north == test_gsnorth
     assert raa.coords == test_coords
 
-    assert isinstance(raa.ring, spgeom.LinearRing)
-    assert [raa.ring.coords.xy[0][0], raa.ring.coords.xy[1][0]] == [test_coords[0], test_coords[1]]
-    assert isinstance(raa.poly, spgeom.Polygon)
-    assert [raa.poly.exterior.coords.xy[0][0], raa.poly.exterior.coords.xy[1][0]] == [test_coords[0], test_coords[1]]
+    assert raa.ring.is_valid
+    assert raa.ring.is_closed
+    assert raa.ring.is_ccw
+    assert raa.poly.is_valid
+    assert raa.poly.exterior.coords.xy == raa.ring.coords.xy
 
 def test_raa_update_pos(areafilter_):
     """ Test the function that calculates the new coordinates of a moving
@@ -314,6 +316,44 @@ def test_raa_update_pos(areafilter_):
     assert raa_1.coords != raa_1_coords_orig
     # NOTE: Verification of correctness of movement to be added
 
+def test_raa_is_ccw(areafilter_):
+    """ Test the function that checks if a coordinate sequence is
+        defined in counter-clockwise order. """
+
+    # Test some coordinate lists
+    coords1 = [0, 0, 0, 1, 1, 1, 1, 0, 0, 0] # ccw
+    coords2 = [0, 0, 1, 0, 1, 1, 0, 1, 0, 0] # not ccw
+    coords3 = [-1, -1, 1, -1, 1, 1, -1, 1, -1, -1] # not ccw
+    coords4 = [-1, -1, -1, 1, 1, 1, 1, -1, -1, -1] # ccw
+
+    # Create areas
+    raa1 = RestrictedAirspaceArea("RAA1", True, 0, 0, coords1)
+    raa2 = RestrictedAirspaceArea("RAA2", True, 0, 0, coords2)
+    raa3 = RestrictedAirspaceArea("RAA3", True, 0, 0, coords3)
+    raa4 = RestrictedAirspaceArea("RAA4", True, 0, 0, coords4)
+
+    # Verify both are processed correctly
+    assert raa1.ring.is_ccw
+    assert raa1.coords == coords1
+    assert raa2.ring.is_ccw
+    assert raa2.coords != coords2
+    assert raa1.coords == raa2.coords
+
+    assert raa3.ring.is_ccw
+    assert raa3.coords != coords3
+    assert raa4.ring.is_ccw
+    assert raa4.coords == coords4
+    assert raa3.coords == raa4.coords
+
+    assert raa1.is_ccw(coords1)
+    assert raa1.is_ccw(raa1.coords)
+    assert not raa2.is_ccw(coords2)
+    assert raa1.is_ccw(raa2.coords)
+    assert not raa3.is_ccw(coords3)
+    assert raa3.is_ccw(raa3.coords)
+    assert raa4.is_ccw(coords4)
+    assert raa4.is_ccw(raa4.coords)
+
 def test_raa_check_poly(areafilter_):
     """ Test the function that ensures a user-entered polygon is defined by a
         counterclockwise closed ring. """
@@ -322,16 +362,21 @@ def test_raa_check_poly(areafilter_):
     raa = RestrictedAirspaceArea("RAA", True, 0, 0, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
 
     # Test some coordinate lists
-    coords0_in = [0, 0, 1, 0, 1, 1, 0, 1]  # Not a closed ring
-    coords1_in = [0, 0, 0, 1, 1, 1, 1, 0, 0, 0]    # Not counter-clockwise
-    coords2_in = [0, 0, 1, 0, 1, 1, 0, 1, 0, 0]    # Correct
+    coords0_in = [0, 0, 1, 0, 1, 1, 0, 1] # Not a closed ring, not ccw
+    coords1_in = [0, 0, 0, 1, 1, 1, 1, 0, 0, 0] # Correct, ccw
+    coords2_in = [0, 0, 1, 0, 1, 1, 0, 1, 0, 0] # Not ccw
+    coords3_in = [-1, -1, 1, -1, 1, 1, -1, 1, -1, -1] # Not ccw
 
-    # All three above lists should result in the same output:
-    coords_out = [0, 0, 1, 0, 1, 1, 0, 1, 0, 0]
+    # The above lists should result in the following outputs:
+    coords0_out = [0, 0, 0, 1, 1, 1, 1, 0, 0, 0]
+    coords1_out = [0, 0, 0, 1, 1, 1, 1, 0, 0, 0]
+    coords2_out = [0, 0, 0, 1, 1, 1, 1, 0, 0, 0]
+    coords3_out = [-1, -1, -1, 1, 1, 1, 1, -1, -1, -1]
 
-    assert raa._check_poly(coords0_in) == coords_out
-    assert raa._check_poly(coords1_in) == coords_out
-    assert raa._check_poly(coords2_in) == coords_out
+    assert raa._check_poly(coords0_in) == coords0_out
+    assert raa._check_poly(coords1_in) == coords1_out
+    assert raa._check_poly(coords2_in) == coords2_out
+    assert raa._check_poly(coords3_in) == coords3_out
 
 def test_raa_delete(areafilter_):
     """ Test the delete function. """
@@ -371,7 +416,8 @@ def test_raa_calc_tangents(areafilter_):
         area. """
 
     # Create an area with vertices at (lon,lat): {(-1, -1), (1, -1), (1, 1), (-1, 1)}
-    raa = RestrictedAirspaceArea("RAA", True, 0, 0, [-1, -1, -1, 1, 1, 1, 1, -1, -1, -1])
+    raa0 = RestrictedAirspaceArea("RAA0", True, 0, 0, [-1, -1, -1, 1, 1, 1, 1, -1, -1, -1])
+    assert raa0.ring.is_ccw
 
     # Create four aircraft at (lon,lat): {(0,2),(2,0),(0, -2),(-2, 0)}
     ntraf = 4
@@ -379,20 +425,44 @@ def test_raa_calc_tangents(areafilter_):
     ac_lat = np.array([2, 0, -2, 0])
 
     # Correct qdr (defined as [-180 .. 180] degrees East-North-Up)
-    qdr_cor_l = np.array([-45, -135, 135, 45]) # Headings 135, 225, 315, 45 in North-East-Down
-    qdr_cor_r = np.array([-135, 135, 45, -45]) # Headings 225, 315, 45, 135 in North-East-Down
+    qdr_cor_l = np.array([135, -135, -45, 45]) # Headings 135, 225, 315, 45 in North-East-Down
+    qdr_cor_r = np.array([-135, -45, 45, 135]) # Headings 225, 315, 45, 135 in North-East-Down
     # Correct distances in NM
     dist_cor_l = np.array([157.402, 157.426, 157.402, 157.426]) * KM_TO_NM
     dist_cor_r = np.array([157.402, 157.426, 157.402, 157.426]) * KM_TO_NM
 
     # Perform calculation
-    qdr_res_l, qdr_res_r, dist_res_l, dist_res_r = raa.calc_tangents(ntraf, ac_lat, ac_lon)
+    qdr_res_l, qdr_res_r, dist_res_l, dist_res_r = raa0.calc_tangents(ntraf, ac_lon, ac_lat)
 
     # Check that the results are within margin from the correct values
     assert np.allclose(qdr_res_l, qdr_cor_l, DIFF_DEG)
     assert np.allclose(qdr_res_r, qdr_cor_r, DIFF_DEG)
     assert np.allclose(dist_res_l, dist_cor_l, DIFF_DIST)
     assert np.allclose(dist_res_r, dist_cor_r, DIFF_DIST)
+
+    # Create another area with vertices at (lon,lat): {(-3, 1), (-0.5, 1), (-0.5, -1), (-3, -1)}
+    raa_1 = RestrictedAirspaceArea("RAA1", True, 0, 0, [1.0, -3.0, 1.0, -0.5, -1.0, -0.5, -1.0, -3.0, 1.0, -3.0])
+
+    # Create two aircraft at (lon,lat): {(0,2),(2,0),(0, -2),(-2, 0)}
+    ntraf1 = 2
+    ac_lon1 = np.array([-1.5, 1.5])
+    ac_lat1 = np.array([-1.5, -1.5])
+
+    # Correct qdr (defined as [-180 .. 180] degrees East-North-Up)
+    qdr_cor_l1 = np.array([-71.69, -83.75]) # Headings 
+    qdr_cor_r1 = np.array([63.595, -38.857]) # Headings 
+    # Correct distances in NM
+    dist_cor_l1 = np.array([175.856, 503.86]) * KM_TO_NM
+    dist_cor_r1 = np.array([124.269, 354.93]) * KM_TO_NM
+
+    # Perform calculation
+    qdr_res_l1, qdr_res_r1, dist_res_l1, dist_res_r1 = raa_1.calc_tangents(ntraf1, ac_lon1, ac_lat1)
+
+    # Check that the results are within margin from the correct values
+    assert np.allclose(qdr_res_l1, qdr_cor_l1, DIFF_DEG)
+    assert np.allclose(qdr_res_r1, qdr_cor_r1, DIFF_DEG)
+    assert np.allclose(dist_res_l1, dist_cor_l1, DIFF_DIST)
+    assert np.allclose(dist_res_r1, dist_cor_r1, DIFF_DIST)
 
 def test_raa_calc_vrel(areafilter_):
     """ Test the correcness of the function that determines the relative velocities
@@ -492,12 +562,20 @@ def test_raa_crs_is_between(areafilter_):
     assert not raa.crs_is_between(180, 181, 179)
 
 ##################################################################################################
-# Tests for other functions
+# Tests for other functions defined in area_restriction.py
 ##################################################################################################
 def test_enu2crs():
     """ Test the function that converts ENU angles to compass angles. """
     enu = np.array([-180, -135, -90, -45, 0, 45, 90, 135, 180])
     crs_corr = np.array([270, 225, 180, 135, 90, 45, 0, 315, 270])
     crs = ar.enu2crs(enu)
+
+    assert np.array_equal(crs, crs_corr)
+
+def test_ned2crs():
+    """ Test the function that converts ENU angles to compass angles. """
+    ned = np.array([-180, -135, -90, -45, 0, 45, 90, 135, 180])
+    crs_corr = np.array([180, 225, 270, 315, 0, 45, 90, 135, 180])
+    crs = ar.ned2crs(ned)
 
     assert np.array_equal(crs, crs_corr)
