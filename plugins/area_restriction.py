@@ -202,9 +202,6 @@ class AreaRestrictionManager(TrafficArrays):
         else:
             dec = 1
 
-        for child in self._children:
-            child.delete(idx)
-
         # Delete entire column idx from v (column = dimension 1)
         for v in self._ArrVars:
             self._Vars[v] = np.delete(self._Vars[v], idx, 1)
@@ -224,10 +221,6 @@ class AreaRestrictionManager(TrafficArrays):
 
     def reset(self):
         """ Reset state on simulator reset event. """
-
-        # Pass reset call to child elements
-        for child in self._children:
-            child.reset()
 
         # Clear all variables by deleting the last element
         # until no aircraft remain
