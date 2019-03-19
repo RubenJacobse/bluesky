@@ -464,37 +464,6 @@ def test_raa_calc_tangents(areafilter_):
     assert np.allclose(dist_res_l1, dist_cor_l1, DIFF_DIST)
     assert np.allclose(dist_res_r1, dist_cor_r1, DIFF_DIST)
 
-def test_raa_calc_vrel(areafilter_):
-    """ Test the correcness of the function that determines the relative velocities
-        of a set of aircraft with respect to an area. """
-
-    # Create some areas with different ground speeds
-    raa_0 = RestrictedAirspaceArea("RAA0", True, 0, 0, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
-    raa_1 = RestrictedAirspaceArea("RAA1", True, 10, 10, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
-    raa_2 = RestrictedAirspaceArea("RAA2", True, -50, -30, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
-
-    # Aircraft velocity components
-    ac_gseast = np.array([100, 90, 80])
-    ac_gsnorth = np.array([100, 90, 80])
-
-    # Aircraft relative velocity components wrt the areas
-    vrel_east_0 = np.array([100, 90, 80])
-    vrel_north_0 = np.array([100, 90, 80])
-    vrel_east_1 = np.array([90, 80, 70])
-    vrel_north_1 = np.array([90, 80, 70])
-    vrel_east_2 = np.array([150, 140, 130])
-    vrel_north_2 = np.array([130, 120, 110])
-
-    # Check that results are within error margin
-    vrel_east, vrel_north = raa_0.calc_vrel(ac_gseast, ac_gsnorth)
-    assert np.allclose(vrel_east, vrel_east_0, DIFF_VEL) and np.allclose(vrel_north, vrel_north_0, DIFF_VEL)
-
-    vrel_east, vrel_north = raa_1.calc_vrel(ac_gseast, ac_gsnorth)
-    assert np.allclose(vrel_east, vrel_east_1, DIFF_VEL) and np.allclose(vrel_north, vrel_north_1, DIFF_VEL)
-
-    vrel_east, vrel_north = raa_2.calc_vrel(ac_gseast, ac_gsnorth)
-    assert np.allclose(vrel_east, vrel_east_2, DIFF_VEL) and np.allclose(vrel_north, vrel_north_2, DIFF_VEL)
-
 def test_raa_is_left(areafilter_):
     """ Test the correctness of the function that determines whether a point lies
         to the left of a given linepiece. """

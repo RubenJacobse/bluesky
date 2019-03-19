@@ -604,15 +604,6 @@ class RestrictedAirspaceArea():
 
         return qdr_l, qdr_r, dist_l, dist_r
 
-    def calc_vrel(self, ac_gseast, ac_gsnorth):
-        """ Calculate the east and north components of the relative
-            velocity vectors of the aircraft with respect to the area. """
-
-        vrel_east = ac_gseast - self.gs_east #- ac_gseast
-        vrel_north = ac_gsnorth - self.gs_north #- ac_gsnorth
-
-        return vrel_east, vrel_north
-
     @staticmethod
     def crs_is_between(crs, crs_l, crs_r):
         """ Check if a given magnetic course crs on [0 .. 360] deg
