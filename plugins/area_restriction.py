@@ -281,7 +281,7 @@ class AreaRestrictionManager(TrafficArrays):
             ac_rel_vec = [spgeom.LineString([curr, fut]) for (curr, fut) in zip(ac_curr_pos, ac_fut_rel_pos)]
 
             # Find aircraft-area conflicts and intrusions
-            self.area_conflicts(idx, area, ac_curr_pos, ac_rel_vec)
+            self.area_findconf(idx, area, ac_curr_pos, ac_rel_vec)
 
             # Components of unit vectors along VO edges
             u_l_east = np.sin(np.radians(self.brg_l))
@@ -390,7 +390,7 @@ class AreaRestrictionManager(TrafficArrays):
             self.t_lookahead = t
             return True, "Aircraft-area conflict look-ahead-time set to {} seconds".format(t)
 
-    def area_conflicts(self, idx, area, ac_curr_pos, ac_rel_vec):
+    def area_findconf(self, idx, area, ac_curr_pos, ac_rel_vec):
         """" Find all aircraft-area conflicts for RestrictedAispaceArea area
              at row idx. """
 
