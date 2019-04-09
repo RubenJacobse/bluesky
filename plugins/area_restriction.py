@@ -60,7 +60,11 @@ def init_plugin():
 
         # If your plugin has a state, you will probably need a reset function to
         # clear the state in between simulations.
-        'reset':         areas.reset
+        'reset':         areas.reset,
+
+        'remove':        areas.remove,
+
+
     }
 
     stackfunctions = {
@@ -148,9 +152,9 @@ class AreaRestrictionManager(TrafficArrays):
         self.t_lookahead = 300
 
     def MakeParameterLists(self, keys):
-        """ Override default TrafficArrays.MakeParameterLists() 
+        """ Override default TrafficArrays.MakeParameterLists()
             to include support for n-dimensional numpy arrays. """
-    
+
         for key in keys:
             # Parameters of type list are added to self._LstVars
             # Parameters of type numpy.ndarray are added to self._ArrVars if they are
@@ -176,7 +180,7 @@ class AreaRestrictionManager(TrafficArrays):
         self.ntraf += n
 
         # Lists (mostly used for strings)
-        for v in self._LstVars:  
+        for v in self._LstVars:
             # Get type
             vartype = None
             lst = self.__dict__.get(v)
@@ -338,14 +342,14 @@ class AreaRestrictionManager(TrafficArrays):
             ac_fut_rel_pos = [spgeom.Point(lon, lat) for (lon, lat) in zip(ac_fut_rel_lon, ac_fut_rel_lat)]
             ac_rel_vec = [spgeom.LineString([curr, fut]) for (curr, fut) in zip(ac_curr_pos, ac_fut_rel_pos)]
 
-            # Find aircraft-area conflicts and intrusions
+            # Find aircraft-area conflicts and intrusions for current area
             self.area_findconf(idx, area, ac_curr_pos, ac_rel_vec)
 
         # For each aircraft, perform area avoidance manoeuvre for the closest conflicting area (if any)
         for ac_idx, area_idx in enumerate(self.area_inconf_first):
 
             # Skip to next aircraft index if no conflict exists for the current aircraft
-            if area_idx == "":    # area_idx can take value 0, thus we need to explicitly compare against None
+            if area_idx == "":    # area_idx can take value 0, thus we need to explicitly compare against ""
                 continue
 
             # Calculate area avoidance resolution for current aircraft and its conflicting area
@@ -354,6 +358,13 @@ class AreaRestrictionManager(TrafficArrays):
             # print("{} first conflict is: {}".format(bs.traf.id[ac_idx], self.areaIDList[area_idx]))
 
             self.stack_reso_apply(ac_idx, reso_crs, reso_tas)
+
+    def remove(self):
+        """ Called when plugin is removed. """
+
+        # Remove self from the TrafficArrays tree
+        if self._parent:
+            self._parent._children.remove(self)
 
     def create_area(self, area_id, area_status, gs_north, gs_east, *coords):
         """ Create a new restricted airspace area """
