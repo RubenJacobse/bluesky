@@ -51,7 +51,7 @@ def test_arm_init(MockTraf_, AreaRestrictionManager_, areafilter_, mocktraf_):
 
     # Check that all traffic variables have been registered properly
     arrVarList = ["vrel_east", "vrel_north", "brg_l", "brg_r", "dist_l", "dist_r",\
-                   "area_conf", "area_inside", "area_tint"]
+                   "area_inconf", "area_inside", "area_tint"]
     lstVarList = ["unused"]
     assert all(x in AreaRestrictionManager_._ArrVars for x in arrVarList)
     assert all(x in AreaRestrictionManager_._LstVars for x in lstVarList)
@@ -211,7 +211,7 @@ def test_arm_update(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
     AreaRestrictionManager_.update()
 
     # Verify that conflicts / inside conditions are evaluated correctly
-    assert np.array_equal(AreaRestrictionManager_.area_conf, np.array([[False, True, True, True]]))
+    assert np.array_equal(AreaRestrictionManager_.area_inconf, np.array([[False, True, True, True]]))
     assert np.array_equal(AreaRestrictionManager_.area_inside, np.array([[False, False, False, True]]))
 
     # Add extra tests to verify avoidance vector calculations
@@ -548,3 +548,34 @@ def test_ned2crs():
     crs = ar.ned2crs(ned)
 
     assert np.array_equal(crs, crs_corr)
+
+def test_crs_closest():
+    """ Test the function that takes two courses and returns the course
+        with the smallest angle difference with respect to a reference 
+        course. """
+
+    # Test for scalar input
+    ref = 340
+    crs_a = 10
+    crs_b = 30
+
+    crs = ar.crs_closest(ref, crs_a, crs_b)
+    assert crs == crs_a
+
+    # Test for single value numpy array input
+    ref = np.array([340])
+    crs_a = np.array([10])
+    crs_b = np.array([30])
+    crs = ar.crs_closest(ref, crs_a, crs_b)
+
+    crs_correct = np.array([10])
+    assert np.array_equal(crs, crs_correct)
+
+    # Test for single value numpy array input
+    ref = np.array([340, 20, 0, 170, 185])
+    crs_a = np.array([10, 360, 340, 350, 350])
+    crs_b = np.array([30, 45, 10, 20, 10])
+    crs = ar.crs_closest(ref, crs_a, crs_b)
+
+    crs_correct = np.array([10, 360, 10, 20, 350])
+    assert np.array_equal(crs, crs_correct)
