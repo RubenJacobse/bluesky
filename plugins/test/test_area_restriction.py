@@ -47,14 +47,17 @@ def test_arm_init(MockTraf_, AreaRestrictionManager_, areafilter_, mocktraf_):
     assert AreaRestrictionManager_.areaList == []
     assert AreaRestrictionManager_.areaIDList == []
     assert AreaRestrictionManager_.nareas == 0
+    assert AreaRestrictionManager_.ntraf == 0
     assert AreaRestrictionManager_.t_lookahead == 300
 
     # Check that all traffic variables have been registered properly
-    arrVarList = ["vrel_east", "vrel_north", "brg_l", "brg_r", "dist_l", "dist_r",\
+    lstVarList = ["area_inconf_first"]
+    ArrVarList = ["wp_crs"]
+    ndArrVarList = ["vrel_east", "vrel_north", "brg_l", "brg_r", "dist_l", "dist_r",\
                    "area_inconf", "area_inside", "area_tint"]
-    lstVarList = ["unused"]
-    assert all(x in AreaRestrictionManager_._ArrVars for x in arrVarList)
     assert all(x in AreaRestrictionManager_._LstVars for x in lstVarList)
+    assert all(x in AreaRestrictionManager_._ArrVars for x in ArrVarList)
+    assert all(x in AreaRestrictionManager_._ndArrVars for x in ndArrVarList)
 
 def test_arm_set_t_lookahead(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
     """ Test the set_t_lookahead() setter method. """
@@ -116,10 +119,12 @@ def test_arm_create(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
     assert ntraf == 4
 
     # Check that list variables have an entry for each aircraft and that
-    # array variables have an entry for each area,aircraft combination
+    # n-dimensional array variables have an entry for each area,aircraft combination
     for var in AreaRestrictionManager_._LstVars:
         assert len(AreaRestrictionManager_._Vars[var]) == ntraf
     for var in AreaRestrictionManager_._ArrVars:
+        assert np.shape(AreaRestrictionManager_._Vars[var]) == (ntraf,)
+    for var in AreaRestrictionManager_._ndArrVars:
         assert np.shape(AreaRestrictionManager_._Vars[var]) == (nareas, ntraf)
 
 def test_arm_delete(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
@@ -151,6 +156,8 @@ def test_arm_reset(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
         assert AreaRestrictionManager_._Vars[var]
     for var in AreaRestrictionManager_._ArrVars:
         assert np.size(AreaRestrictionManager_._Vars[var])
+    for var in AreaRestrictionManager_._ndArrVars:
+        assert np.size(AreaRestrictionManager_._Vars[var])
 
     # Check that all traffic related variables are emptied after reset
     MockTraf_.reset()
@@ -158,6 +165,8 @@ def test_arm_reset(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
     for var in AreaRestrictionManager_._LstVars:
         assert AreaRestrictionManager_._Vars[var] == []
     for var in AreaRestrictionManager_._ArrVars:
+        assert np.size(AreaRestrictionManager_._Vars[var]) == 0
+    for var in AreaRestrictionManager_._ndArrVars:
         assert np.size(AreaRestrictionManager_._Vars[var]) == 0
 
     # Check that all areas have been deleted
@@ -215,8 +224,8 @@ def test_arm_update(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
     assert np.array_equal(AreaRestrictionManager_.area_inside, np.array([[False, False, False, True]]))
 
     # Add extra tests to verify avoidance vector calculations
+    # NOTE: To do!
 
-@pytest.mark.xfail
 def test_arm_traf_noarea(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
     """ Tests whether traffic can be created before area creation """
 
@@ -233,11 +242,14 @@ def test_arm_traf_noarea(AreaRestrictionManager_, MockTraf_, areafilter_, mocktr
     AreaRestrictionManager_.create_area("RAA_5", True, 0, 0, -1, -1, 1, -1, 1, 1, -1, 1, -1, -1)
 
     assert AreaRestrictionManager_.ntraf == 4
+    assert AreaRestrictionManager_.nareas == 2
 
     # Verify all vars have 4 aircraft elements
     for var in AreaRestrictionManager_._LstVars:
         assert len(AreaRestrictionManager_._Vars[var]) == 4
     for var in AreaRestrictionManager_._ArrVars:
+        assert AreaRestrictionManager_._Vars[var].shape == (4,)
+    for var in AreaRestrictionManager_._ndArrVars:
         assert AreaRestrictionManager_._Vars[var].shape == (2, 4)
 
 def test_arm_multi_delete(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
@@ -250,7 +262,7 @@ def test_arm_multi_delete(AreaRestrictionManager_, MockTraf_, areafilter_, mockt
     MockTraf_.fake_traf()
     assert MockTraf_.ntraf == 4
     assert AreaRestrictionManager_.ntraf == 4
-    MockTraf_.delete([1,2])
+    MockTraf_.delete([1, 2])
     assert MockTraf_.ntraf == 2
     assert AreaRestrictionManager_.ntraf == 2
 
@@ -267,6 +279,8 @@ def test_arm_multi_delete(AreaRestrictionManager_, MockTraf_, areafilter_, mockt
     for var in AreaRestrictionManager_._LstVars:
         assert len(AreaRestrictionManager_._Vars[var]) == 2
     for var in AreaRestrictionManager_._ArrVars:
+        assert AreaRestrictionManager_._Vars[var].shape == (2,)
+    for var in AreaRestrictionManager_._ndArrVars:
         assert AreaRestrictionManager_._Vars[var].shape[1] == 2
 
 ##################################################################################################

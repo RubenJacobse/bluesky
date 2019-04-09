@@ -114,6 +114,8 @@ class AreaRestrictionManager(TrafficArrays):
         # Initialize TrafficArrays base class
         super().__init__()
 
+        self._ndArrVars = []
+
         # Register all traffic parameters relevant for this class
         with RegisterElementParameters(self):
             # N-dimensional parameters where each column is an aircraft and each row is an area
@@ -130,11 +132,11 @@ class AreaRestrictionManager(TrafficArrays):
             self.area_inside = np.array([[]], dtype = bool) # Stores whether ac is inside area
             self.area_tint = np.array([[]]) # [s] Time to area intrusion
 
-            # NOTE: To be added: support for both 1- and multi-dimensional numpy arrays...
-            # self.area_inconf_first = np.array([])  # Store index of closest conflicting area for each aircraft
-            self.wp_crs = np.array([[]]) # [deg] Magnetic course to current waypoint
+            # Parameters that are 1-dimensional numpy arrays
+            self.wp_crs = np.array([]) # [deg] Magnetic course to current waypoint for each aircraft
 
-            self.unused = [] # Only used for testing
+            # List parameters
+            self.area_inconf_first = []  # Store index of closest conflicting area for each aircraft
 
         # Keep track of all restricted areas in list and by ID (same order)
         self.areaList = []
@@ -145,6 +147,25 @@ class AreaRestrictionManager(TrafficArrays):
         # Default look-ahead-time in seconds, used to detect aircraft-area conflicts
         self.t_lookahead = 300
 
+    def MakeParameterLists(self, keys):
+        """ Override default TrafficArrays.MakeParameterLists() 
+            to include support for n-dimensional numpy arrays. """
+    
+        for key in keys:
+            # Parameters of type list are added to self._LstVars
+            # Parameters of type numpy.ndarray are added to self._ArrVars if they are
+            # one-dimensional or to self._ndArrVars if they are multidimensional.
+            # Parameters of type TrafficArrays are added to the list of children
+            if isinstance(self._Vars[key], list):
+                self._LstVars.append(key)
+            elif isinstance(self._Vars[key], np.ndarray):
+                if np.ndim(self._Vars[key]) == 1:
+                    self._ArrVars.append(key)
+                elif np.ndim(self._Vars[key]) > 1:
+                    self._ndArrVars.append(key)
+            elif isinstance(self._Vars[key], TrafficArrays):
+                self._Vars[key].reparent(self)
+
     def create(self, n = 1):
         """ Append n elements (aircraft) to all lists and arrays.
 
@@ -154,12 +175,8 @@ class AreaRestrictionManager(TrafficArrays):
 
         self.ntraf += n
 
-        # If no areas exist do nothing
-        if not self.nareas:
-            return
-
-        for v in self._LstVars:  # Lists (mostly used for strings)
-
+        # Lists (mostly used for strings)
+        for v in self._LstVars:  
             # Get type
             vartype = None
             lst = self.__dict__.get(v)
@@ -173,9 +190,32 @@ class AreaRestrictionManager(TrafficArrays):
 
             self._Vars[v].extend(defaultvalue)
 
-        # Allow two-dimensional numpy arrays in _ArrVars
+        # One dimensional numpy arrays
+        for v in self._ArrVars:
+
+            # Get type without byte length
+            fulltype = str(self._Vars[v].dtype)
+            vartype = ""
+            for c in fulltype:
+                if not c.isdigit():
+                    vartype = vartype + c
+
+            # Get default value
+            if vartype in VAR_DEFAULTS:
+                defaultvalue = [VAR_DEFAULTS[vartype]] * n
+            else:
+                defaultvalue = [0.0] * n
+
+            self._Vars[v] = np.append(self._Vars[v], defaultvalue)
+            
+        # Allow two-dimensional numpy arrays in self._ndArrVars
         # Each row can now represent an airspace restriction
-        for v in self._ArrVars:  # Numpy array
+
+        # If no areas exist do nothing (there should be 0 rows if no areas)
+        if not self.nareas:
+            return
+
+        for v in self._ndArrVars:  # Numpy array
 
             # Get numpy dtype without byte length
             dtype_str = str(self._Vars[v].dtype)
@@ -208,10 +248,6 @@ class AreaRestrictionManager(TrafficArrays):
         else:
             dec = 1
 
-        # Delete entire column idx from v (column = dimension 1)
-        for v in self._ArrVars:
-            self._Vars[v] = np.delete(self._Vars[v], idx, 1)
-
         if self._LstVars:
             if isinstance(idx, Collection):
                 for i in reversed(idx):
@@ -221,6 +257,14 @@ class AreaRestrictionManager(TrafficArrays):
                 for v in self._LstVars:
                     del self._Vars[v][idx]
 
+        for v in self._ArrVars:
+            self._Vars[v] = np.delete(self._Vars[v], idx)
+
+        # Delete entire column idx from v (column = dimension 1)
+        for v in self._ndArrVars:
+            print("{}: {}".format(v, self._Vars[v]))
+            self._Vars[v] = np.delete(self._Vars[v], idx, 1)
+
         self.ntraf -= dec
 
         return True
@@ -228,12 +272,17 @@ class AreaRestrictionManager(TrafficArrays):
     def reset(self):
         """ Reset state on simulator reset event. """
 
-        # Clear all variables by deleting the last element
-        # until no aircraft remain
-        while self.ntraf:
-            self.delete(self.ntraf - 1) # Decrements self.ntraf after each deletion
+        # Delete all traffic parameters
+        for v in self._LstVars:
+            self._Vars[v] = []
 
-        # Make sure areas are deleted
+        for v in self._ArrVars:
+            self._Vars[v] = np.array([], dtype=self._Vars[v].dtype)
+
+        for v in self._ndArrVars:
+            self._Vars[v] = np.array([[]], dtype=self._Vars[v].dtype)
+
+        # Make sure all areas are deleted
         for area in self.areaList:
             area.delete()
             self.areaList.remove(area) # Probably redundant
@@ -241,6 +290,9 @@ class AreaRestrictionManager(TrafficArrays):
         self.areaList = []
         self.areaIDList = []
         self.nareas = 0
+        self.ntraf = 0
+
+        # Reset default look-ahead time
         self.t_lookahead = 300
 
     def preupdate(self):
@@ -259,11 +311,6 @@ class AreaRestrictionManager(TrafficArrays):
         # Cannot do anything if no aircraft or areas exist
         if not self.ntraf or not self.nareas:
             return
-
-        # NOTE: To be removed after numpy array dimension support update
-        # Set up numpy array that keeps track of the index of the closest conflicting area for 
-        # all aircraft.
-        self.area_inconf_first = np.full(self.ntraf, None)
 
         # Loop over all existing areas
         # NOTE: Could this be vectorized instead of looped over all aircraft-area combinations?
@@ -298,7 +345,7 @@ class AreaRestrictionManager(TrafficArrays):
         for ac_idx, area_idx in enumerate(self.area_inconf_first):
 
             # Skip to next aircraft index if no conflict exists for the current aircraft
-            if area_idx is None:    # area_idx can take value 0, thus we need to explicitly compare against None
+            if area_idx == "":    # area_idx can take value 0, thus we need to explicitly compare against None
                 continue
 
             # Calculate area avoidance resolution for current aircraft and its conflicting area
@@ -337,7 +384,7 @@ class AreaRestrictionManager(TrafficArrays):
                 self._Vars[v] = defaultvalue
 
         # Add row to all numpy arrays
-        for v in self._ArrVars:
+        for v in self._ndArrVars:
 
             # Get numpy dtype without byte length
             dtype_str = str(self._Vars[v].dtype)
@@ -383,7 +430,7 @@ class AreaRestrictionManager(TrafficArrays):
             self.nareas -= 1
 
             # Delete row corresponding to area from all numpy arrays
-            for v in self._ArrVars:
+            for v in self._ndArrVars:
                 self._Vars[v] = np.delete(self._Vars[v], idx, 0)
 
             return True, "Sucessfully deleted airspace restriction {}".format(area_id)
@@ -610,7 +657,7 @@ class RestrictedAirspaceArea():
             vertex pairs in lon,lat order.
 
             coords = [lat_0, lon_0, ..., lat_n, lon_n] \n
-            verts = np.ndarray([[lon_0, lat_0], ..., [lon_n, lat_n]])
+            verts = np.array([[lon_0, lat_0], ..., [lon_n, lat_n]])
 
             (Essentially the inverse operation of self._verts2coords). """
 
@@ -623,7 +670,7 @@ class RestrictedAirspaceArea():
         """ Convert numpy array of vertex coordinate pairs in lon,lat order to
             a single list of lat,lon coords.
 
-            verts = np.ndarray([[lon_0, lat_0], ..., [lon_n, lat_n]]) \n
+            verts = np.array([[lon_0, lat_0], ..., [lon_n, lat_n]]) \n
             coords = [lat_0, lon_0, ..., lat_n, lon_n]
 
             (Essentially the inverse operation of self._coords2verts). """

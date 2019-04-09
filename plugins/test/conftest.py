@@ -3,6 +3,7 @@
 import pytest
 import numpy as np
 import bluesky as bs
+from bluesky import stack
 from collections.abc import Collection
 from bluesky.tools import areafilter, TrafficArrays, RegisterElementParameters
 from area_restriction import AreaRestrictionManager
@@ -75,6 +76,15 @@ class MockTraf(TrafficArrays):
         self.gsnorth = np.array([450, 0, 450, 0])
         self.gs = np.array([450, 450, 450, 450])
 
+        self.alt = np.array([6100, 6100, 6100, 6100])
+        self.actwp = MockWaypoint()
+
+class MockWaypoint():
+    def __init__(self):
+        self.lat = np.array([4, 0, 4, 0])
+        self.lon = np.array([0, 4, 0, -4])
+
+
 def mockfun(*args):
     """ Take any number of arguments and do nothing """
     pass
@@ -111,6 +121,9 @@ def mocktraf_(monkeypatch, MockTraf_):
 
     # Replace subsequent calls to bs.traf with calls to the MockTraf class
     monkeypatch.setattr(bs, "traf", MockTraf_)
+
+    # Replace subsequent calls to bs.stack with calls to mockfun
+    monkeypatch.setattr(stack, "stack", mockfun)
 
 @pytest.fixture(scope = 'module')
 def AreaRestrictionManager_():
