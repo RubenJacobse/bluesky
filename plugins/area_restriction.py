@@ -250,9 +250,9 @@ class AreaRestrictionManager(TrafficArrays):
         # Might be useful in debugging
         # print("Simulator time is: {} seconds ".format(bs.sim.simt))
 
-        # Calculate resolution for aircraft that are in conflict
-        v_hdg_l = None  # Resolution by heading change only, turn to left
-        v_hdg_r = None  # Resolution by heading change only, turn to right
+        # Cannot do anything if no aircraft or areas exist
+        if not self.ntraf or not self.nareas:
+            return
 
         # Loop over all existing areas
         # NOTE: Could this be vectorized instead of looped over all aircraft-area combinations?
