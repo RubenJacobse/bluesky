@@ -197,7 +197,7 @@ class AreaRestrictionManager(TrafficArrays):
             handling of two-dimensional numpy arrays. """
 
         if isinstance(idx, Collection):
-            idx.sort()
+            idx = np.sort(idx)
             dec = len(idx)
         else:
             dec = 1
