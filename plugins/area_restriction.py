@@ -559,12 +559,12 @@ class AreaRestrictionManager(TrafficArrays):
 
         hdg_cmd = "HDG {},{}".format(ac_id, ac_crs)
         bs.stack.stack(hdg_cmd)
-        spd_cmd = "SPD {},{}".format(ac_id, ac_cas)
-        bs.stack.stack(spd_cmd)
+        # spd_cmd = "SPD {},{}".format(ac_id, ac_cas)
+        # bs.stack.stack(spd_cmd)
 
     	# Print command to python console
         print(hdg_cmd)
-        print(spd_cmd)
+        # print(spd_cmd)
 
 class RestrictedAirspaceArea():
     """ Class that represents a single Restricted Airspace Area. """
