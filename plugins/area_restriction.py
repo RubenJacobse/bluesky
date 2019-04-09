@@ -308,63 +308,6 @@ class AreaRestrictionManager(TrafficArrays):
 
             self.stack_reso_apply(ac_idx, reso_crs, reso_tas)
 
-        # Commented out because not all aircraft-area combinations are conflicts and only the conflicting
-        # aircraft-area pairs will be used for calculating resolution vectors.
-        #
-        # for idx, area in enumerate(self.areaList):
-        #     # Components of unit vectors along left and right VO edges
-        #     u_l_east = np.sin(np.radians(self.brg_l[idx, :]))
-        #     u_l_north = np.cos(np.radians(self.brg_l[idx, :]))
-        #     u_r_east = np.sin(np.radians(self.brg_r[idx, :]))
-        #     u_r_north = np.cos(np.radians(self.brg_r[idx, :]))
-
-        #     # For heading-change-only resolution maneuvers, the resolution vector lies on the edge of
-        #     # the Velocity Obstacle (or Collision Cone if area is non-moving). The vector magnitudes are the
-        #     # same as the current aircraft ground speeds (assuming zero wind).
-        #     if area.gs:
-        #         # Find angles between -vrel and left- and right edges of VO using dot product of -vrel and the 
-        #         # unit vectors along the VO edges
-        #         beta_l_rad = np.arccos(-1 * (u_l_east * area.gs_east + u_l_north * area.gs_north) / (area.gs**2))
-        #         beta_r_rad = np.arccos(-1 * (u_r_east * area.gs_east + u_r_north * area.gs_north) / (area.gs**2))
-
-        #         # Calculate relative resolution velocity component along the VO edges
-        #         v_ul = bs.traf.gs * np.cos(beta_l_rad) + bs.traf.gs * np.cos(np.arcsin(bs.traf.gs * np.sin(beta_l_rad) / bs.traf.gs)) 
-        #         v_ur = bs.traf.gs * np.cos(beta_r_rad) + bs.traf.gs * np.cos(np.arcsin(bs.traf.gs * np.sin(beta_r_rad) / bs.traf.gs))
-        #     else:
-        #         # Resolution velocity magnitudes on left- and right edges of CC
-        #         v_ul = bs.traf.gs
-        #         v_ur = bs.traf.gs
-
-        #     # Calculate north and east components of left- and right resolution absolute velocities
-        #     # (For a non moving area, area.gs_east and area.gs_north are simply 0, but for a moving area
-        #     # these terms are required to get the absolute resolution velocity of each aircraft.)
-        #     vres_l_east = u_l_east * v_ul - area.gs_east
-        #     vres_l_north = u_l_north * v_ul - area.gs_north
-        #     vres_r_east = u_r_east * v_ur - area.gs_east
-        #     vres_r_north = u_r_north * v_ur - area.gs_north
-
-        #     # Calculate magnetic tracks of left- and right resolution vectors
-        #     vres_l_crs = np.degrees(np.arctan2(vres_l_east, vres_l_north)) % 360
-        #     vres_r_crs = np.degrees(np.arctan2(vres_r_east, vres_r_north)) % 360
-
-        #     # For each aircraft find the track angle to the current active waypoint
-        #     # (NOTE: This assumes that there always is an active waypoint.)
-        #     for ac_idx in range(self.ntraf):
-        #         wp_lat = bs.traf.actwp.lat[ac_idx]
-        #         wp_lon = bs.traf.actwp.lon[ac_idx]
-        #         qdr_wp, _ = qdrdist(bs.traf.lat, bs.traf.lon, wp_lat, wp_lon)
-        #         self.wp_crs[ac_idx] = (360 + qdr_wp) % 360
-
-        #     # Determine which of the two resolution vectors should be used based on the current
-        #     # active waypoint.
-        #     reso_crs = crs_closest(self.wp_crs, vres_l_crs, vres_r_crs)
-
-        #     # Set the true airspeed for the resolution maneuver
-        #     reso_tas = bs.traf.gs
-
-        #     # Pass the resolution maneuvers to the BlueSky stack
-        #     self.stack_reso_apply(reso_crs, reso_tas)
-
     def create_area(self, area_id, area_status, gs_north, gs_east, *coords):
         """ Create a new restricted airspace area """
 
