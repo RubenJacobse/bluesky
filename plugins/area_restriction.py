@@ -62,9 +62,9 @@ def init_plugin():
         # clear the state in between simulations.
         'reset':         areas.reset,
 
+        # The remove functin is called before the plugin is removed and can be used to
+        # clear any references to the plugin.
         'remove':        areas.remove,
-
-
     }
 
     stackfunctions = {
