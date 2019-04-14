@@ -53,7 +53,7 @@ def test_arm_init(MockTraf_, AreaRestrictionManager_, areafilter_, mocktraf_):
     # Check that all traffic variables have been registered properly
     lstVarList = ["first_conflict_area_idx", "current_position", "relative_track"]
     ArrVarList = ["crs_to_active_wp", "crs_to_next_wp"]
-    ndArrVarList = ["rel_gseast", "rel_gsnorth", "brg_l", "brg_r", "dist_l", "dist_r",\
+    ndArrVarList = ["rel_gseast", "rel_gsnorth", "brg_left_tangent", "brg_right_tangent", "dist_l", "dist_r",\
                    "is_inconflict", "is_inside", "time_to_intrusion"]
     assert all(x in AreaRestrictionManager_._LstVars for x in lstVarList)
     assert all(x in AreaRestrictionManager_._ArrVars for x in ArrVarList)
@@ -523,17 +523,17 @@ def test_raa_crs_mid(areafilter_):
 
     raa = RestrictedAirspaceArea("RAA1", True, 0, 0, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
 
-    # Test result when crs_l < crs_r
+    # Test result when crs_left_tangent < crs_right_tangent
     assert raa.crs_mid(0, 360) == 180
     assert raa.crs_mid(10, 50) == 30
     assert raa.crs_mid(160, 200) == 180
 
-    # Test result when crs_r < crs_l
+    # Test result when crs_right_tangent < crs_left_tangent
     assert raa.crs_mid(350, 10) == 0
     assert raa.crs_mid(330, 0) == 345
     assert raa.crs_mid(340, 40) == 10
 
-    # Test rsult when crs_l = crs_r
+    # Test rsult when crs_left_tangent = crs_right_tangent
     assert raa.crs_mid(220, 220) == 220
     assert raa.crs_mid(360, 360) == 0
 
