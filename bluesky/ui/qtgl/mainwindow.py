@@ -42,8 +42,8 @@ bg = bs.settings.stack_background_color
 class Splash(QSplashScreen):
     """ Splash screen: BlueSky logo during start-up"""
     def __init__(self):
-        super(Splash, self).__init__(QPixmap(os.path.join(bs.settings.gfx_path, 'splash.gif')), Qt.WindowStaysOnTopHint)
-
+        splash_gif = os.path.join(bs.settings.gfx_path, 'splash.gif')
+        super(Splash, self).__init__(QPixmap(splash_gif))
 
 class DiscoveryDialog(QDialog):
     def __init__(self, parent=None):
