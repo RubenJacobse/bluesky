@@ -30,7 +30,7 @@ VAR_DEFAULTS = {"float": 0.0, "int": 0, "bool": False, "S": "", "str": "", "obje
 
 NM_TO_M = 1852. # Conversion factor nautical miles to metres
 
-# Initialize BlueSky plugin
+
 def init_plugin():
     """Initialize the RAA plugin"""
 
@@ -40,74 +40,77 @@ def init_plugin():
     # Configuration parameters
     config = {
         # The name of your plugin
-        'plugin_name':     'RAA',
+        "plugin_name": "RAA",
 
         # The type of this plugin. For now, only simulation plugins are possible.
-        'plugin_type':     'sim',
+        "plugin_type": "sim",
 
         # Update interval in seconds. By default, your plugin's update function(s)
         # are called every timestep of the simulation. If your plugin needs less
         # frequent updates provide an update interval.
-        'update_interval': 1.0,
+        "update_interval": 1.0,
 
         # The update function is called after traffic is updated. Use this if you
         # want to do things as a result of what happens in traffic. If you need to
         # something before traffic is updated please use preupdate.
-        'update':          areas.update,
+        "update": areas.update,
 
         # The preupdate function is called before traffic is updated. Use this
         # function to provide settings that need to be used by traffic in the current
         # timestep. Examples are ASAS, which can give autopilot commands to resolve
         # a conflict.
-        'preupdate':       areas.preupdate,
+        "preupdate": areas.preupdate,
 
         # If your plugin has a state, you will probably need a reset function to
         # clear the state in between simulations.
-        'reset':         areas.reset,
+        "reset": areas.reset,
 
         # The remove functin is called before the plugin is removed and can be used to
         # clear any references to the plugin.
-        'remove':        areas.remove,
+        "remove": areas.remove,
     }
 
     stackfunctions = {
         # The command name for your function
-        'RAA': [
-            # A short usage string. This will be printed if you type HELP <name> in the BlueSky console
-            'RAA name, ON/OFF, gsnorth, gseast, [lat1,lon1,lat2,lon2,...]',
+        "RAA": [
+            # A short usage string. This will be printed if you type HELP <name> in the
+            # BlueSky console
+            "RAA name, ON/OFF, gsnorth, gseast, [lat1,lon1,lat2,lon2,...]",
 
-            # A list of the argument types your function accepts. For a description of this, see ...
-            'txt,onoff,spd,spd,[latlon,...]',
+            # A list of the argument types your function accepts. For a description of this, see...
+            "txt,onoff,spd,spd,[latlon,...]",
 
             # The name of your function in this plugin
             areas.create_area,
 
-            # a longer help text of your function.
-            'Create restricted airspace areas that are to be avoided by all traffic.'],
-        'DELRAA': [
-            # A short usage string. This will be printed if you type HELP <name> in the BlueSky console
-            'DELRAA name',
+            # A longer help text of your function.
+            "Create restricted airspace areas that are to be avoided by all traffic."],
+        "DELRAA": [
+            # A short usage string. This will be printed if you type HELP <name> in the
+            # BlueSky console
+            "DELRAA name",
 
-            # A list of the argument types your function accepts. For a description of this, see ...
-            'txt',
+            # A list of the argument types your function accepts. For a description of this, see...
+            "txt",
 
             # The name of your function in this plugin
             areas.delete_area,
 
             # a longer help text of your function.
-            'Delete a given restricted airspace area.'],
-        'RAACONF': [
-            # A short usage string. This will be printed if you type HELP <name> in the BlueSky console
-            'RAACONF t_lookahead',
+            "Delete a given restricted airspace area."],
+        "RAACONF": [
+            # A short usage string. This will be printed if you type HELP <name> in the
+            # BlueSky console
+            "RAACONF t_lookahead",
 
             # A list of the argument types your function accepts. For a description of this, see ...
-            'int',
+            "int",
 
             # The name of your function in this plugin
             areas.set_t_lookahead,
 
             # a longer help text of your function.
-            'Set the lookahead time used for area avoidance in seconds.']
+            "Set the lookahead time used for area avoidance in seconds."]
     }
 
     # init_plugin() should always return these two dicts.
@@ -115,7 +118,9 @@ def init_plugin():
 
 
 class AreaRestrictionManager(TrafficArrays):
-    """ This class implements the avoidance of Restricted Airspace Areas. """
+    """
+    This class implements the avoidance of Restricted Airspace Areas.
+    """
 
     def __init__(self):
         # Initialize TrafficArrays base class
@@ -142,6 +147,8 @@ class AreaRestrictionManager(TrafficArrays):
             # ======================================================
             # Traffic parameters that are 1-dimensional numpy arrays
             # ======================================================
+
+            # Waypoint related
             self.crs_to_active_wp = np.array([]) # [deg] Magnetic course to current waypoint
             self.crs_to_next_wp = np.array([])  # [deg] Magnetic course to current waypoint
             self.reso_dv_east = np.array([]) # [m/s] Resolution velocity change east component
@@ -169,8 +176,10 @@ class AreaRestrictionManager(TrafficArrays):
         self.t_lookahead = 300
 
     def MakeParameterLists(self, keys):
-        """ Override default TrafficArrays.MakeParameterLists()
-            to include support for n-dimensional numpy arrays. """
+        """
+        Override default TrafficArrays.MakeParameterLists() to include
+        support for n-dimensional numpy arrays.
+        """
 
         for key in keys:
             # Parameters of type list are added to self._LstVars
@@ -188,10 +197,11 @@ class AreaRestrictionManager(TrafficArrays):
                 self._Vars[key].reparent(self)
 
     def create(self, n = 1):
-        """ Append n elements (aircraft) to all lists and arrays.
+        """
+        Append n elements (aircraft) to all lists and arrays.
 
-            Overrides TrafficArrays.create(n) method to allow
-            handling of two-dimensional numpy arrays.
+        Overrides TrafficArrays.create(n) method to allow handling of
+        two-dimensional numpy arrays.
         """
 
         self.num_traf += n
@@ -228,7 +238,7 @@ class AreaRestrictionManager(TrafficArrays):
                 defaultvalue = [0.0] * n
 
             self._Vars[v] = np.append(self._Vars[v], defaultvalue)
-            
+
         # Allow two-dimensional numpy arrays in self._ndArrVars
         # Each row can now represent an airspace restriction
 
@@ -258,10 +268,12 @@ class AreaRestrictionManager(TrafficArrays):
                 self._Vars[v] = np.concatenate((self._Vars[v], new_cols), 1)
 
     def delete(self, idx):
-        """ Delete element (aircraft) idx from all lists and arrays.
+        """
+        Delete element (aircraft) idx from all lists and arrays.
 
-            Overrides TrafficArrays.delete(idx) method to allow
-            handling of two-dimensional numpy arrays. """
+        Overrides TrafficArrays.delete(idx) method to allow handling of
+        two-dimensional numpy arrays.
+        """
 
         if isinstance(idx, Collection):
             idx = np.sort(idx)
@@ -444,8 +456,10 @@ class AreaRestrictionManager(TrafficArrays):
         self.find_closest_conflicts()
 
     def calculate_relative_velocities(self):
-        """ Calculate the relative velocities of all aircraft with
-            respect to each area. """
+        """
+        Calculate the relative velocities of all aircraft with respect
+        to each area.
+        """
 
         # Velocity components
         for area_idx, area in enumerate(self.areas):
@@ -456,8 +470,10 @@ class AreaRestrictionManager(TrafficArrays):
         self.rel_gs = np.sqrt(self.rel_gseast ** 2 + self.rel_gsnorth ** 2)
 
     def calculate_positions_and_relative_tracks(self):
-        """ Calculate the relevant position parameters used in aircraft-area
-            conflict detection. """
+        """
+        Calculate the relevant position parameters used in aircraft-area
+        conflict detection.
+        """
 
         # Represent each aircraft position as shapely point
         self.current_position = [spgeom.Point(lon, lat) for (lon, lat) in zip(bs.traf.lon, bs.traf.lat)]
@@ -504,12 +520,14 @@ class AreaRestrictionManager(TrafficArrays):
             self.is_inconflict[area_idx, ac_idx] = area.ring.intersects(self.relative_track[area_idx][ac_idx])
 
     def calculate_time_to_intrusion(self, area_idx, area):
-        """ Calculate time-to-intersection [s] for each aircraft-area combination,
-            result can take following values:
+        """
+        Calculate time-to-intersection [s] for each aircraft-area
+        combination, the result can take following values:
 
-              equals -1     : for aircraft not in conflict with the area 0
-              equals 0      : for aircraft already inside the area
-              higher than 0 : for aircraft that are in conflict """
+        equals -1     : for aircraft not in conflict with the area 0
+        equals 0      : for aircraft already inside the area
+        higher than 0 : for aircraft that are in conflict
+        """
 
         for ac_idx in range(self.num_traf):
             if self.is_inside[area_idx, ac_idx]:
@@ -546,8 +564,10 @@ class AreaRestrictionManager(TrafficArrays):
             # print(dbg_str.format(bs.traf.id[ac_idx], self.area_ids[area_idx], t_int_sec))
 
     def calculate_resolution_vectors(self):
-        """ Calculate the resolution vectors for all aircraft that
-            are in conflict with an area. """
+        """
+        Calculate the resolution vectors for all aircraft that are in
+        conflict with an area.
+        """
 
         # Find indices of conflicting aircraft-area pairs
         conflict_pairs = [(ac_idx, area_idx)
@@ -562,8 +582,10 @@ class AreaRestrictionManager(TrafficArrays):
                 self.calculate_resolutions_for_area(area_idx, ac_indices)
 
     def calculate_resolutions_for_area(self, area_idx, ac_indices):
-        """ Calculate the resolution manoeuvres (heading and speed)
-            for all aircraft in conflict with a single area. """
+        """
+        Calculate the resolution manoeuvres (heading and speed) for all
+        aircraft in conflict with a given area.
+        """
 
         area = self.areas[area_idx]
         ac_gs = bs.traf.gs[ac_indices]
