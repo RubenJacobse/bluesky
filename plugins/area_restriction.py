@@ -1,4 +1,4 @@
-""" 
+"""
 Restricted Airspace Area Plugin
 
 Uses the AreaRestrictionManager class to keep track of restricted
@@ -149,8 +149,12 @@ class AreaRestrictionManager(TrafficArrays):
             # ======================================================
 
             # Waypoint related
+            self.idx_active_wp = np.array([], dtype = int) # index of active waypoint
+            self.idx_next_wp = np.array([], dtype = int) # index of next waypoint
             self.crs_to_active_wp = np.array([]) # [deg] Magnetic course to current waypoint
-            self.crs_to_next_wp = np.array([])  # [deg] Magnetic course to current waypoint
+            self.crs_to_next_wp = np.array([]) # [deg] Magnetic course to current waypoint
+
+            # Resolution related
             self.reso_dv_east = np.array([]) # [m/s] Resolution velocity change east component
             self.reso_dv_north = np.array([]) # [m/s] Resolution velocity change north component
             self.new_v_east = np.array([]) # [m/s] New velocity east component
@@ -207,10 +211,10 @@ class AreaRestrictionManager(TrafficArrays):
         self.num_traf += n
 
         # Lists (mostly used for strings)
-        for v in self._LstVars:
+        for var in self._LstVars:
             # Get type
             vartype = None
-            lst = self.__dict__.get(v)
+            lst = self.__dict__.get(var)
             if len(lst) > 0:
                 vartype = str(type(lst[0])).split("'")[1]
 
@@ -219,13 +223,13 @@ class AreaRestrictionManager(TrafficArrays):
             else:
                 defaultvalue = [""] * n
 
-            self._Vars[v].extend(defaultvalue)
+            self._Vars[var].extend(defaultvalue)
 
         # One dimensional numpy arrays
-        for v in self._ArrVars:
+        for var in self._ArrVars:
 
             # Get type without byte length
-            fulltype = str(self._Vars[v].dtype)
+            fulltype = str(self._Vars[var].dtype)
             vartype = ""
             for c in fulltype:
                 if not c.isdigit():
@@ -237,7 +241,7 @@ class AreaRestrictionManager(TrafficArrays):
             else:
                 defaultvalue = [0.0] * n
 
-            self._Vars[v] = np.append(self._Vars[v], defaultvalue)
+            self._Vars[var] = np.append(self._Vars[var], defaultvalue)
 
         # Allow two-dimensional numpy arrays in self._ndArrVars
         # Each row can now represent an airspace restriction
@@ -246,10 +250,10 @@ class AreaRestrictionManager(TrafficArrays):
         if not self.num_areas:
             return
 
-        for v in self._ndArrVars:  # Numpy array
+        for var in self._ndArrVars:  # Numpy array
 
             # Get numpy dtype without byte length
-            dtype_str = str(self._Vars[v].dtype)
+            dtype_str = str(self._Vars[var].dtype)
             for vartype in ["int", "float", "bool"]:
                 if vartype in dtype_str:
                     break
@@ -262,10 +266,10 @@ class AreaRestrictionManager(TrafficArrays):
 
             # Create add n columns to existing array
             new_cols = np.full((self.num_areas, n), defaultvalue)
-            if not self._Vars[v].size:
-                self._Vars[v] = new_cols
+            if not self._Vars[var].size:
+                self._Vars[var] = new_cols
             else:
-                self._Vars[v] = np.concatenate((self._Vars[v], new_cols), 1)
+                self._Vars[var] = np.concatenate((self._Vars[var], new_cols), 1)
 
     def delete(self, idx):
         """
@@ -281,19 +285,19 @@ class AreaRestrictionManager(TrafficArrays):
         else:
             dec = 1
 
-        for v in self._LstVars:
+        for var in self._LstVars:
             if isinstance(idx, Collection):
                 for i in reversed(idx):
-                    del self._Vars[v][i]
+                    del self._Vars[var][i]
             else:
-                del self._Vars[v][idx]
+                del self._Vars[var][idx]
 
-        for v in self._ArrVars:
-            self._Vars[v] = np.delete(self._Vars[v], idx)
+        for var in self._ArrVars:
+            self._Vars[var] = np.delete(self._Vars[var], idx)
 
         # Delete entire column idx from v (column = dimension 1)
-        for v in self._ndArrVars:
-            self._Vars[v] = np.delete(self._Vars[v], idx, 1)
+        for var in self._ndArrVars:
+            self._Vars[var] = np.delete(self._Vars[var], idx, 1)
 
         self.num_traf -= dec
 
@@ -303,26 +307,25 @@ class AreaRestrictionManager(TrafficArrays):
         """ Reset state on simulator reset event. """
 
         # Delete all traffic parameters
-        for v in self._LstVars:
-            self._Vars[v] = []
+        for var in self._LstVars:
+            self._Vars[var] = []
 
-        for v in self._ArrVars:
-            self._Vars[v] = np.array([], dtype=self._Vars[v].dtype)
+        for var in self._ArrVars:
+            self._Vars[var] = np.array([], dtype = self._Vars[var].dtype)
 
-        for v in self._ndArrVars:
-            self._Vars[v] = np.array([[]], dtype=self._Vars[v].dtype)
+        for var in self._ndArrVars:
+            self._Vars[var] = np.array([[]], dtype = self._Vars[var].dtype)
 
         # Make sure all areas are deleted
         for area in self.areas:
             area.delete()
             self.areas.remove(area) # Probably redundant
 
+        # Reset default values
         self.areas = []
         self.area_ids = []
         self.num_areas = 0
         self.num_traf = 0
-
-        # Reset default look-ahead time
         self.t_lookahead = 300
 
     def remove(self):
@@ -474,7 +477,8 @@ class AreaRestrictionManager(TrafficArrays):
         """
 
         # Represent each aircraft position as shapely point
-        self.current_position = [spgeom.Point(lon, lat) for (lon, lat) in zip(bs.traf.lon, bs.traf.lat)]
+        self.current_position = [spgeom.Point(lon, lat) \
+                                    for (lon, lat) in zip(bs.traf.lon, bs.traf.lat)]
 
         # Loop over all existing areas
         # NOTE: Could this be vectorized instead of looped over all aircraft-area combinations?
@@ -489,12 +493,13 @@ class AreaRestrictionManager(TrafficArrays):
                                 self.rel_gsnorth[area_idx, :])
 
             # Create shapely points for future relative position
-            future_relative_position = \
-                [spgeom.Point(lon, lat) for (lon, lat) in zip(future_relative_lon, future_relative_lat)]
+            future_relative_position = [spgeom.Point(lon, lat) for (lon, lat) \
+                                            in zip(future_relative_lon, future_relative_lat)]
 
             # Use current and future relative position to calculate relative track
             self.relative_track[area_idx] = \
-                [spgeom.LineString([curr, fut]) for (curr, fut) in zip(self.current_position, future_relative_position)]
+                [spgeom.LineString([curr, fut]) for (curr, fut) \
+                    in zip(self.current_position, future_relative_position)]
 
     def find_brg_to_area(self, area_idx, area):
         """ For each aircraft find the tangent bearings to the current area. """
@@ -804,7 +809,7 @@ class RestrictedAirspaceArea():
         """ Draw the polygon corresponding to the current area in the
             RadarWidget window. """
 
-        areafilter.defineArea(self.area_id, 'POLY', self.coords)
+        areafilter.defineArea(self.area_id, "POLY", self.coords)
 
     def _undraw(self):
         """ Remove the polygon corresponding to the current area from
