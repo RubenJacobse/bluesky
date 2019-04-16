@@ -281,14 +281,12 @@ class AreaRestrictionManager(TrafficArrays):
         else:
             dec = 1
 
-        if self._LstVars:
+        for v in self._LstVars:
             if isinstance(idx, Collection):
                 for i in reversed(idx):
-                    for v in self._LstVars:
-                        del self._Vars[v][i]
+                    del self._Vars[v][i]
             else:
-                for v in self._LstVars:
-                    del self._Vars[v][idx]
+                del self._Vars[v][idx]
 
         for v in self._ArrVars:
             self._Vars[v] = np.delete(self._Vars[v], idx)
