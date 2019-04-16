@@ -485,8 +485,8 @@ class AreaRestrictionManager(TrafficArrays):
     def find_brg_to_area(self, area_idx, area):
         """ For each aircraft find the tangent bearings to the current area. """
 
-        self.brg_left_tangent[area_idx, :], self.brg_right_tangent[area_idx, :], _, _ = \
-            area.calc_tangents(bs.traf.ntraf, bs.traf.lon, bs.traf.lat)
+        self.brg_left_tangent[area_idx, :], self.brg_right_tangent[area_idx, :] \
+            = area.calc_tangents(bs.traf.ntraf, bs.traf.lon, bs.traf.lat)
 
         self.crs_left_tangent[area_idx, :] = self.brg_left_tangent[area_idx, :] % 360
         self.crs_right_tangent[area_idx, :] = self.brg_right_tangent[area_idx, :] % 360
@@ -833,12 +833,10 @@ class RestrictedAirspaceArea():
                         idx_l = jj
 
             # Calculate tangent courses from aircraft to left- and rightmost vertices
-            qdr_l[ii], dist_l[ii] = qdrdist(
-                ac_pos[1], ac_pos[0], vertex[idx_l][1], vertex[idx_l][0])
-            qdr_r[ii], dist_r[ii] = qdrdist(
-                ac_pos[1], ac_pos[0], vertex[idx_r][1], vertex[idx_r][0])
+            qdr_l[ii], _ = qdrdist(ac_pos[1], ac_pos[0], vertex[idx_l][1], vertex[idx_l][0])
+            qdr_r[ii], _ = qdrdist(ac_pos[1], ac_pos[0], vertex[idx_r][1], vertex[idx_r][0])
 
-        return qdr_l, qdr_r, dist_l, dist_r
+        return qdr_l, qdr_r
 
     @staticmethod
     def is_ccw(coords):
