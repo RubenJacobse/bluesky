@@ -53,8 +53,8 @@ def test_arm_init(MockTraf_, AreaRestrictionManager_, areafilter_, mocktraf_):
     # Check that all traffic variables have been registered properly
     lstVarList = ["first_conflict_area_idx", "current_position", "relative_track"]
     ArrVarList = ["crs_to_active_wp", "crs_to_next_wp"]
-    ndArrVarList = ["rel_gseast", "rel_gsnorth", "brg_left_tangent", "brg_right_tangent", "dist_l", "dist_r",\
-                   "is_inconflict", "is_inside", "time_to_intrusion"]
+    ndArrVarList = ["rel_gseast", "rel_gsnorth", "brg_left_tangent", "brg_right_tangent", \
+                    "is_inconflict", "is_inside", "time_to_intrusion"]
     assert all(x in AreaRestrictionManager_._LstVars for x in lstVarList)
     assert all(x in AreaRestrictionManager_._ArrVars for x in ArrVarList)
     assert all(x in AreaRestrictionManager_._ndArrVars for x in ndArrVarList)
@@ -220,8 +220,10 @@ def test_arm_update(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
     AreaRestrictionManager_.update()
 
     # Verify that conflicts / inside conditions are evaluated correctly
-    assert np.array_equal(AreaRestrictionManager_.is_inconflict, np.array([[False, True, True, True]]))
-    assert np.array_equal(AreaRestrictionManager_.is_inside, np.array([[False, False, False, True]]))
+    assert np.array_equal(AreaRestrictionManager_.is_inconflict, \
+                            np.array([[False, True, True, True]]))
+    assert np.array_equal(AreaRestrictionManager_.is_inside, \
+                            np.array([[False, False, False, True]]))
 
     # Add extra tests to verify avoidance vector calculations
     # NOTE: To do!
@@ -409,7 +411,7 @@ def test_raa_delete(areafilter_):
 
     # Create an area
     raa = RestrictedAirspaceArea("RAA", True, 0, 0, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
-    
+
     raa.delete()
 
 def test_raa_coords2verts(areafilter_):
@@ -436,14 +438,14 @@ def test_raa_verts2coords(areafilter_):
 
     assert raa._verts2coords(verts) == coords
 
-def test_raa_calc_tangents(areafilter_):
+def test_raa_calc_tangents_four_aircraft(areafilter_):
     """ Test the correctness of the function that calculates the bearing
         and distance from aircraft positions to the tangent points of the
         area. """
 
-    # Create an area with vertices at (lon,lat): {(-1, -1), (1, -1), (1, 1), (-1, 1)}
-    raa0 = RestrictedAirspaceArea("RAA0", True, 0, 0, [-1, -1, -1, 1, 1, 1, 1, -1, -1, -1])
-    assert raa0.ring.is_ccw
+    # Create area with vertices at (lon,lat): {(-1, -1), (1, -1), (1, 1), (-1, 1)}
+    raa = RestrictedAirspaceArea("RAA", True, 0, 0, [-1, -1, -1, 1, 1, 1, 1, -1, -1, -1])
+    assert raa.ring.is_ccw
 
     # Create four aircraft at (lon,lat): {(0,2),(2,0),(0, -2),(-2, 0)}
     ntraf = 4
@@ -453,114 +455,124 @@ def test_raa_calc_tangents(areafilter_):
     # Correct qdr (defined as [-180 .. 180] degrees East-North-Up)
     qdr_cor_l = np.array([135, -135, -45, 45]) # Headings 135, 225, 315, 45 in North-East-Down
     qdr_cor_r = np.array([-135, -45, 45, 135]) # Headings 225, 315, 45, 135 in North-East-Down
-    # Correct distances in NM
-    dist_cor_l = np.array([157.402, 157.426, 157.402, 157.426]) * KM_TO_NM
-    dist_cor_r = np.array([157.402, 157.426, 157.402, 157.426]) * KM_TO_NM
 
     # Perform calculation
-    qdr_res_l, qdr_res_r, dist_res_l, dist_res_r = raa0.calc_tangents(ntraf, ac_lon, ac_lat)
+    qdr_res_l, qdr_res_r = raa.calc_tangents(ntraf, ac_lon, ac_lat)
 
     # Check that the results are within margin from the correct values
     assert np.allclose(qdr_res_l, qdr_cor_l, DIFF_DEG)
     assert np.allclose(qdr_res_r, qdr_cor_r, DIFF_DEG)
-    assert np.allclose(dist_res_l, dist_cor_l, DIFF_DIST)
-    assert np.allclose(dist_res_r, dist_cor_r, DIFF_DIST)
 
-    # Create another area with vertices at (lon,lat): {(-3, 1), (-0.5, 1), (-0.5, -1), (-3, -1)}
-    raa_1 = RestrictedAirspaceArea("RAA1", True, 0, 0, [1.0, -3.0, 1.0, -0.5, -1.0, -0.5, -1.0, -3.0, 1.0, -3.0])
+
+def test_raa_calc_tangents_two_aircraft(areafilter_):
+    """ Test the correctness of the function that calculates the bearing
+        and distance from aircraft positions to the tangent points of the
+        area. """
+
+    # Create area with vertices at (lon,lat): {(-3, 1), (-0.5, 1), (-0.5, -1), (-3, -1)}
+    raa = RestrictedAirspaceArea("RAA", True, 0, 0, \
+                                    [1.0, -3.0, 1.0, -0.5, -1.0, -0.5, -1.0, -3.0, 1.0, -3.0])
 
     # Create two aircraft at (lon,lat): {(0,2),(2,0),(0, -2),(-2, 0)}
-    ntraf1 = 2
+    ntraf = 2
     ac_lon1 = np.array([-1.5, 1.5])
     ac_lat1 = np.array([-1.5, -1.5])
 
     # Correct qdr (defined as [-180 .. 180] degrees East-North-Up)
-    qdr_cor_l1 = np.array([-71.69, -83.75]) # Headings 
-    qdr_cor_r1 = np.array([63.595, -38.857]) # Headings 
-    # Correct distances in NM
-    dist_cor_l1 = np.array([175.856, 503.86]) * KM_TO_NM
-    dist_cor_r1 = np.array([124.269, 354.93]) * KM_TO_NM
+    qdr_cor_l1 = np.array([-71.69, -83.75]) # [deg] Correct left tangent headings
+    qdr_cor_r1 = np.array([63.595, -38.857]) # [deg] Correct right tangent headings
 
     # Perform calculation
-    qdr_res_l1, qdr_res_r1, dist_res_l1, dist_res_r1 = raa_1.calc_tangents(ntraf1, ac_lon1, ac_lat1)
+    qdr_res_l1, qdr_res_r1 = raa.calc_tangents(ntraf, ac_lon1, ac_lat1)
 
     # Check that the results are within margin from the correct values
     assert np.allclose(qdr_res_l1, qdr_cor_l1, DIFF_DEG)
     assert np.allclose(qdr_res_r1, qdr_cor_r1, DIFF_DEG)
-    assert np.allclose(dist_res_l1, dist_cor_l1, DIFF_DIST)
-    assert np.allclose(dist_res_r1, dist_cor_r1, DIFF_DIST)
 
-def test_raa_is_left(areafilter_):
+def test_raa_is_left_of_line_on_line(areafilter_):
     """ Test the correctness of the function that determines whether a point lies
         to the left of a given linepiece. """
 
-    raa = RestrictedAirspaceArea("RAA1", True, 0, 0, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
+    raa = RestrictedAirspaceArea("RAA", True, 0, 0, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
 
     # Test result when the point lies on line
-    assert raa.is_left([0, 0], [1, 1], [2, 2]) == 0
-    assert raa.is_left([0, 0], [0, 1], [0, 2]) == 0
-    assert raa.is_left([0, 0], [0, 1], [0, 0.2]) == 0
-    assert raa.is_left([0, 0], [1, 0], [2, 0]) == 0
-    assert raa.is_left([0, 0], [1, 0], [0.1, 0]) == 0
+    assert raa.is_left_of_line([0, 0], [1, 1], [2, 2]) == 0
+    assert raa.is_left_of_line([0, 0], [0, 1], [0, 2]) == 0
+    assert raa.is_left_of_line([0, 0], [0, 1], [0, 0.2]) == 0
+    assert raa.is_left_of_line([0, 0], [1, 0], [2, 0]) == 0
+    assert raa.is_left_of_line([0, 0], [1, 0], [0.1, 0]) == 0
+
+def test_raa_is_left_of_line_false(areafilter_):
+    """ Test the correctness of the function that determines whether a point lies
+        to the left of a given linepiece. """
+
+    raa = RestrictedAirspaceArea("RAA", True, 0, 0, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
 
     # Test result when the point lies to the right of the line
-    assert raa.is_left([0, 0], [1, 1], [1, 0]) < 0
-    assert raa.is_left([0, 0], [0, 1], [1, 0]) < 0
-    assert raa.is_left([0, 0], [0, 1], [0.2, 0]) < 0
-    assert raa.is_left([0, 0], [1, 0], [0, -1]) < 0
-    assert raa.is_left([1, 0], [0, 0], [0, 0.1]) < 0
+    assert raa.is_left_of_line([0, 0], [1, 1], [1, 0]) < 0
+    assert raa.is_left_of_line([0, 0], [0, 1], [1, 0]) < 0
+    assert raa.is_left_of_line([0, 0], [0, 1], [0.2, 0]) < 0
+    assert raa.is_left_of_line([0, 0], [1, 0], [0, -1]) < 0
+    assert raa.is_left_of_line([1, 0], [0, 0], [0, 0.1]) < 0
+
+def test_raa_is_left_of_line_true(areafilter_):
+    """ Test the correctness of the function that determines whether a point lies
+        to the left of a given linepiece. """
+
+    raa = RestrictedAirspaceArea("RAA", True, 0, 0, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
 
     # Test result when the point lies to the left of the line
-    assert raa.is_left([0, 0], [1, 1], [0, 1]) > 0
-    assert raa.is_left([0, 0], [0, 1], [-1, 1]) > 0
-    assert raa.is_left([0, 0], [0, 1], [-1, 1]) > 0
-    assert raa.is_left([0, 0], [1, 0], [0, 1]) > 0
-    assert raa.is_left([1, 0], [0, 0], [0, -0.1]) > 0
-
-def test_raa_crs_mid(areafilter_):
-    """ Test the crs_mid function that returns the bisector course
-        dividing the angle between two courses in half. """
-
-    raa = RestrictedAirspaceArea("RAA1", True, 0, 0, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
-
-    # Test result when crs_left_tangent < crs_right_tangent
-    assert raa.crs_mid(0, 360) == 180
-    assert raa.crs_mid(10, 50) == 30
-    assert raa.crs_mid(160, 200) == 180
-
-    # Test result when crs_right_tangent < crs_left_tangent
-    assert raa.crs_mid(350, 10) == 0
-    assert raa.crs_mid(330, 0) == 345
-    assert raa.crs_mid(340, 40) == 10
-
-    # Test rsult when crs_left_tangent = crs_right_tangent
-    assert raa.crs_mid(220, 220) == 220
-    assert raa.crs_mid(360, 360) == 0
-
-def test_raa_crs_is_between(areafilter_):
-    """ Test the crs_is_between function that checks if a given course
-        lies between a left and right most course. """
-
-    raa = RestrictedAirspaceArea("RAA1", True, 0, 0, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
-
-    # These calls should return True
-    assert raa.crs_is_between(10, 0, 30)
-    assert raa.crs_is_between(0, 359, 1)
-    assert raa.crs_is_between(350, 190, 170)
-    assert raa.crs_is_between(340, 330, 20)
-
-    # Thes calls should return False
-    assert not raa.crs_is_between(0, 10, 20)
-    assert not raa.crs_is_between(340, 355, 190)
-    assert not raa.crs_is_between(22, 33.4, 359.1)
-    assert not raa.crs_is_between(220, 220, 220)
-    assert not raa.crs_is_between(180, 181, 179)
+    assert raa.is_left_of_line([0, 0], [1, 1], [0, 1]) > 0
+    assert raa.is_left_of_line([0, 0], [0, 1], [-1, 1]) > 0
+    assert raa.is_left_of_line([0, 0], [0, 1], [-1, 1]) > 0
+    assert raa.is_left_of_line([0, 0], [1, 0], [0, 1]) > 0
+    assert raa.is_left_of_line([1, 0], [0, 0], [0, -0.1]) > 0
 
 ##################################################################################################
 # Tests for other functions defined in area_restriction.py
 ##################################################################################################
+def test_crs_mid():
+    """ Test the crs_mid function that returns the bisector course
+        dividing the angle between two courses in half. """
+
+    # Test result when crs_left_tangent < crs_right_tangent
+    assert ar.crs_mid(0, 360) == 180
+    assert ar.crs_mid(10, 50) == 30
+    assert ar.crs_mid(160, 200) == 180
+
+    # Test result when crs_right_tangent < crs_left_tangent
+    assert ar.crs_mid(350, 10) == 0
+    assert ar.crs_mid(330, 0) == 345
+    assert ar.crs_mid(340, 40) == 10
+
+    # Test rsult when crs_left_tangent = crs_right_tangent
+    assert ar.crs_mid(220, 220) == 220
+    assert ar.crs_mid(360, 360) == 0
+
+def test_crs_is_between_true():
+    """ Test the crs_is_between function that checks if a given course
+        lies between a left and right most course. """
+
+    # These calls should return True
+    assert ar.crs_is_between(10, 0, 30)
+    assert ar.crs_is_between(0, 359, 1)
+    assert ar.crs_is_between(350, 190, 170)
+    assert ar.crs_is_between(340, 330, 20)
+
+def test_crs_is_between_false():
+    """ Test the crs_is_between function that checks if a given course
+        lies between a left and right most course. """
+
+    # Thes calls should return False
+    assert not ar.crs_is_between(0, 10, 20)
+    assert not ar.crs_is_between(340, 355, 190)
+    assert not ar.crs_is_between(22, 33.4, 359.1)
+    assert not ar.crs_is_between(220, 220, 220)
+    assert not ar.crs_is_between(180, 181, 179)
+
 def test_enu2crs():
     """ Test the function that converts ENU angles to compass angles. """
+
     enu = np.array([-180, -135, -90, -45, 0, 45, 90, 135, 180])
     crs_corr = np.array([270, 225, 180, 135, 90, 45, 0, 315, 270])
     crs = ar.enu2crs(enu)
@@ -569,6 +581,7 @@ def test_enu2crs():
 
 def test_ned2crs():
     """ Test the function that converts ENU angles to compass angles. """
+
     ned = np.array([-180, -135, -90, -45, 0, 45, 90, 135, 180])
     crs_corr = np.array([180, 225, 270, 315, 0, 45, 90, 135, 180])
     crs = ar.ned2crs(ned)
