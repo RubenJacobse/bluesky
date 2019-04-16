@@ -504,6 +504,8 @@ class AreaRestrictionManager(TrafficArrays):
     def find_brg_to_area(self, area_idx, area):
         """ For each aircraft find the tangent bearings to the current area. """
 
+        # NOTE: Unfortunately this does not work, avoiding with constant heading
+        # requires the calculation of the rhumb line course between points...
         self.brg_left_tangent[area_idx, :], self.brg_right_tangent[area_idx, :] \
             = area.calc_tangents(bs.traf.ntraf, bs.traf.lon, bs.traf.lat)
 
