@@ -879,9 +879,12 @@ class RestrictedAirspaceArea():
 
         return False if dir_sum > 0 else True
 
+
 def calc_future_pos(dt, lon, lat, gseast, gsnorth):
-    """ Calculate future lon and lat vectors after time dt based on
-        current position and velocity vectors"""
+    """
+    Calculate future lon and lat vectors after time dt based on
+    current position and velocity vectors.
+    """
 
     newlat = lat + np.degrees(dt * gsnorth / Rearth)
     newcoslat = np.cos(np.deg2rad(newlat))
@@ -889,31 +892,41 @@ def calc_future_pos(dt, lon, lat, gseast, gsnorth):
 
     return newlon, newlat
 
-def enu2crs(enu):
-    """ Convert an array of angles defined in East-North-Up on
-        [-180,180] degrees to compass angles on [0,360]. """
 
-    crs = ((90 - enu) + 360 ) % 360
+def enu2crs(enu):
+    """
+    Convert an array of angles defined in East-North-Up on
+    [-180,180] degrees to compass angles on [0,360].
+    """
+
+    crs = ((90 - enu) + 360) % 360
 
     return crs
+
 
 def ned2crs(ned):
-    """ Convert an array of angles defined in North-East-Down on
-    [-180,180] degrees to compass angles on [0,360]. """
+    """
+    Convert an array of angles defined in North-East-Down on
+    [-180,180] degrees to compass angles on [0,360].
+    """
 
-    crs = (ned + 360 ) % 360
+    crs = (ned + 360) % 360
 
     return crs
 
+
 def crs_closest(ref_crs, crs_a, crs_b):
-    """ Returns the value of either crs_a or crs_b depending on which
-        has the smallest angle difference with respect to ref. """
+    """
+    Takes three course vectors ref_rs, crs_a, and crs_b and per element
+    returns the value of either crs_a or crs_b depending on which has
+    the smallest angle difference with respect to ref_crs.
+    """
 
     # Calculate absolute angle difference between both courses and the reference
-    crs_diff_a = np.absolute(np.remainder(ref_crs - crs_a + 180, 360) - 180)
-    crs_diff_b = np.absolute(np.remainder(ref_crs - crs_b + 180, 360) - 180)
+    diff_ref_a = np.absolute(np.remainder(ref_crs - crs_a + 180, 360) - 180)
+    diff_ref_b = np.absolute(np.remainder(ref_crs - crs_b + 180, 360) - 180)
 
     # Select the course with the smallest angle difference
-    crs = np.where(crs_diff_a < crs_diff_b, crs_a, crs_b)
+    crs = np.where(diff_ref_a < diff_ref_b, crs_a, crs_b)
 
     return crs
