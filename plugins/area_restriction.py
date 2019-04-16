@@ -660,6 +660,7 @@ class AreaRestrictionManager(TrafficArrays):
         # print(hdg_cmd)
         # print(spd_cmd)
 
+
 class RestrictedAirspaceArea():
     """ Class that represents a single Restricted Airspace Area. """
 
@@ -692,23 +693,20 @@ class RestrictedAirspaceArea():
         self._draw()
 
     def update_pos(self, dt):
-        """ Update the position of the area (only if its groundspeed
-            is nonzero). Recalculates the coordinates and updates the
-            polygon position drawn in the RadarWidget. """
+        """
+        Update the position of the area (only if its groundspeed is
+        nonzero). Recalculates the coordinates and updates the polygon
+        position drawn in the BlueSky RadarWidget.
+        """
 
         if self.gsnorth or self.gseast:
-
-            # Get lon and lat vectors from verts
+            # Calculate new vertex positions after timestep dt
             curr_lon = self.verts[:, 0]
             curr_lat = self.verts[:, 1]
-
-            # Calculate new lon and lat values for all vertices
             newlon, newlat = calc_future_pos(dt, curr_lon, curr_lat, self.gseast, self.gsnorth)
 
-            # Update vertices using new lat and lon vectors
+            # Update vertex representations in all formats
             self.verts = np.array([newlon, newlat]).T
-
-            # Update the other coordinate representations
             self.ring = spgeom.LinearRing(self.verts)
             self.poly = spgeom.Polygon(self.verts)
             self.coords = self._verts2coords(self.verts)
@@ -719,19 +717,23 @@ class RestrictedAirspaceArea():
             self._draw()
 
     def delete(self):
-        """ On deletion, remove the drawing of current area from the
-            BlueSky RadarWidget canvas. """
+        """
+        On deletion, remove the drawing of current area from the
+        BlueSky RadarWidget canvas.
+        """
 
         self._undraw()
 
     def _check_poly(self, coords):
-        """ During initialization check that the user specified polygon
-            is valid.
+        """
+        During initialization check that the user specified polygon
+        is valid.
 
-            - Vertices shall form a closed ring (first and last vertex are the same)
-            - Vertices shall be ordered counterclockwise
+        - Vertices shall form a closed ring (first and last vertex are the same)
+        - Vertices shall be ordered counterclockwise
 
-            If this is not already the case then create a valid polygon. """
+        If this is not already the case then create a valid polygon.
+        """
 
         # Make sure the border is a closed ring (first and last coordinate pair should be the same)
         if (coords[0], coords[1]) != (coords[-2], coords[-1]):
@@ -747,13 +749,15 @@ class RestrictedAirspaceArea():
         return coords
 
     def _coords2verts(self, coords):
-        """ Convert list with coords in lat,lon order to numpy array of
-            vertex pairs in lon,lat order.
+        """
+        Convert list with coords in lat,lon order to numpy array of
+        vertex pairs in lon,lat order.
 
-            coords = [lat_0, lon_0, ..., lat_n, lon_n] \n
-            verts = np.array([[lon_0, lat_0], ..., [lon_n, lat_n]])
+        coords = [lat_0, lon_0, ..., lat_n, lon_n] \n
+        verts = np.array([[lon_0, lat_0], ..., [lon_n, lat_n]])
 
-            (Essentially the inverse operation of self._verts2coords). """
+        (This is the inverse operation of self._verts2coords).
+        """
 
         verts_latlon = np.reshape(coords, (len(coords) // 2, 2))
         verts_lonlat = np.flip(verts_latlon, 1)
@@ -761,13 +765,15 @@ class RestrictedAirspaceArea():
         return verts_lonlat
 
     def _verts2coords(self, verts):
-        """ Convert numpy array of vertex coordinate pairs in lon,lat order to
-            a single list of lat,lon coords.
+        """
+        Convert numpy array of vertex coordinate pairs in lon,lat order to
+        a single list of lat,lon coords.
 
-            verts = np.array([[lon_0, lat_0], ..., [lon_n, lat_n]]) \n
-            coords = [lat_0, lon_0, ..., lat_n, lon_n]
+        verts = np.array([[lon_0, lat_0], ..., [lon_n, lat_n]]) \n
+        coords = [lat_0, lon_0, ..., lat_n, lon_n]
 
-            (Essentially the inverse operation of self._coords2verts). """
+        (Essentially the inverse operation of self._coords2verts).
+        """
 
         verts_latlon = np.flip(verts, 1)
         coords_latlon = list(verts_latlon.flatten("C"))
@@ -787,22 +793,24 @@ class RestrictedAirspaceArea():
         areafilter.deleteArea(self.area_id)
 
     # NOTE: How can this be vectorized further?
-    def calc_tangents(self, ntraf, ac_lon, ac_lat):
-        """ For a given aircraft position find left- and rightmost courses
-            that are tangent to a given polygon as well as the distance to
-            the corresponding vertices. """
+    def calc_tangents(self, num_traf, ac_lon, ac_lat):
+        """
+        For a given aircraft position find left- and rightmost courses
+        that are tangent to a given polygon as well as the distance to
+        the corresponding vertices.
+        """
 
         # Initialize arrays to store qdrs and distances
-        qdr_l = np.zeros(ntraf, dtype=float)
-        qdr_r = np.zeros(ntraf, dtype=float)
-        dist_l = np.zeros(ntraf, dtype=float)
-        dist_r = np.zeros(ntraf, dtype=float)
+        qdr_l = np.zeros(num_traf, dtype = float)
+        qdr_r = np.zeros(num_traf, dtype = float)
+        dist_l = np.zeros(num_traf, dtype = float)
+        dist_r = np.zeros(num_traf, dtype = float)
 
         # Create array containing [lon, lat] for each vertex
         vertex = np.array(self.ring.coords.xy).T
 
         # Calculate qdrs and distances for each aircraft
-        for ii in range(ntraf):
+        for ii in range(num_traf):
             ac_pos = [ac_lon[ii], ac_lat[ii]]
 
             # Start by assuming both tangents touch at polygon vertex with index 0
@@ -814,70 +822,83 @@ class RestrictedAirspaceArea():
             #
             # Algorithm from: http://geomalgorithms.com/a15-_tangents.html
             for jj in range(1, len(vertex) - 1):
-                eprev = self.is_left(vertex[jj - 1], vertex[jj], ac_pos)
-                enext = self.is_left(vertex[jj], vertex[jj + 1], ac_pos)
+                eprev = self.is_left_of_line(vertex[jj - 1], vertex[jj], ac_pos)
+                enext = self.is_left_of_line(vertex[jj], vertex[jj + 1], ac_pos)
 
                 if eprev <= 0 and enext > 0:
-                    if not self.is_left(ac_pos, vertex[jj], vertex[idx_r]) < 0:
+                    if not self.is_left_of_line(ac_pos, vertex[jj], vertex[idx_r]) < 0:
                         idx_r = jj
                 elif eprev > 0 and enext <= 0:
-                    if not self.is_left(ac_pos, vertex[jj], vertex[idx_l]) > 0:
+                    if not self.is_left_of_line(ac_pos, vertex[jj], vertex[idx_l]) > 0:
                         idx_l = jj
 
             # Calculate tangent courses from aircraft to left- and rightmost vertices
-            qdr_l[ii], dist_l[ii] = qdrdist(ac_pos[1], ac_pos[0], vertex[idx_l][1], vertex[idx_l][0])
-            qdr_r[ii], dist_r[ii] = qdrdist(ac_pos[1], ac_pos[0], vertex[idx_r][1], vertex[idx_r][0])
+            qdr_l[ii], dist_l[ii] = qdrdist(
+                ac_pos[1], ac_pos[0], vertex[idx_l][1], vertex[idx_l][0])
+            qdr_r[ii], dist_r[ii] = qdrdist(
+                ac_pos[1], ac_pos[0], vertex[idx_r][1], vertex[idx_r][0])
 
         return qdr_l, qdr_r, dist_l, dist_r
 
     @staticmethod
-    def crs_is_between(crs, crs_l, crs_r):
-        """ Check if a given magnetic course crs on [0 .. 360] deg
-            lies in between crs_l and crs_r (in clockwise direction). """
-
-        if ((crs_l > crs_r) and (crs > crs_l or crs < crs_r)) or \
-             ((crs_l < crs_r) and (crs > crs_l and crs < crs_r)):
-            return True
-
-        return False
-
-    @staticmethod
-    def crs_mid(crs_l, crs_r):
-        """ Find the course that forms the bisector of the angle
-            between crs_l and crs_r. """
-
-        if crs_l < crs_r:
-            crs_mid = 0.5 * (crs_l + crs_r)
-        elif crs_l > crs_r:
-            crs_mid = (crs_l + 0.5*(360 - crs_l + crs_r)) % 360
-        else:
-            # Ensure when crs_l,crs_r = 360 then crs_mid = 0
-            crs_mid = crs_l % 360
-
-        return crs_mid
-
-    @staticmethod
-    def is_left(p_0, p_1, p_2):
-        """  Check if point p_2 lies to the left of the line through p_0 and p_1.
-
-            Returns:
-                > 0 if p_2 lies on the left side of the line
-                = 0 if p_2 lies exactly on the line
-                < 0 if p_2 lies on the right side of the line """
-
-        return (p_1[0] - p_0[0]) * (p_2[1] - p_0[1]) - (p_2[0] - p_0[0]) * (p_1[1] - p_0[1])
-
-    @staticmethod
     def is_ccw(coords):
-        """ Check if a list of lat,lon coordinates is defined in
-            counterclockwise order. """
+        """
+        Check if a list of lat,lon coordinates is defined in
+        counterclockwise order.
+        """
 
         dir_sum = 0
-        for ii in range(0, len(coords) - 2, 2): # ii = 0,2,4,...
-            edge = (coords[ii + 3] - coords[ii + 1]) * (coords[ii] + coords[ii + 2])
+        for ii in range(0, len(coords) - 2, 2):  # ii = 0,2,4,...
+            edge = (coords[ii + 3] - coords[ii + 1]) * \
+                (coords[ii] + coords[ii + 2])
             dir_sum += edge
 
         return False if dir_sum > 0 else True
+
+    @staticmethod
+    def is_left_of_line(line_start, line_end, point):
+        """
+        Check if point lies to the left of the line through line_start
+        to line_end.
+
+        Returns:
+            > 0 if point lies on the left side of the line
+            = 0 if point lies exactly on the line
+            < 0 if point lies on the right side of the line
+        """
+
+        return (line_end[0] - line_start[0]) * (point[1] - line_start[1]) \
+                    - (point[0] - line_start[0]) * (line_end[1] - line_start[1])
+
+
+def crs_mid(crs_left, crs_right):
+    """
+    Find the course that forms the bisector of the angle
+    between crs_left and crs_right (in clockwise direction).
+    """
+
+    if crs_left < crs_right:
+        crs_mid = 0.5 * (crs_left + crs_right)
+    elif crs_left > crs_right:
+        # North in between crs_l and crs_r
+        crs_mid = (crs_left + 0.5 * (360 - crs_left + crs_right)) % 360
+    else:
+        # Ensure when crs_l,crs_r = 360 then crs_mid = 0
+        crs_mid = crs_left % 360
+
+    return crs_mid
+
+
+def crs_is_between(crs, crs_left, crs_right):
+    """
+    Check if a given magnetic course crs on [0 .. 360] deg lies
+    in between crs_left and crs_right (in clockwise direction).
+    """
+
+    is_between = ((crs_left > crs_right) and (crs > crs_left or crs < crs_right)) or \
+                    ((crs_left < crs_right) and (crs > crs_left and crs < crs_right))
+
+    return is_between
 
 
 def calc_future_pos(dt, lon, lat, gseast, gsnorth):
