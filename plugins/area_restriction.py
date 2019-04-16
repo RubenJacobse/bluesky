@@ -327,6 +327,13 @@ class AreaRestrictionManager(TrafficArrays):
         # Reset default look-ahead time
         self.t_lookahead = 300
 
+    def remove(self):
+        """ Called when plugin is removed. """
+
+        # Remove self from the TrafficArrays tree
+        if self._parent:
+            self._parent._children.remove(self)
+
     def preupdate(self):
         """ Update the area positions before traf is updated. """
 
@@ -343,13 +350,6 @@ class AreaRestrictionManager(TrafficArrays):
             self.calculate_resolution_vectors()
             # self.calculate_new_velocities()
             self.apply_new_velocities()
-
-    def remove(self):
-        """ Called when plugin is removed. """
-
-        # Remove self from the TrafficArrays tree
-        if self._parent:
-            self._parent._children.remove(self)
 
     def create_area(self, area_id, area_status, gsnorth, gseast, *coords):
         """ Create a new restricted airspace area """
