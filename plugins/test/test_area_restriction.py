@@ -54,7 +54,7 @@ def test_arm_init(MockTraf_, AreaRestrictionManager_, areafilter_, mocktraf_):
     lstVarList = ["first_conflict_area_idx", "current_position", "relative_track"]
     ArrVarList = ["crs_to_active_wp", "crs_to_next_wp"]
     ndArrVarList = ["rel_gseast", "rel_gsnorth", "brg_left_tangent", "brg_right_tangent", \
-                    "is_inconflict", "is_inside", "time_to_intrusion"]
+                    "is_in_area_conflict", "is_inside", "time_to_area_intrusion"]
     assert all(x in AreaRestrictionManager_._LstVars for x in lstVarList)
     assert all(x in AreaRestrictionManager_._ArrVars for x in ArrVarList)
     assert all(x in AreaRestrictionManager_._ndArrVars for x in ndArrVarList)

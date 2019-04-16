@@ -141,8 +141,8 @@ class AreaRestrictionManager(TrafficArrays):
             self.crs_left_tangent = np.array([[]]) # [deg] Compass course from ac to leftmost vertex [0..360]
             self.crs_right_tangent = np.array([[]]) # [deg] Compass course from ac to rightmost vertex [0..360]
             self.is_inside = np.array([[]], dtype = bool) # Stores whether ac is inside area
-            self.is_inconflict = np.array([[]], dtype = bool) # Stores whether ac is in conflict with area
-            self.time_to_intrusion = np.array([[]]) # [s] Time to area intrusion
+            self.is_in_area_conflict = np.array([[]], dtype = bool) # Stores whether ac is in conflict with area
+            self.time_to_area_intrusion = np.array([[]])  # [s] Time to area intrusion
 
             # ======================================================
             # Traffic parameters that are 1-dimensional numpy arrays
