@@ -823,7 +823,7 @@ class RestrictedAirspaceArea():
         areafilter.deleteArea(self.area_id)
 
     # NOTE: Can this be vectorized further?
-    def calc_tangents(self, num_traf, ac_lon, ac_lat):
+    def calc_qdr_tangents(self, num_traf, ac_lon, ac_lat):
         """
         For a given aircraft position find left- and rightmost courses
         that are tangent to a given polygon as well as the distance to
