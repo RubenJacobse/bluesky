@@ -25,6 +25,7 @@ class MockTraf(TrafficArrays):
             self.id = []
             self.lon = np.array([])
             self.lat = np.array([])
+            self.hdg = np.array([])
             self.gseast = np.array([])
             self.gsnorth = np.array([])
             self.gs = np.array([])
@@ -75,6 +76,7 @@ class MockTraf(TrafficArrays):
         self.gseast = np.array([0, -450, 0, 450])
         self.gsnorth = np.array([450, 0, 450, 0])
         self.gs = np.array([450, 450, 450, 450])
+        self.hdg = np.array([360, 270, 360, 90])
 
         self.alt = np.array([6100, 6100, 6100, 6100])
         self.actwp = MockWaypoint()
