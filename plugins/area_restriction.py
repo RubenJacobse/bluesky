@@ -912,14 +912,14 @@ class RestrictedAirspaceArea():
                         idx_left_vert = jj
 
             # Calculate tangent loxodrome angles from aircraft to left- and rightmost vertices
-            lox_angle_left[ii], _ = rhumb_azimuth(ac_pos[1],
-                                                  ac_pos[0],
-                                                  vertex[idx_left_vert][1],
-                                                  vertex[idx_left_vert][0])
-            lox_angle_right[ii], _ = rhumb_azimuth(ac_pos[1],
-                                                   ac_pos[0],
-                                                   vertex[idx_right_vert][1],
-                                                   vertex[idx_right_vert][0])
+            lox_angle_left[ii] = rhumb_azimuth(ac_pos[1],
+                                               ac_pos[0],
+                                               vertex[idx_left_vert][1],
+                                               vertex[idx_left_vert][0])
+            lox_angle_right[ii] = rhumb_azimuth(ac_pos[1],
+                                                ac_pos[0],
+                                                vertex[idx_right_vert][1],
+                                                vertex[idx_right_vert][0])
 
         return lox_angle_left, lox_angle_right
 
