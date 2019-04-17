@@ -588,7 +588,7 @@ def test_ned2crs():
 
     assert np.array_equal(crs, crs_corr)
 
-def test_crs_closest():
+def test_crs_closest_scalar():
     """ Test the function that takes two courses and returns the course
         with the smallest angle difference with respect to a reference 
         course. """
@@ -601,6 +601,12 @@ def test_crs_closest():
     crs = ar.crs_closest(ref, crs_a, crs_b)
     assert crs == crs_a
 
+
+def test_crs_closest_numpy_scalar():
+    """ Test the function that takes two courses and returns the course
+        with the smallest angle difference with respect to a reference 
+        course. """
+
     # Test for single value numpy array input
     ref = np.array([340])
     crs_a = np.array([10])
@@ -609,6 +615,12 @@ def test_crs_closest():
 
     crs_correct = np.array([10])
     assert np.array_equal(crs, crs_correct)
+
+
+def test_crs_closest_numpy_vector():
+    """ Test the function that takes two courses and returns the course
+        with the smallest angle difference with respect to a reference 
+        course. """
 
     # Test for single value numpy array input
     ref = np.array([340, 20, 0, 170, 185])
