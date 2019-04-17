@@ -25,6 +25,9 @@ from bluesky.tools.aero import Rearth
 from bluesky.tools.geo import qdrdist
 from bluesky.tools.trafficarrays import TrafficArrays, RegisterElementParameters
 
+# Temporary import
+from tempgeo import rhumb_azimuth
+
 # Default variable values for numpy arrays
 VAR_DEFAULTS = {"float": 0.0, "int": 0, "bool": False, "S": "", "str": "", "object": None}
 
