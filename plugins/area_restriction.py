@@ -367,11 +367,11 @@ class AreaRestrictionManager(TrafficArrays):
         self.areas.append(new_area)
         self.area_ids.append(area_id)
 
-        for v in self._LstVars:  # Lists (mostly used for strings)
+        for var in self._LstVars:  # Lists (mostly used for strings)
 
             # Get type
             vartype = None
-            lst = self.__dict__.get(v)
+            lst = self.__dict__.get(var)
             if lst:
                 vartype = str(type(lst[0])).split("'")[1]
 
@@ -380,14 +380,14 @@ class AreaRestrictionManager(TrafficArrays):
             else:
                 defaultvalue = [""] * bs.traf.ntraf
 
-            if not self._Vars[v]:
-                self._Vars[v] = defaultvalue
+            if not self._Vars[var]:
+                self._Vars[var] = defaultvalue
 
         # Add row to all numpy arrays
-        for v in self._ndArrVars:
+        for var in self._ndArrVars:
 
             # Get numpy dtype without byte length
-            dtype_str = str(self._Vars[v].dtype)
+            dtype_str = str(self._Vars[var].dtype)
             for dtype in ["int", "float", "bool"]:
                 if dtype in dtype_str:
                     vartype = dtype
@@ -403,9 +403,9 @@ class AreaRestrictionManager(TrafficArrays):
             newrow = np.full((1, bs.traf.ntraf), defaultvalue)
 
             if not self.num_areas:
-                self._Vars[v] = newrow
+                self._Vars[var] = newrow
             else:
-                self._Vars[v] = np.vstack((self._Vars[v], newrow))
+                self._Vars[var] = np.vstack((self._Vars[var], newrow))
 
         # Increment after adding variable elements
         self.num_areas += 1
@@ -430,8 +430,8 @@ class AreaRestrictionManager(TrafficArrays):
             self.num_areas -= 1
 
             # Delete row corresponding to area from all numpy arrays
-            for v in self._ndArrVars:
-                self._Vars[v] = np.delete(self._Vars[v], idx, 0)
+            for var in self._ndArrVars:
+                self._Vars[var] = np.delete(self._Vars[var], idx, 0)
 
             return True, "Sucessfully deleted airspace restriction {}".format(area_id)
 
