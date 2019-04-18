@@ -1,6 +1,16 @@
-import numpy as np
+"""
+Module that implements azimuth angle calculation for rhumb lines
+between two points.
 
-DIV_ZERO_SAFETY_FACTOR = 1e-15
+Based on adaptations of equations given by: https://planetcalc.com/713
+The arctan(y/x) term given there is incorrect and has been replaced here
+by arctan2(y,x) to return angles in the correct quadrant.
+
+© Ruben Jacobse, 2019
+"""
+
+# Third-party imports
+import numpy as np
 
 
 def rhumb_azimuth(lat_start, lon_start, lat_end, lon_end):
@@ -48,8 +58,8 @@ def _rhumb_azimuth_scalar(lat_start, lon_start, lat_end, lon_end):
     # NOTE: If the start and end latitude are exactly equal, then the denominator in the
     # azimuth_rad calculation can become zero leading to division by zero. To prevent
     # this, a very small safety factor DIV_ZERO_SAFETY_FACTOR is added to this term.
-    azimuth_rad = np.arctan(delta_lon_rad / (natlog_factor(lat_end_rad) \
-        - natlog_factor(lat_begin_rad) + DIV_ZERO_SAFETY_FACTOR))
+    azimuth_rad = np.arctan2(delta_lon_rad, (natlog_factor(lat_end_rad) \
+        - natlog_factor(lat_begin_rad)))
 
     azimuth_deg = np.degrees(azimuth_rad)
 
@@ -85,8 +95,8 @@ def _rhumb_azimuth_vector(lat_start, lon_start, lat_end, lon_end):
     # NOTE: If the start and end latitude are exactly equal, then the denominator in the
     # azimuth_rad calculation can become zero leading to division by zero. To prevent
     # this, a very small safety factor DIV_ZERO_SAFETY_FACTOR is added to this term.
-    azimuth_rad = np.arctan(delta_lon_rad / (natlog_factor(lat_end_rad) \
-        - natlog_factor(lat_begin_rad) + DIV_ZERO_SAFETY_FACTOR))
+    azimuth_rad = np.arctan2(delta_lon_rad, (natlog_factor(lat_end_rad) \
+        - natlog_factor(lat_begin_rad)))
 
     azimuth_deg = np.degrees(azimuth_rad)
 
@@ -115,4 +125,3 @@ def natlog_factor(lat):
         ** (eccentricity / 2)
 
     return np.log(tan_term * lat_term)
-
