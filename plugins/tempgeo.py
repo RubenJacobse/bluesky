@@ -35,10 +35,8 @@ def rhumb_azimuth(lat_start, lon_start, lat_end, lon_end):
 
 def _rhumb_azimuth_scalar(lat_start, lon_start, lat_end, lon_end):
     """
-    Perform the rhumb line azimuth calculation for scalar input
+    Perform the rhumb line azimuth angle calculation for scalar input
     """
-
-    # NOTE: Equations from https://planetcalc.com/713/
 
     # Longitude difference value depends on whether the points are on the
     # same hemisphere
@@ -49,15 +47,12 @@ def _rhumb_azimuth_scalar(lat_start, lon_start, lat_end, lon_end):
     else:
         delta_lon = lon_end - lon_start - 360
 
-    # Further equations use radians
+    # Subsequent equations use radians
     lat_begin_rad = np.radians(lat_start)
     lat_end_rad = np.radians(lat_end)
     delta_lon_rad = np.radians(delta_lon)
 
     # Azimuth angle calculation
-    # NOTE: If the start and end latitude are exactly equal, then the denominator in the
-    # azimuth_rad calculation can become zero leading to division by zero. To prevent
-    # this, a very small safety factor DIV_ZERO_SAFETY_FACTOR is added to this term.
     azimuth_rad = np.arctan2(delta_lon_rad, (natlog_factor(lat_end_rad) \
         - natlog_factor(lat_begin_rad)))
 
@@ -68,10 +63,8 @@ def _rhumb_azimuth_scalar(lat_start, lon_start, lat_end, lon_end):
 
 def _rhumb_azimuth_vector(lat_start, lon_start, lat_end, lon_end):
     """
-    Perform the rhumb line azimuth calculation for vector input
+    Perform the rhumb line azimuth angle calculation for vector input
     """
-
-    # NOTE: Equations from https://planetcalc.com/713/
 
     delta_lon = np.zeros(np.shape(lat_start))
 
@@ -86,15 +79,12 @@ def _rhumb_azimuth_vector(lat_start, lon_start, lat_end, lon_end):
     case_3 = np.where(lon_end - lon_start > 180)
     delta_lon[case_3] = lon_end[case_3] - lon_start[case_3] - 360
 
-    # Further equations use radians
+    # Subsequent equations use radians
     lat_begin_rad = np.radians(lat_start)
     lat_end_rad = np.radians(lat_end)
     delta_lon_rad = np.radians(delta_lon)
 
     # Azimuth angle calculation
-    # NOTE: If the start and end latitude are exactly equal, then the denominator in the
-    # azimuth_rad calculation can become zero leading to division by zero. To prevent
-    # this, a very small safety factor DIV_ZERO_SAFETY_FACTOR is added to this term.
     azimuth_rad = np.arctan2(delta_lon_rad, (natlog_factor(lat_end_rad) \
         - natlog_factor(lat_begin_rad)))
 
@@ -110,8 +100,6 @@ def natlog_factor(lat):
     ln(tan(pi/4 + lat/2) * ((1 - e * sin(lat)) / (1 + e * sin(lat))) ** (e / 2))
 
     """
-
-    # NOTE: Equations from https://planetcalc.com/713/
 
     # Calculate eccentricity
     a = 6378137.0 # [m] WGS84 Earth semi-major axis
