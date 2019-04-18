@@ -30,7 +30,8 @@ from tempgeo import rhumb_azimuth
 
 # Default variable values for numpy arrays
 VAR_DEFAULTS = {"float": 0.0, "int": 0, "bool": False, "S": "", "str": "", "object": None}
-AREA_AVOIDANCE_CRS_MARGIN = 5 # [deg] Course margin for area avoidance
+AREA_AVOIDANCE_CRS_MARGIN = 1 # [deg] Course margin for area avoidance
+COMMANDED_CRS_MARGIN = 0.2 # [deg] Used to verify if a commanded heading has been reached
 NM_TO_M = 1852. # Conversion factor nautical miles to metres
 
 
@@ -168,7 +169,7 @@ class AreaRestrictionManager(TrafficArrays):
             # Keep track of the avoidance state of each aircraft
             self.is_in_area_conflict_mode = np.array([], dtype = bool)
             self.is_in_aircraft_conflict_mode = np.array([], dtype = bool)
-            self.is_in_route_mode = np.array([], dtype = bool)
+            self.is_in_route_following_mode = np.array([], dtype = bool)
 
             # =======================
             # Traffic parameter lists
@@ -363,16 +364,15 @@ class AreaRestrictionManager(TrafficArrays):
         self.calculate_positions_and_relative_tracks()
         for area_idx, area in enumerate(self.areas):
             self.find_bearings_tangent_to_area(area_idx, area)
-            self.find_ac_inside(area_idx, area)
-            self.find_ac_inconflict(area_idx, area)
+            self.find_ac_inside_and_inconflict(area_idx, area)
             self.calculate_time_to_intrusion(area_idx, area)
 
         # Calculate resolution vectors for each aircraft's closest area conflict
         self.calculate_area_resolution_vectors()
 
         # Determine which state each aircraft is in and take appropriate action
-        self.determine_state()
-        self.apply_state_based_action()
+        self.determine_aircraft_mode()
+        self.apply_mode_based_action()
 
     def create_area(self, area_id, area_status, gsnorth, gseast, *coords):
         """ Create a new restricted airspace area """
@@ -534,7 +534,7 @@ class AreaRestrictionManager(TrafficArrays):
     def find_bearings_tangent_to_area(self, area_idx, area):
         """ For each aircraft find the tangent bearings to the current area ."""
 
-        # Constant heading requires loxodrome (rhumb line) angle        
+        # Constant heading requires loxodrome (rhumb line) angle
         self.brg_left_tangent[area_idx, :], self.brg_right_tangent[area_idx, :] \
             = area.calc_rhumb_tangents(bs.traf.ntraf, bs.traf.lon, bs.traf.lat)
 
@@ -542,16 +542,12 @@ class AreaRestrictionManager(TrafficArrays):
         self.crs_left_tangent[area_idx, :] = self.brg_left_tangent[area_idx, :] % 360
         self.crs_right_tangent[area_idx, :] = self.brg_right_tangent[area_idx, :] % 360
 
-    def find_ac_inside(self, area_idx, area):
+    def find_ac_inside_and_inconflict(self, area_idx, area):
         """ Check whether each aircraft is inside the area. """
 
         for ac_idx in range(self.num_traf):
             self.is_inside[area_idx, ac_idx] = self.current_position[ac_idx].within(area.poly)
 
-    def find_ac_inconflict(self, area_idx, area):
-        """ Check whether each aircraft is in conflict with the area. """
-
-        for ac_idx in range(self.num_traf):
             self.is_in_conflict[area_idx, ac_idx] = \
                 area.ring.intersects(self.relative_track[area_idx][ac_idx])
 
@@ -583,6 +579,7 @@ class AreaRestrictionManager(TrafficArrays):
                 t_int = intr_dist_m / bs.traf.gs[ac_idx]
             else:
                 t_int = -1
+
             self.time_to_intrusion[area_idx, ac_idx] = t_int
 
     def calculate_area_resolution_vectors(self):
@@ -590,6 +587,10 @@ class AreaRestrictionManager(TrafficArrays):
         Calculate the resolution vectors for all aircraft that are in
         conflict with an area.
         """
+
+        # Ensure delta v vectors are reset each time step
+        self.reso_dv_east = np.zeros(np.shape(bs.traf.id))
+        self.reso_dv_north = np.zeros(np.shape(bs.traf.id))
 
         # Loop over all aircraft-area combinations and for each aircraft store the
         # index of the area where the time to intrusion is the smallest positive number.
@@ -609,9 +610,9 @@ class AreaRestrictionManager(TrafficArrays):
             ac_indices = [ac for ac, area in conflict_pairs if area == area_idx]
 
             if ac_indices:
-                self.calculate_single_area_resolutions(area_idx, ac_indices)
+                self.calculate_resolutions_for_single_area(area_idx, ac_indices)
 
-    def calculate_single_area_resolutions(self, area_idx, ac_indices):
+    def calculate_resolutions_for_single_area(self, area_idx, ac_indices):
         """
         Calculate the resolution manoeuvres (heading and speed) for all
         aircraft in conflict with a given area.
@@ -675,12 +676,12 @@ class AreaRestrictionManager(TrafficArrays):
         self.reso_dv_east[ac_indices] = new_v_east - bs.traf.gseast[ac_indices]
         self.reso_dv_north[ac_indices] = new_v_north - bs.traf.gsnorth[ac_indices]
 
-    def determine_state(self):
+    def determine_aircraft_mode(self):
         """
-        Determine in which state each aircraft is:
-            - in conflict with an area
-            - in conflict with an aircraft
-            - following its route
+        Determine which mode each aircraft is in:
+            - in area conflict
+            - in aircraft conflict
+            - in route following
         """
 
         for ac_idx in range(self.num_traf):
@@ -696,24 +697,27 @@ class AreaRestrictionManager(TrafficArrays):
 
             # Can only be in route following mode if not in aircraft or area conflict
             if self.is_in_area_conflict_mode[ac_idx] or self.is_in_aircraft_conflict_mode[ac_idx]:
-                self.is_in_route_mode[ac_idx] = False
+                self.is_in_route_following_mode[ac_idx] = False
             else:
-                self.is_in_route_mode[ac_idx] = True
+                self.is_in_route_following_mode[ac_idx] = True
 
-    def apply_state_based_action(self):
+    def apply_mode_based_action(self):
         """
         Apply the new velocities for all aircraft that need to perform
         a resolution manoeuver.
         """
 
+        # NOTE: Some of the branches of the if statements inside this loop are redundant, but
+        # are still explicitly included to improve readability.
         for ac_idx in range(self.num_traf):
-
             if self.is_in_area_conflict_mode[ac_idx]:
-                # If the aircraft is already manoeuvring or its course is within tolerance from the
-                # commanded course, do nothing. Otherwise, give a manoeuvre command
-                if self.is_in_area_reso[ac_idx] and abs(self.commanded_crs[ac_idx] - bs.traf.trk[ac_idx]) < 0.1:
+                if self.is_in_area_reso[ac_idx]:
+                    # Aircraft is already in a resolution manoeuver, no action required.
                     pass
                 else:
+                    # Aircraft is not in a resolution manoeuver, must initiate a new one
+                    print("{} new resolution manoeuver initiated".format(bs.traf.id[ac_idx]))
+
                     new_v_east = bs.traf.gseast[ac_idx] + self.reso_dv_east[ac_idx]
                     new_v_north = bs.traf.gsnorth[ac_idx] + self.reso_dv_north[ac_idx]
                     new_v = np.sqrt(new_v_east ** 2 + new_v_north ** 2)
@@ -724,14 +728,29 @@ class AreaRestrictionManager(TrafficArrays):
                     self.commanded_crs[ac_idx] = new_crs
                     self.commanded_spd[ac_idx] = new_v
             else:
-                # If the aircraft is not in an area conflict then it is also not in a reso manoeuver
                 if self.is_in_area_reso[ac_idx]:
-                    self.is_in_area_reso[ac_idx] = False
+                    # Check if current course is within margin of the resolution commanded course
+                    current_crs = ned2crs(bs.traf.trk[ac_idx])
+                    delta_crs = abs(current_crs - self.commanded_crs[ac_idx])
+                    if delta_crs < COMMANDED_CRS_MARGIN:
+                        # Course is within margin, reset resolution variables
+                        print("{} resolution manoeuver completed!".format(bs.traf.id[ac_idx]))
 
-            if self.is_in_aircraft_conflict_mode[ac_idx]:
+                        self.is_in_area_reso[ac_idx] = False
+                        self.commanded_crs[ac_idx] = 0
+                        self.commanded_spd[ac_idx] = 0
+                    else:
+                        # Commanded course has not yet been reached, take no action
+                        pass
+                else:
+                    # The aircraft is not in a resolution manoeuver, take no action
+                    pass
+
+            if self.is_in_aircraft_conflict_mode[ac_idx] \
+                        and not self.is_in_area_conflict_mode[ac_idx]:
                 pass
 
-            if self.is_in_route_mode[ac_idx]:
+            if self.is_in_route_following_mode[ac_idx]:
                 pass
 
     def stack_reso_apply(self, ac_idx, crs, tas):
@@ -742,18 +761,18 @@ class AreaRestrictionManager(TrafficArrays):
         ac_alt = bs.traf.alt[ac_idx]
         ac_cas = bs.tools.aero.vtas2cas(tas, ac_alt)
 
-        hdg_cmd = "HDG {},{}".format(ac_id, ac_crs)
+        hdg_cmd = "HDG {},{:.2f}".format(ac_id, ac_crs)
         bs.stack.stack(hdg_cmd)
         # spd_cmd = "SPD {},{}".format(ac_id, ac_cas)
         # bs.stack.stack(spd_cmd)
 
         # Print command to python console
-        print("{} is {}in area conflict with {}".format(bs.traf.id[ac_idx], \
-              "" if np.any(self.is_in_conflict[:, ac_idx]) else "not ", \
-                                                        self.first_conflict_area_idx[ac_idx]))
-        print(hdg_cmd)
+        # print("{} is {}in area conflict with {}".format(bs.traf.id[ac_idx], \
+        #       "" if np.any(self.is_in_conflict[:, ac_idx]) else "not ", \
+        #                                                 self.first_conflict_area_idx[ac_idx]))
+        # print(hdg_cmd)
         # print(spd_cmd)
-
+        
 
 class RestrictedAirspaceArea():
     """ Class that represents a single Restricted Airspace Area. """
