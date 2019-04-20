@@ -378,7 +378,7 @@ class AreaRestrictionManager(TrafficArrays):
         """ Create a new restricted airspace area """
 
         if area_id in self.area_ids:
-            return False, "Error: Airspace restriction with name {} already exists".format(area_id)
+            return False, "Error: Airspace restriction {} already exists".format(area_id)
 
         # Create new RestrictedAirspaceArea instance and add to internal lists
         new_area = RestrictedAirspaceArea(area_id, area_status, gseast, gsnorth, list(coords))
@@ -435,7 +435,7 @@ class AreaRestrictionManager(TrafficArrays):
         """ Delete an existing restricted airspace area. """
 
         if area_id not in self.area_ids:
-            return False, "Error: Airspace restriction with name {} does not exist".format(area_id)
+            return False, "Error: Airspace restriction {} does not exist".format(area_id)
         else:
             # Find index of area
             idx = self.area_ids.index(area_id)
@@ -546,7 +546,8 @@ class AreaRestrictionManager(TrafficArrays):
         """ Check whether each aircraft is inside the area. """
 
         for ac_idx in range(self.num_traf):
-            self.is_inside[area_idx, ac_idx] = self.current_position[ac_idx].within(area.poly)
+            self.is_inside[area_idx, ac_idx] = \
+                self.current_position[ac_idx].within(area.poly)
 
             self.is_in_conflict[area_idx, ac_idx] = \
                 area.ring.intersects(self.relative_track[area_idx][ac_idx])
@@ -598,7 +599,9 @@ class AreaRestrictionManager(TrafficArrays):
             for area_idx, t_int in enumerate(t_int_column):
                 if not self.first_conflict_area_idx[ac_idx] and t_int > 0:
                     self.first_conflict_area_idx[ac_idx] = area_idx
-                elif self.first_conflict_area_idx[ac_idx] and t_int > 0 and t_int < self.first_conflict_area_idx[ac_idx]:
+                elif (self.first_conflict_area_idx[ac_idx]
+                      and t_int > 0
+                      and t_int < self.first_conflict_area_idx[ac_idx]):
                     self.first_conflict_area_idx[ac_idx] = area_idx
 
         # Find indices of conflicting aircraft-area pairs
@@ -631,8 +634,8 @@ class AreaRestrictionManager(TrafficArrays):
         # the Velocity Obstacle (or Collision Cone if area is non-moving). The vector magnitudes
         # are the same as the current aircraft ground speeds (assuming zero wind).
         if area.gs:
-            # Find angles between -vrel and left- and right edges of VO using dot product of -vrel
-            # and the unit vectors along the VO edges
+            # Find angles between -vrel and left- and right edges of VO using dot
+            # product of -vrel and the unit vectors along the VO edges
             beta_l_rad = np.arccos(-1 * (u_l_east * area.gseast + \
                                          u_l_north * area.gsnorth) / (area.gs**2))
             beta_r_rad = np.arccos(-1 * (u_r_east * area.gseast + \
@@ -695,7 +698,7 @@ class AreaRestrictionManager(TrafficArrays):
             # NOTE: To be implemented, for now always set to False
             self.is_in_aircraft_conflict_mode[ac_idx] = False
 
-            # Can only be in route following mode if not in aircraft or area conflict
+            # Can only be in route following mode if not in either aircraft or area conflict
             if self.is_in_area_conflict_mode[ac_idx] or self.is_in_aircraft_conflict_mode[ac_idx]:
                 self.is_in_route_following_mode[ac_idx] = False
             else:
@@ -772,7 +775,7 @@ class AreaRestrictionManager(TrafficArrays):
         #                                                 self.first_conflict_area_idx[ac_idx]))
         # print(hdg_cmd)
         # print(spd_cmd)
-        
+
 
 class RestrictedAirspaceArea():
     """ Class that represents a single Restricted Airspace Area. """
@@ -928,8 +931,8 @@ class RestrictedAirspaceArea():
             idx_left_vert = 0
             idx_right_vert = 0
 
-            # Loop over vertices 1:n-1 and evaluate position of aircraft wrt the edges to find the
-            # indices of the vertices at which the tangents touch the polygon
+            # Loop over vertices 1:n-1 and evaluate position of aircraft wrt the edges 
+            # to find the indices of the vertices at which the tangents touch the polygon
             #
             # Algorithm from: http://geomalgorithms.com/a15-_tangents.html
             for jj in range(1, len(vertex) - 1):
@@ -978,9 +981,8 @@ class RestrictedAirspaceArea():
             idx_left_vert = 0
             idx_right_vert = 0
 
-            # Loop over vertices 1:n-1 and evaluate position of aircraft wrt
-            # the edges to find the indices of the vertices at which the tangents
-            # touch the polygon.
+            # Loop over vertices 1:n-1 and evaluate position of aircraft wrt the edges
+            # to find the indices of the vertices at which the tangents touch the polygon.
             #
             # Algorithm from: http://geomalgorithms.com/a15-_tangents.html
             for jj in range(1, len(vertex) - 1):
