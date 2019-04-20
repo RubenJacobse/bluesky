@@ -38,8 +38,7 @@ def main():
     """
     # When importerror gives different name than (pip) install needs,
     # also advise latest version
-    missingmodules = {"OpenGL": "pyopengl and pyopengl-accelerate",
-                      "PyQt4": "pyqt5"}
+    missingmodules = {"OpenGL": "pyopengl and pyopengl-accelerate"}
 
     ### Parse command-line arguments ###
     # BlueSky.py modes:
@@ -78,7 +77,9 @@ def main():
 
         # Only start a simulation node if called with --sim or --detached
         if mode[:3] == 'sim':
-            bs.sim.start()
+            if mode[-8:] != 'detached':
+                bs.sim.connect()
+            bs.sim.run()
         else:
             # Only print start message in the non-sim cases to avoid printing
             # this for every started node
