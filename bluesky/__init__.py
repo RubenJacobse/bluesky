@@ -50,17 +50,17 @@ def init(mode="sim", pygame=False, discovery=False, cfgfile="", scnfile=""):
     settings.init(cfgfile)
 
     # Is this a server running headless?
-    headless = (mode.endswith("headless"))
+    is_headless = (mode.endswith("headless"))
 
     # Keep track of the gui type.
     global gui_type
     gui_type = "pygame" if pygame \
-                else "none" if headless or mode.startswith("sim") \
+                else "none" if is_headless or mode.startswith("sim") \
                 else "qtgl"
 
     # Load navdatabase in all versions of BlueSky
     # Only the headless server doesn't need this
-    if not headless:
+    if not is_headless:
         from bluesky.navdatabase import Navdatabase
         global navdb
         navdb = Navdatabase()
@@ -69,12 +69,12 @@ def init(mode="sim", pygame=False, discovery=False, cfgfile="", scnfile=""):
     if mode.startswith("server"):
         from bluesky.network import Server
         global server
-        server = Server(headless)
+        server = Server(is_headless)
 
     # The remaining objects are only instantiated in the sim nodes
     if mode.startswith("sim"):
         # Check whether simulation node should run detached
-        detached = (mode.endswith("detached"))
+        is_detached = (mode.endswith("detached"))
 
         if pygame:
             from bluesky.ui.pygame import Screen
@@ -89,7 +89,7 @@ def init(mode="sim", pygame=False, discovery=False, cfgfile="", scnfile=""):
         # Initialize singletons
         global traf, sim, scr
         traf = Traffic()
-        sim = Simulation(detached)
+        sim = Simulation(is_detached)
         scr = Screen()
 
         # Initialize remaining modules
