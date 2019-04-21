@@ -36,32 +36,47 @@ settings.set_variable_defaults(asas_dt=1.0,
 
 class ASAS(TrafficArrays):
     """
-    Class that implements an Airborne Separation Assurance System for
+    Class that implements the Airborne Separation Assurance System for
     conflict detection and resolution. Maintains a conflict database,
     and links to external CD and CR methods.
     """
 
-    # Dictionary of CD methods
-    CDmethods = {"STATEBASED": StateBasedCD}
+    # Dictionary of conflict detection methods
+    cd_methods = {"STATEBASED": StateBasedCD}
 
-    # Dictionary of CR methods
-    CRmethods = {"OFF": DoNothing, "MVP": MVP, "EBY": Eby, "SWARM": Swarm}
-    # If pyclipper is installed add it to CRmethods-dict
+    # Dictionary of conflict resolution methods
+    cr_methods = {"OFF": DoNothing,
+                  "MVP": MVP,
+                  "EBY": Eby,
+                  "SWARM": Swarm}
+
+    # The SSD method requires the pyclipper module for its visualizations
     if SSD.loaded_pyclipper():
-        CRmethods["SSD"] = SSD
+        cr_methods["SSD"] = SSD
 
     @classmethod
-    def addCDMethod(asas, name, module):
-        asas.CDmethods[name] = module
+    def add_conflict_detection_method(cls, name, module):
+        """
+        Add conflict detection method 'name' defined in 'module' to the ASAS
+        class variable that tracks all available conflict detection methods.
+        """
+
+        cls.cd_methods[name] = module
 
     @classmethod
-    def addCRMethod(asas, name, module):
-        asas.CRmethods[name] = module
+    def add_conflict_resolution_method(cls, name, module):
+        """
+        Add conflict resolution method 'name' defined in 'module' to the ASAS
+        class variable tracks all available conflict resolution methods.
+        """
+
+        cls.cr_methods[name] = module
 
     def __init__(self):
         super(ASAS, self).__init__()
+
         with RegisterElementParameters(self):
-            # ASAS info PER AIRCRAFT:
+            # ASAS info per aircraft:
             self.inconf = np.array([], dtype=bool)  # In-conflict flag
             self.tcpamax = np.array([])  # Maximum time to CPA for aircraft in conflict
             self.active = np.array([], dtype=bool)  # whether the autopilot follows ASAS or not
@@ -70,7 +85,7 @@ class ASAS(TrafficArrays):
             self.alt = np.array([])  # alt provided by the ASAS [m]
             self.vs = np.array([])  # vspeed provided by the ASAS [m/s]
 
-        # All ASAS variables are initialized in the reset function
+        # All other ASAS variables are initialized in the reset function
         self.reset()
 
     def reset(self):
@@ -81,11 +96,11 @@ class ASAS(TrafficArrays):
 
         super(ASAS, self).reset()
 
-        """ ASAS constructor """
+        # ASAS constructor
         self.cd_name      = "STATEBASED"
         self.cr_name      = "OFF"
-        self.cd           = ASAS.CDmethods[self.cd_name]
-        self.cr           = ASAS.CRmethods[self.cr_name]
+        self.cd           = ASAS.cd_methods[self.cd_name]
+        self.cr           = ASAS.cr_methods[self.cr_name]
 
         self.dtlookahead  = settings.asas_dtlookahead       # [s] lookahead time
         self.mar          = settings.asas_mar               # [-] Safety margin for evasion
@@ -123,31 +138,32 @@ class ASAS(TrafficArrays):
         self.asase        = np.array([])               # [m/s] East resolution speed from ASAS
         self.asaseval     = False                      # [-] Whether target resolution is calculated or not
 
-        self.clearconfdb()
+        self.clear_conflict_database()
 
-        # NOTE: Should this also be moved to inside clearconfdb()?
+        # NOTE: Should this also be moved to inside clear_conflict_database()?
         self.dcpa = np.array([])  # CPA distance
 
     def toggle(self, flag=None):
         """
-        Switch the ASAS module on or off. Returns current state if no argument
-        is provided.
+        Switch the ASAS module ON or OFF, and reset the conflict database.
+        If no argument is provided, returns only the current state and does
+        not perform database reset.
         """
 
         if flag is None:
-            return True, "ASAS is currently " + ("ON" if self.swasas else "OFF")
-        self.swasas = flag
+            return True, "ASAS module is currently {}".format("ON" if self.swasas else "OFF")
 
         # Clear conflict list when switched off
+        self.swasas = flag
         if not self.swasas:
-            self.clearconfdb()
-            self.inconf = self.inconf&False  # Set in-conflict flag to False
+            self.clear_conflict_database()
+            self.inconf = False
 
-        return True
+        return True, "ASAS module set to: {}".format("ON" if self.swasas else "OFF")
 
-    def clearconfdb(self):
+    def clear_conflict_database(self):
         """
-        Clear conflict database
+        Clear the ASAS conflict database and reset the intial state.
         """
 
         self.confpairs = list()  # Conflict pairs detected in the current timestep (used for resolving)
@@ -164,32 +180,42 @@ class ASAS(TrafficArrays):
         self.qdr = np.array([])  # Bearing from ownship to intruder
         self.dist = np.array([])  # Horizontal distance between ""
 
-        return
-
     def SetCDmethod(self, method=""):
+        """
+        Set the ASAS conflict detection method. If no argument is given,
+        the current method and a list of available methods is printed.
+        """
+
         if not method:
-            return True, ("Current CD method: " + self.cd_name +
-                          "\nAvailable CD methods: " +
-                          ", ".join(list(ASAS.CDmethods.keys())))
-        if method not in ASAS.CDmethods:
-            return False, (method + " doesn't exist.\nAvailable CD methods: " +
-                           ", ".join(list(ASAS.CDmethods.keys())))
+            return True, "Current CD method: {}\nAvailable CD methods: {}"\
+                .format(self.cd_name, str.join(", ", list(ASAS.cd_methods.keys())))
+
+        if method not in ASAS.cd_methods:
+            return False, "{} doesn't exist.\nAvailable CD methods: {}"\
+                .format(method, str.join(", ", list(ASAS.cd_methods.keys())))
 
         self.cd_name = method
-        self.cd = ASAS.CDmethods[method]
+        self.cd = ASAS.cd_methods[method]
 
-        # Clear conflcit database for new method
-        self.clearconfdb()
+        # Reset the database for use by the new method
+        self.clear_conflict_database()
 
     def SetCRmethod(self, method=""):
+        """
+        Set the ASAS conflict resolution method. If no argument is given,
+        the current method and a list of available methods is printed.
+        """
+
         if not method:
-            return True, ("Current CR method: " + self.cr_name +
-                          "\nAvailable CR methods: " + str.join(", ", list(ASAS.CRmethods.keys())))
-        if method not in ASAS.CRmethods:
-            return False, (method + " doesn't exist.\nAvailable CR methods: " + str.join(", ", list(ASAS.CRmethods.keys())))
+            return True, "Current CR method: {}\nAvailable CR methods: {}"\
+                .format(self.cr_name, str.join(", ", list(ASAS.cr_methods.keys())))
+
+        if method not in ASAS.cr_methods:
+            return False, "{} doesn't exist.\nAvailable CR methods: {}"\
+                .format(method, str.join(", ", list(ASAS.cr_methods.keys())))
 
         self.cr_name = method
-        self.cr = ASAS.CRmethods[method]
+        self.cr = ASAS.cr_methods[method]
         self.cr.start(self)
 
     def SetPZR(self, value=None):
