@@ -70,7 +70,7 @@ class Traffic(TrafficArrays):
         super(Traffic, self).__init__()
 
         # Traffic is the toplevel trafficarrays object
-        TrafficArrays.SetRoot(self)
+        TrafficArrays.set_class_root(self)
 
         self.ntraf = 0
 

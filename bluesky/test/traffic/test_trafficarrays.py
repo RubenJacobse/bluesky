@@ -52,7 +52,7 @@ def t_a(pytestconfig):
             super(TestRoot, self).__init__()
 
             # Traffic is the toplevel trafficarrays object
-            ta.TrafficArrays.SetRoot(self)
+            ta.TrafficArrays.set_class_root(self)
 
             with ta.RegisterElementParameters(self):
                 self.fl_list = []

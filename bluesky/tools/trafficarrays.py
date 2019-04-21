@@ -11,13 +11,18 @@ except ImportError:
     from collections import Collection
 import numpy as np
 
-defaults = {"float": 0.0, "int": 0, "uint":0, "bool": False, "S": "", "str": ""}
+VAR_DEFAULTS = {"float": 0.0,
+                "int": 0,
+                "uint": 0,
+                "bool": False,
+                "S": "",
+                "str": ""}
 
 
 class RegisterElementParameters():
     """
     Class to use in 'with'-syntax. This class automatically calls for
-    the MakeParameterLists function of the TrafficArrays object inside which
+    the make_parameter_lists function of the TrafficArrays object inside which
     it is called, and registers the parameters defined in the 'with' block.
     """
 
@@ -28,15 +33,16 @@ class RegisterElementParameters():
     def __enter__(self):
         # On entering the context only the parent's attributes are present,
         # store the keys of these attributes as a set().
-        self.keys0 = set(self._parent.__dict__.keys())
+        self.keys_initial = set(self._parent.__dict__.keys())
 
     def __exit__(self, type, value, tb):
         # On exiting the context the parameters defined inside the with-block are also
         # available. Their keys are obtained by taking the set difference with the
         # original parent's attribute keys and are then added to the respective
         # parameter tracking lists in the parent object.
-        self._parent.MakeParameterLists(set(self._parent.__dict__.keys()) - self.keys0)
-        
+        keys_current = set(self._parent.__dict__.keys())
+        self._parent.make_parameter_lists(keys_current - self.keys_initial)
+
 
 class TrafficArrays(object):
     """
@@ -51,7 +57,7 @@ class TrafficArrays(object):
     root = None
 
     @classmethod
-    def SetRoot(cls, obj):
+    def set_class_root(cls, obj):
         """
         This function is used to set the root element of the tree of all
         TrafficArrays objects.
@@ -77,17 +83,17 @@ class TrafficArrays(object):
         # Keep track of all object attributes
         self._Vars     = self.__dict__
 
-    def reparent(self, newparent):
+    def reparent(self, new_parent):
         """
-        Remove object from the parent's list of children, and add it to
-        the list of children of the new parent.
+        Remove current object from the parent's list of children, and add
+        it to the list of children of the new parent.
         """
 
         self._parent._children.pop(self._parent._children.index(self))
-        newparent._children.append(self)
-        self._parent = newparent
+        new_parent._children.append(self)
+        self._parent = new_parent
 
-    def MakeParameterLists(self, keys):
+    def make_parameter_lists(self, keys):
         """
         Takes a list of parameter keys and adds these to the object's
         parameter tracking lists.
@@ -109,34 +115,34 @@ class TrafficArrays(object):
         Append n elements (aircraft) to all parameter lists and arrays.
         """
 
-        for v in self._LstVars:  # Lists (mostly used for strings)
+        for var in self._LstVars:  # Lists (mostly used for strings)
 
             # Get type
-            vartype = None
-            lst = self.__dict__.get(v)
+            var_type = None
+            lst = self.__dict__.get(var)
             if len(lst) > 0:
-                vartype = str(type(lst[0])).split("'")[1]
+                var_type = str(type(lst[0])).split("'")[1]
 
-            if vartype in defaults:
-                defaultvalue = [defaults[vartype]] * n
+            if var_type in VAR_DEFAULTS:
+                defaultvalue = [VAR_DEFAULTS[var_type]] * n
             else:
                 defaultvalue = [""] * n
 
-            self._Vars[v].extend(defaultvalue)
+            self._Vars[var].extend(defaultvalue)
 
-        for v in self._ArrVars:  # Numpy array
+        for var in self._ArrVars:  # Numpy array
             # Get type without byte length
-            vartype = ''.join(c for c in str(self._Vars[v].dtype) if c.isalpha())
+            var_type = ''.join(c for c in str(self._Vars[var].dtype) if c.isalpha())
 
             # Get default value
-            if vartype in defaults:
-                defaultvalue = [defaults[vartype]] * n
+            if var_type in VAR_DEFAULTS:
+                defaultvalue = [VAR_DEFAULTS[var_type]] * n
             else:
                 defaultvalue = [0.0] * n
 
-            self._Vars[v] = np.append(self._Vars[v], defaultvalue)
+            self._Vars[var] = np.append(self._Vars[var], defaultvalue)
 
-    def istrafarray(self, key):
+    def is_traf_array(self, key):
         """  Checks if key is in one of the parameter tracking lists. """
 
         return key in self._LstVars or key in self._ArrVars
@@ -159,17 +165,17 @@ class TrafficArrays(object):
         for child in self._children:
             child.delete(idx)
 
-        for v in self._ArrVars:
-            self._Vars[v] = np.delete(self._Vars[v], idx)
+        for var in self._ArrVars:
+            self._Vars[var] = np.delete(self._Vars[var], idx)
 
         if self._LstVars:
             if isinstance(idx, Collection):
                 for i in reversed(idx):
-                    for v in self._LstVars:
-                        del self._Vars[v][i]
+                    for var in self._LstVars:
+                        del self._Vars[var][i]
             else:
-                for v in self._LstVars:
-                    del self._Vars[v][idx]
+                for var in self._LstVars:
+                    del self._Vars[var][idx]
 
     def reset(self):
         """
@@ -181,8 +187,8 @@ class TrafficArrays(object):
         for child in self._children:
             child.reset()
 
-        for v in self._ArrVars:
-            self._Vars[v] = np.array([], dtype=self._Vars[v].dtype)
+        for var in self._ArrVars:
+            self._Vars[var] = np.array([], dtype=self._Vars[var].dtype)
 
-        for v in self._LstVars:
-            self._Vars[v] = []
+        for var in self._LstVars:
+            self._Vars[var] = []

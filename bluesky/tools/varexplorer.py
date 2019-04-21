@@ -55,7 +55,7 @@ def lsvar(varname=''):
         thevar = v.get()  # reference to the actual variable
         attrs = getvarsfromobj(thevar)  # When the variable is an object, get child attributes
         vartype = v.get_type()  # Type of the variable
-        if isinstance(v.parent, TrafficArrays) and v.parent.istrafarray(v.varname):
+        if isinstance(v.parent, TrafficArrays) and v.parent.is_traf_array(v.varname):
             vartype += ' (TrafficArray)'
         txt = \
         'Variable:   {}\n'.format(v.varname) + \
