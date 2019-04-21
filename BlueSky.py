@@ -5,11 +5,14 @@ import sys
 import traceback
 import bluesky as bs
 
-# Create custom system-wide exception handler. For now it replicates python's
-# default traceback message. This was added to counter a new PyQt5.5 feature
-# where unhandled exceptions would result in a qFatal with a very uninformative
-# message.
 def exception_handler(exc_type, exc_value, exc_traceback):
+    """
+    Create custom system-wide exception handler. For now it replicates Python's
+    default traceback message. This was added to counter a new PyQt5.5 feature
+    where unhandled exceptions would result in a qFatal with a very uninformative
+    message.
+    """
+
     traceback.print_exception(exc_type, exc_value, exc_traceback)
     sys.exit()
 
@@ -19,42 +22,38 @@ sys.excepthook = exception_handler
 
 def main():
     """
-        Start BlueSky: This is the main entrypoint for BlueSky.
-        Depending on settings and arguments passed it can start in different
-        modes. The central part of BlueSky consists of a server managing all
-        simulations, normally together with a gui. The different modes for this
-        are:
-        - server-gui: Start gui and simulation server
-        - server-headless: start server without gui
-        - client: start gui only, which can connect to an already running server
+        Start BlueSky: This is the main entrypoint for BlueSky. Depending on
+        settings and arguments passed it can start in different modes. The
+        central part of BlueSky consists of a server managing all simulations,
+        normally together with a gui. The different modes for this are:
+
+        - server-gui:       Start gui and simulation server
+        - server-headless:  Start server without gui
+        - client:           Start gui only, which can connect to an already
+                            running server
 
         A BlueSky server can start one or more simulation processes, which run
         the actual simulations. These simulations can also be started completely
         separate from all other BlueSky functionality, in the detached mode.
         This is useful when calling bluesky from within another python
         script/program. The corresponding modes are:
-        - sim: The normal simulation process started by a BlueSky server
-        - sim-detached: An isolated simulation node, without networking
+
+        - sim:              The normal simulation process started by a BlueSky server
+        - sim-detached:     An isolated simulation node, without networking
     """
     # When importerror gives different name than (pip) install needs,
     # also advise latest version
     missingmodules = {"OpenGL": "pyopengl and pyopengl-accelerate"}
 
-    ### Parse command-line arguments ###
-    # BlueSky.py modes:
-    # server-gui: Start gui and simulation server
-    # client: start gui only, which can connect to an already running server
-    # server-headless: start server only
-    # detached: start only one simulation node, without networking
-    #   ==> useful for calling bluesky from within another python script/program
-    if '--detached' in sys.argv:
-        mode = 'sim-detached'
-    elif '--sim' in sys.argv:
-        mode = 'sim'
-    elif '--client' in sys.argv:
-        mode = 'client'
-    elif '--headless' in sys.argv:
-        mode = 'server-headless'
+    # Parse command-line arguments
+    if "--detached" in sys.argv:
+        mode = "sim-detached"
+    elif "--sim" in sys.argv:
+        mode = "sim"
+    elif "--client" in sys.argv:
+        mode = "client"
+    elif "--headless" in sys.argv:
+        mode = "server-headless"
     else:
         mode = 'server-gui'
 
@@ -110,5 +109,5 @@ def main():
 
 
 if __name__ == "__main__":
-    # Run mainloop if BlueSky is called directly
+    # Run main loop if BlueSky is called directly
     main()
