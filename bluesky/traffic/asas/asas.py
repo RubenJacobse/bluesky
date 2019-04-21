@@ -1,5 +1,5 @@
 """
-This module implements an Airborne Separation Assurance System. It uses
+This module implements the Airborne Separation Assurance System. It uses
 conflict detection and conflict resolution methods defined in separate
 modules.
 """
@@ -14,28 +14,8 @@ from bluesky.tools.simtime import timed_function
 from bluesky.tools.aero import ft, nm
 from bluesky.tools.trafficarrays import TrafficArrays, RegisterElementParameters
 
-# Register default settings
-settings.set_variable_defaults(prefer_compiled=False,
-                               asas_dt=1.0,
-                               asas_dtlookahead=300.0,
-                               asas_mar=1.2,
-                               asas_pzr=5.0,
-                               asas_pzh=1000.0,
-                               asas_vmin=200.0,
-                               asas_vmax=500.0)
-
-# Import default CD methods
-StateBasedCD = False
-if settings.prefer_compiled:
-    try:
-        from . import casas as StateBasedCD
-        print('StateBasedCD: using compiled version.')
-    except ImportError:
-        print('StateBasedCD: no compiled version for this platform.')
-
-if not StateBasedCD:
-    print('StateBasedCD: using Python version.')
-    from . import StateBasedCD
+# Import default conflict detection method
+from . import StateBasedCD
 
 # Import default conflict resolution methods
 from . import DoNothing
@@ -43,6 +23,15 @@ from . import Eby
 from . import MVP
 from . import Swarm
 from . import SSD
+
+# Register default settings
+settings.set_variable_defaults(asas_dt=1.0,
+                               asas_dtlookahead=300.0,
+                               asas_mar=1.2,
+                               asas_pzr=5.0,
+                               asas_pzh=1000.0,
+                               asas_vmin=200.0,
+                               asas_vmax=500.0)
 
 
 class ASAS(TrafficArrays):
