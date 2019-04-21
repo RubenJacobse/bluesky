@@ -1,17 +1,28 @@
-""" Airborne Separation Assurance System. Implements CD&R functionality together with
-    separate conflict detection and conflict resolution modules."""
+"""
+This module implements an Airborne Separation Assurance System. It uses
+conflict detection and conflict resolution methods defined in separate
+modules.
+"""
+
+# Third-party imports
 import numpy as np
+
+# BlueSky imports
 import bluesky as bs
 from bluesky import settings
 from bluesky.tools.simtime import timed_function
 from bluesky.tools.aero import ft, nm
 from bluesky.tools.trafficarrays import TrafficArrays, RegisterElementParameters
 
-# Register settings defaults
-settings.set_variable_defaults(prefer_compiled=False, asas_dt=1.0,
-                               asas_dtlookahead=300.0, asas_mar=1.2,
-                               asas_pzr=5.0, asas_pzh=1000.0,
-                               asas_vmin=200.0, asas_vmax=500.0)
+# Register default settings
+settings.set_variable_defaults(prefer_compiled=False,
+                               asas_dt=1.0,
+                               asas_dtlookahead=300.0,
+                               asas_mar=1.2,
+                               asas_pzr=5.0,
+                               asas_pzh=1000.0,
+                               asas_vmin=200.0,
+                               asas_vmax=500.0)
 
 # Import default CD methods
 StateBasedCD = False
@@ -20,13 +31,13 @@ if settings.prefer_compiled:
         from . import casas as StateBasedCD
         print('StateBasedCD: using compiled version.')
     except ImportError:
-        print('StateBasedCD: using default Python version, no compiled version for this platform.')
+        print('StateBasedCD: no compiled version for this platform.')
 
 if not StateBasedCD:
     print('StateBasedCD: using Python version.')
     from . import StateBasedCD
 
-# Import default CR methods
+# Import default conflict resolution methods
 from . import DoNothing
 from . import Eby
 from . import MVP
@@ -35,8 +46,11 @@ from . import SSD
 
 
 class ASAS(TrafficArrays):
-    """ Central class for ASAS conflict detection and resolution.
-        Maintains a confict database, and links to external CD and CR methods."""
+    """
+    Class that implements an Airborne Separation Assurance System for
+    conflict detection and resolution. Maintains a conflict database,
+    and links to external CD and CR methods.
+    """
 
     # Dictionary of CD methods
     CDmethods = {"STATEBASED": StateBasedCD}
@@ -71,6 +85,11 @@ class ASAS(TrafficArrays):
         self.reset()
 
     def reset(self):
+        """
+        Reset all ASAS variables to their initial state. This function is
+        used to both intialize and reset all ASAS variables.
+        """
+
         super(ASAS, self).reset()
 
         """ ASAS constructor """
@@ -121,6 +140,11 @@ class ASAS(TrafficArrays):
         self.dcpa = np.array([])  # CPA distance
 
     def toggle(self, flag=None):
+        """
+        Switch the ASAS module on or off. Returns current state if no argument
+        is provided.
+        """
+
         if flag is None:
             return True, "ASAS is currently " + ("ON" if self.swasas else "OFF")
         self.swasas = flag
@@ -225,14 +249,19 @@ class ASAS(TrafficArrays):
         self.dtasas = value
 
     def SetResoHoriz(self, value=None):
-        """ Processes the RMETHH command. Sets swresovert = False"""
+        """
+        Processes the RMETHH command. Sets swresovert = False
+        """
+
         # Acceptable arguments for this command
         options = ["BOTH", "SPD", "HDG", "NONE", "ON", "OFF", "OF"]
+
         if value is None:
             return True, "RMETHH [ON / BOTH / OFF / NONE / SPD / HDG]" + \
                          "\nHorizontal resolution limitation is currently " + ("ON" if self.swresohoriz else "OFF") + \
                          "\nSpeed resolution limitation is currently " + ("ON" if self.swresospd else "OFF") + \
                          "\nHeading resolution limitation is currently " + ("ON" if self.swresohdg else "OFF")
+
         if str(value) not in options:
             return False, "RMETH Not Understood" + "\nRMETHH [ON / BOTH / OFF / NONE / SPD / HDG]"
         else:
@@ -258,12 +287,16 @@ class ASAS(TrafficArrays):
                 self.swresovert  = False
 
     def SetResoVert(self, value=None):
-        """ Processes the RMETHV command. Sets swresohoriz = False."""
+        """
+        Processes the RMETHV command. Sets swresohoriz = False
+        """
+
         # Acceptable arguments for this command
         options = ["NONE", "ON", "OFF", "OF", "V/S"]
         if value is None:
             return True, "RMETHV [ON / V/S / OFF / NONE]" + \
                          "\nVertical resolution limitation is currently " + ("ON" if self.swresovert else "OFF")
+
         if str(value) not in options:
             return False, "RMETV Not Understood" + "\nRMETHV [ON / V/S / OFF / NONE]"
         else:
@@ -277,7 +310,10 @@ class ASAS(TrafficArrays):
                 self.swresovert  = False
 
     def SetResoFacH(self, value=None):
-        ''' Set the horizontal resolution factor'''
+        """
+        Set the horizontal resolution factor
+        """
+
         if value is None:
             return True, ("RFACH [FACTOR]\nCurrent horizontal resolution factor is: %.1f" % self.resoFacH)
 
@@ -291,7 +327,10 @@ class ASAS(TrafficArrays):
                      "\nCurrent resolution PZ radius: " + str(self.Rm / nm) + " NM\n"
 
     def SetResoFacV(self, value=None):
-        ''' Set the vertical resolution factor'''
+        """
+        Set the vertical resolution factor
+        """
+
         if value is None:
             return True, ("RFACV [FACTOR]\nCurrent vertical resolution factor is: %.1f" % self.resoFacV)
 
@@ -305,11 +344,15 @@ class ASAS(TrafficArrays):
                      "\nCurrent resolution PZ height: " + str(self.dhm / ft) + " ft\n"
 
     def SetPrio(self, flag=None, priocode="FF1"):
-        '''Set the prio switch and the type of prio '''
+        """
+        Set the prio switch and the type of prio
+        """
+
         if self.cr_name == "SSD":
             options = ["RS1","RS2","RS3","RS4","RS5","RS6","RS7","RS8","RS9"]
         else:
             options = ["FF1", "FF2", "FF3", "LAY1", "LAY2"]
+
         if flag is None:
             if self.cr_name == "SSD":
                 return True, "PRIORULES [ON/OFF] [PRIOCODE]"  + \
@@ -336,6 +379,7 @@ class ASAS(TrafficArrays):
                              "\nPriority is currently " + ("ON" if self.swprio else "OFF") + \
                              "\nPriority code is currently: " + str(self.priocode)
         self.swprio = flag
+        
         if priocode not in options:
             return False, "Priority code Not Understood. Available Options: " + str(options)
         else:
@@ -348,6 +392,7 @@ class ASAS(TrafficArrays):
             return True, "NORESO [ACID]" + \
                          "\nCurrent list of aircraft nobody will avoid:" + \
                          str(self.noresolst)
+
         # Split the input into separate aircraft ids if multiple acids are given
         acids = noresoac.split(',') if len(noresoac.split(',')) > 1 else noresoac.split(' ')
 
@@ -362,12 +407,16 @@ class ASAS(TrafficArrays):
         # active the switch, if there are acids in the list
         self.swnoreso = len(self.noresolst) > 0
 
-    def SetResooff(self, resooffac=''):
-        "ADD or Remove aircraft that will not avoid anybody else"
-        if resooffac is '':
+    def SetResooff(self, resooffac=""):
+        """
+        ADD or Remove aircraft that will not avoid anybody else
+        """
+
+        if resooffac is "":
             return True, "NORESO [ACID]" + \
                          "\nCurrent list of aircraft will not avoid anybody:" + \
                          str(self.resoofflst)
+
         # Split the input into separate aircraft ids if multiple acids are given
         acids = resooffac.split(',') if len(resooffac.split(',')) > 1 else resooffac.split(' ')
 
@@ -386,12 +435,18 @@ class ASAS(TrafficArrays):
         # Input is in knots
         if flag is None:
             return True, "ASAS limits in kts are currently [" + str(self.vmin * 3600 / 1852) + ";" + str(self.vmax * 3600 / 1852) + "]"
+
         if flag == "MAX":
             self.vmax = spd * nm / 3600.
         else:
             self.vmin = spd * nm / 3600.
 
     def create(self, n=1):
+        """
+        Create n new aircraft elements.
+        """
+
+        # Call actual create function
         super(ASAS, self).create(n)
 
         self.trk[-n:] = bs.traf.trk[-n:]
@@ -399,15 +454,19 @@ class ASAS(TrafficArrays):
         self.alt[-n:] = bs.traf.alt[-n:]
 
     def ResumeNav(self):
-        """ Decide for each aircraft in the conflict list whether the ASAS
-            should be followed or not, based on if the aircraft pairs passed
-            their CPA. """
+        """ 
+        Decide for each aircraft in the conflict list whether the ASAS
+        should be followed or not, based on if the aircraft pairs passed
+        their CPA.
+        """
+
         # Conflict pairs to be deleted
         delpairs = set()
 
         # Look at all conflicts, also the ones that are solved but CPA is yet to come
         for conflict in self.resopairs:
             idx1, idx2 = bs.traf.id2idx(conflict)
+            
             # If the ownship aircraft is deleted remove its conflict from the list
             if idx1 < 0:
                 delpairs.add(conflict)
