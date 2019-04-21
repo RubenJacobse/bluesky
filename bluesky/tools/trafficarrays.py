@@ -1,6 +1,9 @@
-""" Classes that derive from TrafficArrays (like Traffic) get automated create,
-    delete, and reset functionality for all registered child arrays."""
 # -*- coding: utf-8 -*-
+"""
+Classes that derive from TrafficArrays (like Traffic) get automated create,
+delete, and reset functionality for all registered child arrays.
+"""
+
 try:
     from collections.abc import Collection
 except ImportError:
@@ -12,9 +15,11 @@ defaults = {"float": 0.0, "int": 0, "uint":0, "bool": False, "S": "", "str": ""}
 
 
 class RegisterElementParameters():
-    """ Class to use in 'with'-syntax. This class automatically
-        calls for the MakeParameterLists function of the parent
-        TrafficArrays object, with all parameters defined in 'with'. """
+    """
+    Class to use in 'with'-syntax. This class automatically calls for
+    the MakeParameterLists function of the TrafficArrays object inside which
+    it is called, and registers the parameters defined in the 'with' block.
+    """
 
     def __init__(self, parent):
         # On initialization store the parent object as an attribute
@@ -27,27 +32,31 @@ class RegisterElementParameters():
 
     def __exit__(self, type, value, tb):
         # On exiting the context the parameters defined inside the with-block are also
-        # available. Their keys are obtained by taking the set difference with the 
+        # available. Their keys are obtained by taking the set difference with the
         # original parent's attribute keys and are then added to the respective
         # parameter tracking lists in the parent object.
         self._parent.MakeParameterLists(set(self._parent.__dict__.keys()) - self.keys0)
         
 
 class TrafficArrays(object):
-    """ Base class that enables vectorization of traffic data using 
-        arrays and lists but also offers object-like benefits to 
-        simplify adding and deleting traffic elements for all 
-        parameters at once. """
-    
+    """
+    Base class that enables vectorization of traffic data using arrays
+    and lists but also offers object-like benefits to simplify adding
+    and deleting traffic elements for all parameters at once.
+    """
+
     # The TrafficArrays class keeps track of all of the constructed
-    # TrafficArrays objects (the Traffic object takes this role when it
+    # TrafficArrays objects (the Traffic object becomes the 'root' when it
     # is initialized because that is where aircraft are added and deleted).
     root = None
 
     @classmethod
     def SetRoot(cls, obj):
-        """ This function is used to set the root of the tree for all 
-            TrafficArrays objects. """
+        """
+        This function is used to set the root element of the tree of all
+        TrafficArrays objects.
+        """
+
         cls.root = obj
 
     def __init__(self):
@@ -60,7 +69,7 @@ class TrafficArrays(object):
 
         # Keep track of child objects of the current object
         self._children = []
-        
+
         # Parameter tracking lists for numpy array and list type variables
         self._ArrVars  = []
         self._LstVars  = []
@@ -69,18 +78,22 @@ class TrafficArrays(object):
         self._Vars     = self.__dict__
 
     def reparent(self, newparent):
-        """ Remove object from the parent's list of children, and add
-            it to the list of children of the new parent. """
+        """
+        Remove object from the parent's list of children, and add it to
+        the list of children of the new parent.
+        """
 
         self._parent._children.pop(self._parent._children.index(self))
         newparent._children.append(self)
         self._parent = newparent
 
     def MakeParameterLists(self, keys):
-        """ Takes a list of keys and adds these to the object's 
-             parameter tracking lists. """
+        """
+        Takes a list of parameter keys and adds these to the object's
+        parameter tracking lists.
+        """
 
-        # Keys for objects of type list and numpy array are added to the respective 
+        # Keys for objects of type list and numpy array are added to the respective
         # parameter lists. If a key to an object of type TrafficArrays is passed
         # then the object is added to the current object's list of children.
         for key in keys:
@@ -92,8 +105,9 @@ class TrafficArrays(object):
                 self._Vars[key].reparent(self)
 
     def create(self, n=1):
-        """ Append n elements (aircraft) to all parameter lists and
-            arrays. """
+        """
+        Append n elements (aircraft) to all parameter lists and arrays.
+        """
 
         for v in self._LstVars:  # Lists (mostly used for strings)
 
@@ -123,22 +137,25 @@ class TrafficArrays(object):
             self._Vars[v] = np.append(self._Vars[v], defaultvalue)
 
     def istrafarray(self, key):
-        """ Checks if key is in one of the parameter tracking lists. """
-        
+        """  Checks if key is in one of the parameter tracking lists. """
+
         return key in self._LstVars or key in self._ArrVars
 
     def create_children(self, n=1):
-        """ Recursively append n elements (aircraft) to the parameter 
-            lists of all child objects below the current object. """
+        """
+        Recursively append n elements (aircraft) to the parameter lists
+        of all child objects below the current object.
+        """
 
         for child in self._children:
             child.create(n)
             child.create_children(n)
 
     def delete(self, idx):
-        """" Recursively delete element (aircraft) idx from all lists 
-             and arrays. """
-        
+        """"
+        Recursively delete element (aircraft) idx from all lists and arrays.
+        """
+
         for child in self._children:
             child.delete(idx)
 
@@ -155,9 +172,11 @@ class TrafficArrays(object):
                     del self._Vars[v][idx]
 
     def reset(self):
-        """ Recursively delete all elements from parameter lists and 
-            start at 0 aircraft. Lists will become empty, arrays will
-            become empty arrays of the same type. """
+        """
+        Recursively delete all elements from parameter lists and start at
+        zero aircraft. Lists will be emptied, numpy arrays will become empty
+        arrays with the same dtype.
+        """
 
         for child in self._children:
             child.reset()
