@@ -22,24 +22,24 @@ sys.excepthook = exception_handler
 
 def main():
     """
-        Start BlueSky: This is the main entrypoint for BlueSky. Depending on
-        settings and arguments passed it can start in different modes. The
-        central part of BlueSky consists of a server managing all simulations,
-        normally together with a gui. The different modes for this are:
+    Start BlueSky: This is the main entrypoint for BlueSky. Depending on
+    settings and arguments passed it can start in different modes. The
+    central part of BlueSky consists of a server managing all simulations,
+    normally together with a gui. The different modes for this are:
 
-        - server-gui:       Start gui and simulation server
-        - server-headless:  Start server without gui
-        - client:           Start gui only, which can connect to an already
-                            running server
+    - server-gui:       Start gui and simulation server
+    - server-headless:  Start server without gui
+    - client:           Start gui only, which can connect to an already
+                        running server
 
-        A BlueSky server can start one or more simulation processes, which run
-        the actual simulations. These simulations can also be started completely
-        separate from all other BlueSky functionality, in the detached mode.
-        This is useful when calling bluesky from within another python
-        script/program. The corresponding modes are:
+    A BlueSky server can start one or more simulation processes, which run
+    the actual simulations. These simulations can also be started completely
+    separate from all other BlueSky functionality, in the detached mode.
+    This is useful when calling bluesky from within another python
+    script/program. The corresponding modes are:
 
-        - sim:              The normal simulation process started by a BlueSky server
-        - sim-detached:     An isolated simulation node, without networking
+    - sim:              The normal simulation process started by a BlueSky server
+    - sim-detached:     An isolated simulation node, without networking
     """
 
     # Parse command-line arguments
@@ -88,11 +88,6 @@ def main():
             bs.sim.run()
         elif mode == "sim-detached":
             bs.sim.run()
-        else:
-            # Only print start message in the non-sim cases to avoid printing
-            # this for every started node
-            print("   *****   BlueSky Open ATM simulator *****")
-            print("Distributed under GNU General Public License v3")
 
         # Start server if server-gui or server-headless is started here
         if mode == "server-gui":

@@ -12,8 +12,8 @@ BS_CMDERR = 4
 INIT, HOLD, OP, END = list(range(4))
 
 # Startup flags
-gui_type = ''
-startup_scnfile = ''
+gui_type = ""
+startup_scnfile = ""
 
 # Main singleton objects in BlueSky
 net = None
@@ -24,15 +24,28 @@ scr = None
 server = None
 
 
-def init(mode='sim', pygame=False, discovery=False, cfgfile='', scnfile=''):
-    """ Initialize bluesky modules.
-
-        Arguments:
-        - mode: can be 'sim', 'sim-detached', 'server-gui', 'server-headless',
-          or 'client'
-        - pygame: indicate if BlueSky is started with BlueSky_pygame.py
-        - discovery: Enable network discovery
+def init(mode="sim", pygame=False, discovery=False, cfgfile="", scnfile=""):
     """
+    Initialize BlueSky modules.
+
+    Arguments:
+    - mode:         Can be "sim", "sim-detached", "server-gui", "server-headless",
+                    or "client"
+    - pygame:       Indicate if BlueSky is started with BlueSky_pygame.py
+    - discovery:    Enable network discovery
+    """
+
+    # Only print start message in the non-sim cases to avoid printing
+    # this for every started node
+    if mode not in ("sim", "sim-detached"):
+        print("***********************************************************************")
+        print("*****                                                             *****")
+        print("*****                  BlueSky Open ATM simulator                 *****")
+        print("*****                                                             *****")
+        print("*****     Distributed under the GNU General Public License v3     *****")
+        print("*****                                                             *****")
+        print("***********************************************************************")
+
     # Initialize global settings first, possibly loading a custom config file
     settings.init(cfgfile)
 
