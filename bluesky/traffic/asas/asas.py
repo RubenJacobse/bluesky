@@ -115,22 +115,10 @@ class ASAS(TrafficArrays):
         self.asase        = np.array([])               # [m/s] East resolution speed from ASAS
         self.asaseval     = False                      # [-] Whether target resolution is calculated or not
 
-        # Sets of pairs: conflict pairs, LoS pairs
-        self.confpairs = list()  # Conflict pairs detected in the current timestep (used for resolving)
-        self.confpairs_unique = set()  # Unique conflict pairs (a, b) = (b, a) are merged
-        self.resopairs = set()  # Resolved (when RESO is on) conflicts that are still before CPA
-        self.lospairs = list()  # Current loss of separation pairs
-        self.lospairs_unique = set()  # Unique LOS pairs (a, b) = (b, a) are merged
-        self.confpairs_all = list()  # All conflicts since simt=0
-        self.lospairs_all = list()  # All losses of separation since simt=0
+        self.clearconfdb()
 
+        # NOTE: Should this also be moved to inside clearconfdb()?
         self.dcpa = np.array([])  # CPA distance
-
-        # Conflict time and geometry data per conflict pair
-        self.tcpa = np.array([])  # Time to CPA
-        self.tLOS = np.array([])  # Time to start LoS
-        self.qdr = np.array([])  # Bearing from ownship to intruder
-        self.dist = np.array([])  # Horizontal distance between ""
 
     def toggle(self, flag=None):
         if flag is None:
@@ -148,6 +136,7 @@ class ASAS(TrafficArrays):
         """
         Clear conflict database
         """
+
         self.confpairs = list()  # Conflict pairs detected in the current timestep (used for resolving)
         self.confpairs_unique = set()  # Unique conflict pairs (a, b) = (b, a) are merged
         self.resopairs = set()  # Resolved (when RESO is on) conflicts that are still before CPA
