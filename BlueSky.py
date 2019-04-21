@@ -54,22 +54,33 @@ def main():
     else:
         mode = "server-gui"
 
-    discovery = ('--discoverable' in sys.argv or mode[-8:] == 'headless')
+    # Keyword arguments passed to BlueSky during initialization
+    kwargs = {}
 
-    # Check if alternate config file is passed or a default scenfile
-    cfgfile = ''
-    scnfile = ''
-    for i in range(len(sys.argv)):
-        if len(sys.argv) > i + 1:
-            if sys.argv[i] == '--config-file':
-                cfgfile = sys.argv[i + 1]
-            elif sys.argv[i] == '--scenfile':
-                scnfile = sys.argv[i + 1]
+    # Determine if the BlueSky process should be discoverable (default is False)
+    if "--discoverable" in sys.argv or "headless" in mode:
+        kwargs["discovery"] = True
 
-    # Catch import errors
+    # Check if alternate config file is passed
+    if "--config-file" in sys.argv:
+        idx = sys.argv.index("--config-file")
+        try:
+            kwargs["cfgfile"] = sys.argv[idx + 1]
+        except IndexError:
+            print("Missing argument for '--config-file', using default config file")
+
+    # Check if default scenario file is passed
+    if "--scenfile" in sys.argv:
+        idx = sys.argv.index("--scenfile")
+        try:
+            kwargs["scnfile"] = sys.argv[idx + 1]
+        except IndexError:
+            print("Missing argument for '--scenfile', no scenario file will be loaded")
+
+    # Catch Python module import errors
     try:
-        # Initialize bluesky modules
-        bs.init(mode, discovery=discovery, cfgfile=cfgfile, scnfile=scnfile)
+        # Initialize BlueSky modules
+        bs.init(mode, **kwargs)
 
         # Only start a simulation node if called with --sim or --detached
         if mode[:3] == 'sim':
