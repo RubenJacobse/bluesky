@@ -41,9 +41,6 @@ def main():
         - sim:              The normal simulation process started by a BlueSky server
         - sim-detached:     An isolated simulation node, without networking
     """
-    # When importerror gives different name than (pip) install needs,
-    # also advise latest version
-    missingmodules = {"OpenGL": "pyopengl and pyopengl-accelerate"}
 
     # Parse command-line arguments
     if "--detached" in sys.argv:
@@ -55,7 +52,7 @@ def main():
     elif "--headless" in sys.argv:
         mode = "server-headless"
     else:
-        mode = 'server-gui'
+        mode = "server-gui"
 
     discovery = ('--discoverable' in sys.argv or mode[-8:] == 'headless')
 
@@ -99,11 +96,19 @@ def main():
 
     # Give info on missing module
     except ImportError as error:
+        # When ImportError gives different name than (pip) install needs,
+        # also advise latest version
+        missingmodules = {"OpenGL": "pyopengl and pyopengl-accelerate",
+                          "PyQt4": "pyqt5"}
+
         modulename = missingmodules.get(error.name) or error.name
+
+        # Will crash program if ImportError source is unknown
         if modulename is None:
             raise error
-        print("Bluesky needs", modulename)
-        print("Install using e.g. pip install", modulename)
+        else:
+            print("Bluesky needs Python package: {}".format(modulename))
+            print("Install using e.g. 'pip install {}'".format(modulename))
 
     print('BlueSky normal end.')
 
