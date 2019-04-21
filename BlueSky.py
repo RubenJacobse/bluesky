@@ -104,8 +104,7 @@ def main():
     except ImportError as error:
         # When ImportError gives different name than (pip) install needs,
         # also advise latest version
-        missingmodules = {"OpenGL": "pyopengl and pyopengl-accelerate",
-                          "PyQt4": "pyqt5"}
+        missingmodules = {"OpenGL": "pyopengl and pyopengl-accelerate"}
 
         modulename = missingmodules.get(error.name) or error.name
 
