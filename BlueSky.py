@@ -93,15 +93,14 @@ def main():
             print("   *****   BlueSky Open ATM simulator *****")
             print("Distributed under GNU General Public License v3")
 
-        # Start server if server/gui or server-headless is started here
-        if mode[:6] == 'server':
-            if mode[-8:] == 'headless':
-                bs.server.run()
-            else:
-                bs.server.start()
+        # Start server if server-gui or server-headless is started here
+        if mode == "server-gui":
+            bs.server.start()
+        elif mode == "server-headless":
+            bs.server.run()
 
         # Start gui if client or main server/gui combination is started here
-        if mode in ('client', 'server-gui'):
+        if mode in ("client", "server-gui"):
             from bluesky.ui import qtgl
             qtgl.start(mode)
 
