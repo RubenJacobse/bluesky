@@ -218,50 +218,84 @@ class ASAS(TrafficArrays):
         self.cr = ASAS.cr_methods[method]
         self.cr.start(self)
 
-    def SetPZR(self, value=None):
-        if value is None:
-            return True, ("ZONER [radius (nm)]\nCurrent PZ radius: %.2f NM" % (self.R / nm))
+    def SetPZR(self, radius=None):
+        """
+        Set the protected zone radius in Nautical Miles. If no argument
+        is given, the current value is returned.
+        """
 
-        self.R  = value * nm
+        if radius is None:
+            return True, "ZONER [radius (nm)]\n" \
+                         + "Current PZ radius: {:.2f} NM".format(self.R / nm)
+
+        self.R  = radius * nm
         self.Rm = np.maximum(self.mar * self.R, self.Rm)
 
-    def SetPZH(self, value=None):
-        if value is None:
-            return True, ("ZONEDH [height (ft)]\nCurrent PZ height: %.2f ft" % (self.dh / ft))
+    def SetPZH(self, height=None):
+        """
+        Set the protected zone height in feet. If no argument is given,
+        the current value is returned.
+        """
 
-        self.dh  = value * ft
+        if height is None:
+            return True, "ZONEDH [height (ft)]\n" \
+                         + "Current PZ height: {:.2f} ft".format(self.dh / ft)
+
+        self.dh  = height * ft
         self.dhm = np.maximum(self.mar * self.dh, self.dhm)
 
-    def SetPZRm(self, value=None):
-        if value is None:
-            return True, ("RSZONER [radius (nm)]\nCurrent PZ radius margin: %.2f NM" % (self.Rm / nm))
+    def SetPZRm(self, radius_margin=None):
+        """
+        Set the protected zone radius margin in Nautical Miles. If no
+        argument is given, the current value is returned.
+        """
 
-        if value < self.R / nm:
+        if radius_margin is None:
+            return True, "RSZONER [radius (nm)]\n" \
+                         + "Current PZ radius margin: {:.2f} NM".format(self.Rm / nm)
+
+        if radius_margin < self.R / nm:
             return False, "PZ radius margin may not be smaller than PZ radius"
 
-        self.Rm  = value * nm
+        self.Rm  = radius_margin * nm
 
-    def SetPZHm(self, value=None):
-        if value is None:
-            return True, ("RSZONEDH [height (ft)]\nCurrent PZ height margin: %.2f ft" % (self.dhm / ft))
+    def SetPZHm(self, height_margin=None):
+        """
+        Set the protected zone height margin in feet. If no argument is
+        given,the current value is returned.
+        """
 
-        if value < self.dh / ft:
+        if height_margin is None:
+            return True, "RSZONEDH [height (ft)]\n" \
+                         + "Current PZ height margin: {:.2f} ft".format(self.dhm / ft)
+
+        if height_margin < self.dh / ft:
             return False, "PZ height margin may not be smaller than PZ height"
 
-        self.dhm  = value * ft
+        self.dhm  = height_margin * ft
 
-    def SetDtLook(self, value=None):
-        if value is None:
-            return True, ("DTLOOK [time]\nCurrent value: %.1f sec" % self.dtlookahead)
+    def SetDtLook(self, detection_time=None):
+        """
+        Set the conflict detection look-ahead time in seconds. If no argument
+        is given, the current value is returned.
+        """
 
-        self.dtlookahead = value
-        self.clearconfdb() # Clear current conflict database
+        if detection_time is None:
+            return True, "DTLOOK [time]\nCurrent value: {:.1f} sec".format(self.dtlookahead)
 
-    def SetDtNoLook(self, value=None):
-        if value is None:
-            return True, ("DTNOLOOK [time]\nCurrent value: %.1f sec" % self.dtasas)
+        self.dtlookahead = detection_time
+        self.clear_conflict_database()
 
-        self.dtasas = value
+    def SetDtNoLook(self, detection_interval=None):
+        """
+        Set the interval for conflict detection in seconds. If no argument
+        is given, the current value is returned.
+        """
+
+        if detection_interval is None:
+            return True, "DTNOLOOK [time]\nCurrent value: {:.1f} sec".format(self.dtasas)
+
+        self.dtasas = detection_interval
 
     def SetResoHoriz(self, value=None):
         """
