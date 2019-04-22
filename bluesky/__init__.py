@@ -50,7 +50,7 @@ def init(mode="sim", pygame=False, discovery=False, cfgfile="", scnfile=""):
     settings.init(cfgfile)
 
     # Is this a server running headless?
-    is_headless = (mode.endswith("headless"))
+    is_headless = mode.endswith("headless")
 
     # Keep track of the gui type.
     global gui_type
@@ -74,8 +74,9 @@ def init(mode="sim", pygame=False, discovery=False, cfgfile="", scnfile=""):
     # The remaining objects are only instantiated in the sim nodes
     if mode.startswith("sim"):
         # Check whether simulation node should run detached
-        is_detached = (mode.endswith("detached"))
+        is_detached = mode.endswith("detached")
 
+        # Check whether to use Qt or pygame gui
         if pygame:
             from bluesky.ui.pygame import Screen
             from bluesky.simulation.pygame import Simulation
