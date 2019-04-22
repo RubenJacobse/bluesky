@@ -112,7 +112,7 @@ def main():
         if modulename is None:
             raise error
         else:
-            print("Bluesky needs Python package: {}".format(modulename))
+            print("BlueSky needs Python package: {}".format(modulename))
             print("Install using e.g. 'pip install {}'".format(modulename))
 
     print('BlueSky normal end.')
