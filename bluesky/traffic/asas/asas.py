@@ -102,6 +102,7 @@ class ASAS(TrafficArrays):
         self.cd           = ASAS.cd_methods[self.cd_name]
         self.cr           = ASAS.cr_methods[self.cr_name]
 
+        self.dtasas       = settings.asas_dt
         self.dtlookahead  = settings.asas_dtlookahead # [s] lookahead time
         self.mar          = settings.asas_mar         # [-] Safety margin for evasion
         self.R            = settings.asas_pzr * nm    # [m] Horizontal separation minimum for detection
