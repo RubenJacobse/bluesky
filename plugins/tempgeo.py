@@ -304,3 +304,75 @@ def ellipsoid_greatcircle_intersect(p1_lat, p1_lon, p2_lat, p2_lon, p3_lat, p3_l
     intersect_lat, intersect_lon = vector_to_latlon(intersect_x, intersect_y, intersect_z)
 
     return np.degrees(intersect_lat), np.degrees(intersect_lon)
+
+if __name__ == "__main__":
+    (lat00, lon00) = sphere_greatcircle_intersect(52.2, 5.0, 51.7, 5.4, 51.5, 4.5, 52.0, 5.5)
+    
+    # (lat, lon) = ellipse_greatcircle_intersect(51.88158, 4.60602,
+    #                                    52.18404, 5.44647,
+    #                                    51.5, 4.5,
+    #                                    52.0, 5.5)
+    # print("Lat: {:.30f}, Lon {:.30f}".format(lat, lon))
+
+    (lat02, lon02) = sphere_greatcircle_intersect(52.33534, 2.32361,
+                                              51.53950, 7.26196,
+                                              51.5, 4.5,
+                                              53.03461, 5.41626)
+    
+    (lat03, lon03) = sphere_greatcircle_intersect(42.94034, -74.70703,
+                                              -7.18810, 84.90234,
+                                              -18.64625, -10.72266,
+                                              55.77657, 104.76563)
+    
+    (lat04, lon04) = sphere_greatcircle_intersect(52, 5,
+                                              37, -120,
+                                              0, -60,
+                                              70, 0)
+
+# Ellipsoid
+    (lat10, lon10) = ellipsoid_greatcircle_intersect(52.2, 5.0, 51.7, 5.4, 51.5, 4.5, 52.0, 5.5)
+    
+    # (lat, lon) = ellipse_greatcircle_intersect(51.88158, 4.60602,
+    #                                    52.18404, 5.44647,
+    #                                    51.5, 4.5,
+    #                                    52.0, 5.5)
+    # print("Lat: {:.30f}, Lon {:.30f}".format(lat, lon))
+
+    (lat12, lon12) = ellipsoid_greatcircle_intersect(52.33534, 2.32361,
+                                                 51.53950, 7.26196,
+                                                 51.5, 4.5,
+                                                 53.03461, 5.41626)
+    
+    (lat13, lon13) = ellipsoid_greatcircle_intersect(42.94034, -74.70703,
+                                                 -7.18810, 84.90234,
+                                                 -18.64625, -10.72266,
+                                                 55.77657, 104.76563)
+    
+    (lat14, lon14) = ellipsoid_greatcircle_intersect(52, 5,
+                                                 37, -120,
+                                                 0, -60,
+                                                 70, 0)
+
+    (lat15, lon15) = ellipsoid_greatcircle_intersect(55, 4,
+                                                 55, 22,
+                                                 0, 8,
+                                                 88, 8)
+    # print("Lat: {:.30f}, Lon {:.30f}".format(lat15, lon15))
+
+print("\nOn sphere:")
+print("Lat: {:.30f}, Lon {:.30f}".format(lat00, lon00))
+print("Lat: {:.30f}, Lon {:.30f}".format(lat02, lon02))
+print("Lat: {:.30f}, Lon {:.30f}".format(lat03, lon03))
+print("Lat: {:.30f}, Lon {:.30f}".format(lat04, lon04))
+
+print("\nOn ellipsoid:")
+print("Lat: {:.30f}, Lon {:.30f}".format(lat10, lon10))
+print("Lat: {:.30f}, Lon {:.30f}".format(lat12, lon12))
+print("Lat: {:.30f}, Lon {:.30f}".format(lat13, lon13))
+print("Lat: {:.30f}, Lon {:.30f}".format(lat14, lon14))
+
+print("\nDifferences:")
+print("Lat: {:.30f}, Lon: {:.30f}".format(abs(lat10 - lat00), abs(lon10 - lon00)))
+print("Lat: {:.30f}, Lon: {:.30f}".format(abs(lat12 - lat02), abs(lon12 - lon02)))
+print("Lat: {:.30f}, Lon: {:.30f}".format(abs(lat13 - lat03), abs(lon13 - lon03)))
+print("Lat: {:.30f}, Lon: {:.30f}".format(abs(lat14 - lat04), abs(lon14 - lon04)))
