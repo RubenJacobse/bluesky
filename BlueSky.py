@@ -42,6 +42,9 @@ def main():
     - sim-detached:     An isolated simulation node, without networking
     """
 
+    # Store keyword arguments passed to BlueSky during initialization
+    kwargs = {}
+
     # Parse command-line arguments
     if "--detached" in sys.argv:
         mode = "sim-detached"
@@ -53,9 +56,6 @@ def main():
         mode = "server-headless"
     else:
         mode = "server-gui"
-
-    # Keyword arguments passed to BlueSky during initialization
-    kwargs = {}
 
     # Determine if the BlueSky process should be discoverable (default is False)
     if "--discoverable" in sys.argv or "headless" in mode:
