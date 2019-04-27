@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """ Main BlueSky start script """
-from __future__ import print_function
+
 import sys
 import traceback
 import bluesky as bs
