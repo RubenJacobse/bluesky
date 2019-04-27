@@ -22,7 +22,7 @@ sys.excepthook = exception_handler
 
 def main():
     """
-    Start BlueSky: This is the main entrypoint for BlueSky. Depending on
+    Start BlueSky: This is the main entry point for BlueSky. Depending on
     settings and arguments passed it can start in different modes. The
     central part of BlueSky consists of a server managing all simulations,
     normally together with a gui. The different modes for this are:
@@ -35,7 +35,7 @@ def main():
     A BlueSky server can start one or more simulation processes, which run
     the actual simulations. These simulations can also be started completely
     separate from all other BlueSky functionality, in the detached mode.
-    This is useful when calling bluesky from within another python
+    This is useful when calling BlueSky from within another Python
     script/program. The corresponding modes are:
 
     - sim:              The normal simulation process started by a BlueSky server
