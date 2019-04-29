@@ -64,6 +64,7 @@ def main():
         scnfile.write(zero_time_str + "DT {}\n".format(SIM_TIME_STEP))
         scnfile.write(zero_time_str + "TRAIL {}\n".format("ON" if SHOW_AC_TRAILS else "OFF"))
         scnfile.write(zero_time_str + "SWRAD {}\n".format("SYM"))
+        scnfile.write(zero_time_str + "FF\n")
 
         scnfile.write("\n# Setup circular experiment area and activate it as a traffic area in BlueSky\n")
         scnfile.write(zero_time_str + "PLUGINS LOAD AREA\n")
