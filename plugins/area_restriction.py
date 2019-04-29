@@ -259,12 +259,11 @@ class AreaRestrictionManager(TrafficArrays):
             return
 
         for var in self._ndArrVars:  # Numpy array
-
-            # Get numpy dtype without byte length
-            dtype_str = str(self._Vars[var].dtype)
-            for vartype in ["int", "float", "bool"]:
-                if vartype in dtype_str:
-                    break
+            fulltype = str(self._Vars[var].dtype)
+            vartype = ""
+            for c in fulltype:
+                if not c.isdigit():
+                    vartype = vartype + c
 
             # Get default value
             if vartype in VAR_DEFAULTS:
