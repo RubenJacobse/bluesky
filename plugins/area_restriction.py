@@ -504,7 +504,10 @@ class AreaRestrictionManager(TrafficArrays):
         self.current_position = [spgeom.Point(lon, lat) \
                                  for (lon, lat) in zip(bs.traf.lon, bs.traf.lat)]
 
-        relative_track = [[]] * self.num_traf
+        # NOTE: we need to build this list of lists iteratively, otherwise each sub-element
+        # is a pointer to the same list, and the relative_track[idx].append() will append to ALL
+        # sub lists...
+        relative_track = [[] for i in range(self.num_traf)]
 
         # NOTE: Could this be vectorized instead of looped over all aircraft-area combinations?
         for area_idx, area in enumerate(self.areas):
@@ -526,9 +529,6 @@ class AreaRestrictionManager(TrafficArrays):
             # Use current and future relative position to calculate relative track
             for ac_idx, (curr, fut) in enumerate(zip(self.current_position, future_relative_position)):
                 relative_track[ac_idx].append(spgeom.LineString([curr, fut]))
-
-            # relative_track[area_idx] = [spgeom.LineString([curr, fut]) for (curr, fut) \
-            #                             in zip(self.current_position, future_relative_position)]
 
         self.relative_track = relative_track
 
