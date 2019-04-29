@@ -711,8 +711,8 @@ class AreaRestrictionManager(TrafficArrays):
         a resolution manoeuver.
         """
 
-        # NOTE: Some of the branches of the if statements inside this loop are redundant, but
-        # are still explicitly included to improve readability.
+        # NOTE: Some of the branches of the if-statements inside this loop are
+        # redundant, but are still explicitly included to improve readability.
         for ac_idx in range(self.num_traf):
             ac_current_crs = ned2crs(bs.traf.trk[ac_idx])
 
@@ -731,11 +731,11 @@ class AreaRestrictionManager(TrafficArrays):
                         # Course not yet within margin of commanded course, continue manoeuver.
                         pass
             else:
-                # Aircraft is no longer in conflict with an area.
+                # Aircraft not in conflict with an area.
                 if self.is_in_area_reso[ac_idx]:
-                    # Check if current course is within margin of the resolution commanded course
+                    # Aircraft is howevever still in area resolution mode
                     if abs(ac_current_crs - self.commanded_crs[ac_idx]) < COMMANDED_CRS_MARGIN:
-                        # Course is within margin, reset resolution variables
+                        # Course is within margin of commanded course, reset resolution variables
                         self.is_in_area_reso[ac_idx] = False
                         self.commanded_crs[ac_idx] = 0
                         self.commanded_spd[ac_idx] = 0
@@ -744,7 +744,7 @@ class AreaRestrictionManager(TrafficArrays):
                         # Commanded course has not yet been reached, take no action
                         pass
                 else:
-                    # The aircraft is not in a resolution manoeuver, take no action
+                    # The aircraft is not in area resolution mode, take no action
                     pass
 
             if self.is_in_aircraft_conflict_mode[ac_idx] \
