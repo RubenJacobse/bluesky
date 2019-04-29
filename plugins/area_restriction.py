@@ -714,35 +714,32 @@ class AreaRestrictionManager(TrafficArrays):
         # NOTE: Some of the branches of the if statements inside this loop are redundant, but
         # are still explicitly included to improve readability.
         for ac_idx in range(self.num_traf):
+            ac_current_crs = ned2crs(bs.traf.trk[ac_idx])
+
             if self.is_in_area_conflict_mode[ac_idx]:
-                if self.is_in_area_reso[ac_idx]:
-                    # Aircraft is already in a resolution manoeuver, no action required.
-                    pass
-                else:
+                # Aircraft is in conflict with an area
+                if not self.is_in_area_reso[ac_idx]:
                     # Aircraft is not in a resolution manoeuver, must initiate a new one
-                    print("{} new resolution manoeuver initiated".format(bs.traf.id[ac_idx]))
-
-                    new_v_east = bs.traf.gseast[ac_idx] + self.reso_dv_east[ac_idx]
-                    new_v_north = bs.traf.gsnorth[ac_idx] + self.reso_dv_north[ac_idx]
-                    new_v = np.sqrt(new_v_east ** 2 + new_v_north ** 2)
-                    new_crs = np.degrees(np.arctan2(new_v_east, new_v_north)) % 360
-
-                    self.stack_reso_apply(ac_idx, new_crs, new_v)
-                    self.is_in_area_reso[ac_idx] = True
-                    self.commanded_crs[ac_idx] = new_crs
-                    self.commanded_spd[ac_idx] = new_v
+                    self.perform_manoeuver(ac_idx)
+                else:
+                    # Aircraft is already in a resolution manoeuver
+                    if abs(ac_current_crs - self.commanded_crs[ac_idx]) < COMMANDED_CRS_MARGIN:
+                        # Current course within margin of commanded course, but still in
+                        # conflict, perform new manoeuver.
+                        self.perform_manoeuver(ac_idx)
+                    else:
+                        # Course not yet within margin of commanded course, continue manoeuver.
+                        pass
             else:
+                # Aircraft is no longer in conflict with an area.
                 if self.is_in_area_reso[ac_idx]:
                     # Check if current course is within margin of the resolution commanded course
-                    current_crs = ned2crs(bs.traf.trk[ac_idx])
-                    delta_crs = abs(current_crs - self.commanded_crs[ac_idx])
-                    if delta_crs < COMMANDED_CRS_MARGIN:
+                    if abs(ac_current_crs - self.commanded_crs[ac_idx]) < COMMANDED_CRS_MARGIN:
                         # Course is within margin, reset resolution variables
-                        print("{} resolution manoeuver completed!".format(bs.traf.id[ac_idx]))
-
                         self.is_in_area_reso[ac_idx] = False
                         self.commanded_crs[ac_idx] = 0
                         self.commanded_spd[ac_idx] = 0
+                        print("{} resolution manoeuver completed!".format(bs.traf.id[ac_idx]))
                     else:
                         # Commanded course has not yet been reached, take no action
                         pass
@@ -756,6 +753,27 @@ class AreaRestrictionManager(TrafficArrays):
 
             if self.is_in_route_following_mode[ac_idx]:
                 pass
+
+    def perform_manoeuver(self, ac_idx):
+        """
+        Perform a resolution manoeuver to solve a conflict with a
+        restricted airspace.
+        """
+
+        new_v_east = bs.traf.gseast[ac_idx] + self.reso_dv_east[ac_idx]
+        new_v_north = bs.traf.gsnorth[ac_idx] + self.reso_dv_north[ac_idx]
+        new_v = np.sqrt(new_v_east ** 2 + new_v_north ** 2)
+        new_crs = np.degrees(np.arctan2(new_v_east, new_v_north)) % 360
+
+        print("{} in conflict with {}, turning to course {:.2f} degrees"\
+            .format(bs.traf.id[ac_idx], 
+                    self.area_ids[self.first_conflict_area_idx[ac_idx]], 
+                    new_crs))
+
+        self.stack_reso_apply(ac_idx, new_crs, new_v)
+        self.is_in_area_reso[ac_idx] = True
+        self.commanded_crs[ac_idx] = new_crs
+        self.commanded_spd[ac_idx] = new_v
 
     def stack_reso_apply(self, ac_idx, crs, tas):
         """ Apply all resolution vectors via the BlueSky stack. """
