@@ -504,7 +504,7 @@ class AreaRestrictionManager(TrafficArrays):
         self.current_position = [spgeom.Point(lon, lat) \
                                  for (lon, lat) in zip(bs.traf.lon, bs.traf.lat)]
 
-        relative_track = [[]] * self.num_areas
+        relative_track = [[]] * self.num_traf
 
         # NOTE: Could this be vectorized instead of looped over all aircraft-area combinations?
         for area_idx, area in enumerate(self.areas):
@@ -524,8 +524,11 @@ class AreaRestrictionManager(TrafficArrays):
                                         in zip(future_relative_lon, future_relative_lat)]
 
             # Use current and future relative position to calculate relative track
-            relative_track[area_idx] = [spgeom.LineString([curr, fut]) for (curr, fut) \
-                                        in zip(self.current_position, future_relative_position)]
+            for ac_idx, (curr, fut) in enumerate(zip(self.current_position, future_relative_position)):
+                relative_track[ac_idx].append(spgeom.LineString([curr, fut]))
+
+            # relative_track[area_idx] = [spgeom.LineString([curr, fut]) for (curr, fut) \
+            #                             in zip(self.current_position, future_relative_position)]
 
         self.relative_track = relative_track
 
@@ -551,7 +554,7 @@ class AreaRestrictionManager(TrafficArrays):
                 self.current_position[ac_idx].within(area.poly)
 
             self.is_in_conflict[area_idx, ac_idx] = \
-                area.ring.intersects(self.relative_track[area_idx][ac_idx])
+                area.ring.intersects(self.relative_track[ac_idx][area_idx])
 
     def calculate_time_to_intrusion(self, area_idx, area):
         """
@@ -570,7 +573,7 @@ class AreaRestrictionManager(TrafficArrays):
                 # Find intersection points of the relative vector with the area and use the
                 # distance to the closest point to calculate time-to-intersection. (We cannot
                 # use shapely distance functions because vertex definitions are in degrees).
-                intr_points = area.ring.intersection(self.relative_track[area_idx][ac_idx])
+                intr_points = area.ring.intersection(self.relative_track[ac_idx][area_idx])
                 intr_closest = spops.nearest_points(self.current_position[ac_idx], intr_points)[1]
                 intr_closest_lat, intr_closest_lon = intr_closest.y, intr_closest.x
                 _, intr_dist_nm = qdrdist(bs.traf.lat[ac_idx],
