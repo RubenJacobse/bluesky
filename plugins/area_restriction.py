@@ -483,7 +483,7 @@ class AreaRestrictionManager(TrafficArrays):
         for ac_idx in range(self.num_traf):
 
             self.idx_active_wp[ac_idx] = bs.traf.ap.route[ac_idx].iactwp
-            if bs.traf.ap.route[ac_idx].nwp >= self.idx_active_wp[ac_idx] + 1:
+            if bs.traf.ap.route[ac_idx].nwp > self.idx_active_wp[ac_idx] + 1:
                 self.idx_next_wp[ac_idx] = self.idx_active_wp[ac_idx] + 1
             else:
                 self.idx_next_wp[ac_idx] = self.idx_active_wp[ac_idx]
