@@ -48,13 +48,15 @@ def main():
     experiment geometry.
     """
 
-    file_name = "C{}_{}_L{}_W{}_R{}_A{}_P{}.scn".format(CENTER_LAT,
+    file_name = "C{}_{}_L{}_W{}_AR{}_A{}_NP{}_D-{}_R-{}.scn".format(CENTER_LAT,
                                                         CENTER_LON,
                                                         CORRIDOR_LENGTH,
                                                         CORRIDOR_WIDTH,
                                                         AREA_RADIUS,
                                                         RESTRICTION_ANGLE,
-                                                        NUM_DEP_DEST_POINTS)
+                                                        NUM_DEP_DEST_POINTS,
+                                                        "ON" if ASAS_ON else "OFF",
+                                                        ASAS_RESO_METHOD)
 
     # Open file, overwrite if existing
     with open(file_name, "w+") as scnfile:
@@ -67,7 +69,8 @@ def main():
         scnfile.write(zero_time_str + "SWRAD {}\n".format("SYM"))
         scnfile.write(zero_time_str + "FF\n")
 
-        scnfile.write("\n# Setup circular experiment area and activate it as a traffic area in BlueSky\n")
+        scnfile.write("\n# Setup circular experiment area and activate it" \
+                      + " as a traffic area in BlueSky\n")
         scnfile.write(zero_time_str + "PLUGINS LOAD AREA\n")
         scnfile.write(zero_time_str + "CIRCLE EXPERIMENT {},{},{}\n"\
             .format(CENTER_LAT, CENTER_LON, AREA_RADIUS))
