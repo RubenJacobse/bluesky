@@ -39,6 +39,7 @@ SHOW_AC_TRAILS = True
 ASAS_ON = False
 ASAS_RESO_METHOD = "MVP"
 
+random.seed(1)
 
 def main():
     """
@@ -210,14 +211,19 @@ def main():
         scnfile.write(zero_time_str + "DEFWPT COR201,{:.6f},{:.6f},FIX\n".format(inner_left_top_lat, CENTER_LON))
 
         # Create aircaft
-        scnfile.write("\n# Create aircraft\n")
-        for ac_idx in [1]:
-            ac_str = create_random_aircraft_at_time(zero_time_str,
+        scnfile.write("\n# Create aircraft")
+        creation_time = 0
+        for ac_idx in range(20):
+            creation_time = creation_time + random.randint(30,90)
+            creation_time_str = time.strftime('%H:%M:%S', time.gmtime(creation_time))
+            creation_time_str = "{}.00>".format(creation_time_str)
+            ac_str = create_random_aircraft_at_time(creation_time_str,
                                                     ac_idx,
                                                     NUM_DEP_DEST_POINTS,
                                                     dep_waypoints,
-                                                    dest_waypoints)
-            scnfile.write(ac_str)
+                                                    dest_waypoints,
+                                                    [inner_left_bottom_lat, CENTER_LON])
+            scnfile.write('\n' + ac_str)
 
 def intersect_area_ring(CENTER_LAT,
                         CENTER_LON,
@@ -290,19 +296,22 @@ def create_random_aircraft_at_time(time,
                                    ac_idx,
                                    NUM_DEP_DEST_POINTS,
                                    dep_waypoints,
-                                   dest_waypoints):
+                                   dest_waypoints,
+                                   cor_entrypoint):
     """ """
 
     ac_type = "B744"
     ac_alt = "36000"
     ac_spd = "280"
-    ac_hdg = "360"
 
     dep_wp_idx = random.randint(0, NUM_DEP_DEST_POINTS - 1)
     dest_wp_idx = random.randint(0, NUM_DEP_DEST_POINTS - 1)
     (ac_lat, ac_lon) = dep_waypoints[dep_wp_idx]
 
-    aircraft_str = time + "CRE AC{:03d} {},{:.6f},{:.6f},{},{},{}\n".format(ac_idx,
+    ac_hdg, _ = bsgeo.qdrdist(ac_lat, ac_lon, cor_entrypoint[0], cor_entrypoint[1])
+    ac_hdg = ar.ned2crs(ac_hdg)
+
+    aircraft_str = time + "CRE AC{:03d} {},{:.6f},{:.6f},{:.2f},{},{}\n".format(ac_idx,
                                                                             ac_type,
                                                                             ac_lat,
                                                                             ac_lon,
