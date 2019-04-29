@@ -298,9 +298,8 @@ def create_random_aircraft_at_time(time,
     ac_spd = "280"
     ac_hdg = "360"
 
-    dep_wp_idx = random.randint(0, NUM_DEP_DEST_POINTS)
-    dest_wp_idx = random.randint(0, NUM_DEP_DEST_POINTS)
-
+    dep_wp_idx = random.randint(0, NUM_DEP_DEST_POINTS - 1)
+    dest_wp_idx = random.randint(0, NUM_DEP_DEST_POINTS - 1)
     (ac_lat, ac_lon) = dep_waypoints[dep_wp_idx]
 
     aircraft_str = time + "CRE AC{:03d} {},{:.6f},{:.6f},{},{},{}\n".format(ac_idx,
