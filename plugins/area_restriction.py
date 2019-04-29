@@ -504,9 +504,10 @@ class AreaRestrictionManager(TrafficArrays):
         self.current_position = [spgeom.Point(lon, lat) \
                                  for (lon, lat) in zip(bs.traf.lon, bs.traf.lat)]
 
+        relative_track = [[]] * self.num_areas
+
         # NOTE: Could this be vectorized instead of looped over all aircraft-area combinations?
         for area_idx, area in enumerate(self.areas):
-
             self.rel_gseast[area_idx, :] = bs.traf.gseast - area.gseast
             self.rel_gsnorth[area_idx, :] = bs.traf.gsnorth - area.gsnorth
 
@@ -523,9 +524,10 @@ class AreaRestrictionManager(TrafficArrays):
                                         in zip(future_relative_lon, future_relative_lat)]
 
             # Use current and future relative position to calculate relative track
-            self.relative_track[area_idx] = \
-                [spgeom.LineString([curr, fut]) for (curr, fut) \
-                    in zip(self.current_position, future_relative_position)]
+            relative_track[area_idx] = [spgeom.LineString([curr, fut]) for (curr, fut) \
+                                        in zip(self.current_position, future_relative_position)]
+
+        self.relative_track = relative_track
 
         # Magnitude of relative velocities
         self.rel_gs = np.sqrt(self.rel_gseast ** 2 + self.rel_gsnorth ** 2)
