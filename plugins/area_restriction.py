@@ -752,7 +752,14 @@ class AreaRestrictionManager(TrafficArrays):
                 pass
 
             if self.is_in_route_following_mode[ac_idx]:
-                pass
+                # NOTE: current implementation is naive, could result in all sorts of turning
+                # behaviour if the active waypoint is behind the aircraft.
+                #
+                # Waypoint recovery after conflict: Find the next active waypoint
+                # and send the aircraft to that waypoint.
+                iwpid = bs.traf.ap.route[ac_idx].findact(ac_idx)
+                if iwpid != -1:  # To avoid problems if there are no waypoints
+                    bs.traf.ap.route[ac_idx].direct(ac_idx, bs.traf.ap.route[ac_idx].wpname[iwpid])
 
     def perform_manoeuver(self, ac_idx):
         """
