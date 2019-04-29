@@ -144,8 +144,8 @@ class AreaRestrictionManager(TrafficArrays):
             self.brg_right_tangent = np.array([[]]) # [deg] Bearing from ac to rightmost vertex in N-E-D [-180..180]
             self.crs_left_tangent = np.array([[]]) # [deg] Compass course from ac to leftmost vertex [0..360]
             self.crs_right_tangent = np.array([[]]) # [deg] Compass course from ac to rightmost vertex [0..360]
-            self.is_inside = np.array([[]], dtype = bool) # Stores whether ac is inside area
-            self.is_in_conflict = np.array([[]], dtype = bool) # Stores whether ac is in conflict with each area
+            self.is_inside = np.array([[]], dtype=bool) # Stores whether ac is inside area
+            self.is_in_conflict = np.array([[]], dtype=bool) # Stores whether ac is in conflict with each area
             self.time_to_intrusion = np.array([[]])  # [s] Time to area intrusion
 
             # ======================================================
@@ -153,23 +153,23 @@ class AreaRestrictionManager(TrafficArrays):
             # ======================================================
 
             # Waypoint related
-            self.idx_active_wp = np.array([], dtype = int) # index of active waypoint
-            self.idx_next_wp = np.array([], dtype = int) # index of next waypoint
+            self.idx_active_wp = np.array([], dtype=int) # index of active waypoint
+            self.idx_next_wp = np.array([], dtype=int) # index of next waypoint
             self.crs_to_active_wp = np.array([]) # [deg] Magnetic course to current waypoint
             self.crs_to_next_wp = np.array([]) # [deg] Magnetic course to current waypoint
 
             # Resolution related
             self.reso_dv_east = np.array([]) # [m/s] Resolution velocity change east component
             self.reso_dv_north = np.array([]) # [m/s] Resolution velocity change north component
-            self.is_in_area_reso = np.array([], dtype = bool)
-            self.is_in_aircraft_reso = np.array([], dtype = bool)
+            self.is_in_area_reso = np.array([], dtype=bool)
+            self.is_in_aircraft_reso = np.array([], dtype=bool)
             self.commanded_crs = np.array([])
             self.commanded_spd = np.array([])
 
             # Keep track of the avoidance state of each aircraft
-            self.is_in_area_conflict_mode = np.array([], dtype = bool)
-            self.is_in_aircraft_conflict_mode = np.array([], dtype = bool)
-            self.is_in_route_following_mode = np.array([], dtype = bool)
+            self.is_in_area_conflict_mode = np.array([], dtype=bool)
+            self.is_in_aircraft_conflict_mode = np.array([], dtype=bool)
+            self.is_in_route_following_mode = np.array([], dtype=bool)
 
             # =======================
             # Traffic parameter lists
@@ -208,7 +208,7 @@ class AreaRestrictionManager(TrafficArrays):
             elif isinstance(self._Vars[key], TrafficArrays):
                 self._Vars[key].reparent(self)
 
-    def create(self, n = 1):
+    def create(self, n=1):
         """
         Append n elements (aircraft) to all lists and arrays.
 
@@ -318,10 +318,10 @@ class AreaRestrictionManager(TrafficArrays):
             self._Vars[var] = []
 
         for var in self._ArrVars:
-            self._Vars[var] = np.array([], dtype = self._Vars[var].dtype)
+            self._Vars[var] = np.array([], dtype=self._Vars[var].dtype)
 
         for var in self._ndArrVars:
-            self._Vars[var] = np.array([[]], dtype = self._Vars[var].dtype)
+            self._Vars[var] = np.array([[]], dtype=self._Vars[var].dtype)
 
         # Make sure all areas are deleted
         for area in self.areas:
@@ -502,7 +502,7 @@ class AreaRestrictionManager(TrafficArrays):
 
         # Represent each aircraft position as shapely point
         self.current_position = [spgeom.Point(lon, lat) \
-                                    for (lon, lat) in zip(bs.traf.lon, bs.traf.lat)]
+                                 for (lon, lat) in zip(bs.traf.lon, bs.traf.lat)]
 
         # NOTE: Could this be vectorized instead of looped over all aircraft-area combinations?
         for area_idx, area in enumerate(self.areas):
@@ -512,15 +512,15 @@ class AreaRestrictionManager(TrafficArrays):
 
             # Calculate position of each aircraft relative to the area after lookahead time
             future_relative_lon, future_relative_lat = \
-                                                calc_future_pos(self.t_lookahead,
-                                                                bs.traf.lon,
-                                                                bs.traf.lat,
-                                                                self.rel_gseast[area_idx, :],
-                                                                self.rel_gsnorth[area_idx, :])
+                calc_future_pos(self.t_lookahead,
+                                bs.traf.lon,
+                                bs.traf.lat,
+                                self.rel_gseast[area_idx, :],
+                                self.rel_gsnorth[area_idx, :])
 
             # Create shapely points for future relative position
             future_relative_position = [spgeom.Point(lon, lat) for (lon, lat) \
-                                            in zip(future_relative_lon, future_relative_lat)]
+                                        in zip(future_relative_lon, future_relative_lat)]
 
             # Use current and future relative position to calculate relative track
             self.relative_track[area_idx] = \
@@ -563,7 +563,7 @@ class AreaRestrictionManager(TrafficArrays):
 
         for ac_idx in range(self.num_traf):
             if self.is_inside[area_idx, ac_idx]:
-                t_int = 0   # NOTE: If area avoidance works properly, this should never happen!
+                t_int = 0 # NOTE: If area avoidance works properly, this should never happen!
             elif self.is_in_conflict[area_idx, ac_idx]:
                 # Find intersection points of the relative vector with the area and use the
                 # distance to the closest point to calculate time-to-intersection. (We cannot
@@ -605,7 +605,7 @@ class AreaRestrictionManager(TrafficArrays):
 
         # Find indices of conflicting aircraft-area pairs
         conflict_pairs = [(ac_idx, area_idx) for ac_idx, area_idx \
-                            in enumerate(self.first_conflict_area_idx) if area_idx is not None]
+                          in enumerate(self.first_conflict_area_idx) if area_idx is not None]
 
         # Per area, calculate resolution vectors for all aircraft conflicting with that area
         for area_idx in range(self.num_areas):
@@ -636,15 +636,15 @@ class AreaRestrictionManager(TrafficArrays):
             # Find angles between -vrel and left- and right edges of VO using dot
             # product of -vrel and the unit vectors along the VO edges
             beta_l_rad = np.arccos(-1 * (u_l_east * area.gseast + \
-                                         u_l_north * area.gsnorth) / (area.gs**2))
+                                         u_l_north * area.gsnorth) / (area.gs ** 2))
             beta_r_rad = np.arccos(-1 * (u_r_east * area.gseast + \
-                                         u_r_north * area.gsnorth) / (area.gs**2))
+                                         u_r_north * area.gsnorth) / (area.gs ** 2))
 
             # Calculate relative resolution velocity component along the VO edges
             v_ul = ac_gs * np.cos(beta_l_rad) + ac_gs \
-                    * np.cos(np.arcsin(ac_gs * np.sin(beta_l_rad) / ac_gs))
+                   * np.cos(np.arcsin(ac_gs * np.sin(beta_l_rad) / ac_gs))
             v_ur = ac_gs * np.cos(beta_r_rad) + ac_gs \
-                    * np.cos(np.arcsin(ac_gs * np.sin(beta_r_rad) / ac_gs))
+                   * np.cos(np.arcsin(ac_gs * np.sin(beta_r_rad) / ac_gs))
         else:
             # Resolution velocity magnitudes on left- and right edges of CC
             v_ul = ac_gs
@@ -660,9 +660,9 @@ class AreaRestrictionManager(TrafficArrays):
 
         # Calculate magnetic tracks of left- and right resolution vectors
         vres_l_crs = (np.degrees(np.arctan2(vres_l_east, vres_l_north)) \
-                        - AREA_AVOIDANCE_CRS_MARGIN) % 360
+                      - AREA_AVOIDANCE_CRS_MARGIN) % 360
         vres_r_crs = (np.degrees(np.arctan2(vres_r_east, vres_r_north)) \
-                        + AREA_AVOIDANCE_CRS_MARGIN) % 360
+                      + AREA_AVOIDANCE_CRS_MARGIN) % 360
 
         # Determine which of the two resolution vectors should be used based on the course to
         # the current active waypoint. We choose the course with the smallest angle difference
@@ -749,7 +749,7 @@ class AreaRestrictionManager(TrafficArrays):
                     pass
 
             if self.is_in_aircraft_conflict_mode[ac_idx] \
-                        and not self.is_in_area_conflict_mode[ac_idx]:
+                    and not self.is_in_area_conflict_mode[ac_idx]:
                 pass
 
             if self.is_in_route_following_mode[ac_idx]:
@@ -786,7 +786,7 @@ class RestrictedAirspaceArea():
         self.status = status
         self.gsnorth = gsnorth
         self.gseast = gseast
-        self.gs = np.sqrt(gsnorth**2 + gseast**2)
+        self.gs = np.sqrt(gsnorth ** 2 + gseast ** 2)
 
         # Enforce that the coordinate list defines a valid ring
         coords = self._check_poly(coords)
@@ -916,8 +916,8 @@ class RestrictedAirspaceArea():
         """
 
         # Initialize arrays to store qdrs and distances
-        qdr_left = np.zeros(num_traf, dtype = float)
-        qdr_right = np.zeros(num_traf, dtype = float)
+        qdr_left = np.zeros(num_traf, dtype=float)
+        qdr_right = np.zeros(num_traf, dtype=float)
 
         # Create array containing [lon, lat] for each vertex
         vertex = np.array(self.ring.coords.xy).T
@@ -930,7 +930,7 @@ class RestrictedAirspaceArea():
             idx_left_vert = 0
             idx_right_vert = 0
 
-            # Loop over vertices 1:n-1 and evaluate position of aircraft wrt the edges 
+            # Loop over vertices 1:n-1 and evaluate position of aircraft wrt the edges
             # to find the indices of the vertices at which the tangents touch the polygon
             #
             # Algorithm from: http://geomalgorithms.com/a15-_tangents.html
@@ -966,8 +966,8 @@ class RestrictedAirspaceArea():
         """
 
         # Initialize arrays to store loxodrome angles
-        lox_angle_left = np.zeros(num_traf, dtype = float)
-        lox_angle_right = np.zeros(num_traf, dtype = float)
+        lox_angle_left = np.zeros(num_traf, dtype=float)
+        lox_angle_right = np.zeros(num_traf, dtype=float)
 
         # Create array containing [lon, lat] for each vertex
         vertex = np.array(self.ring.coords.xy).T
@@ -1017,7 +1017,7 @@ class RestrictedAirspaceArea():
         dir_sum = 0
         for ii in range(0, len(coords) - 2, 2):  # ii = 0,2,4,...
             edge = (coords[ii + 3] - coords[ii + 1]) * \
-                (coords[ii] + coords[ii + 2])
+                   (coords[ii] + coords[ii + 2])
             dir_sum += edge
 
         return False if dir_sum > 0 else True
@@ -1035,7 +1035,7 @@ class RestrictedAirspaceArea():
         """
 
         return (line_end[0] - line_start[0]) * (point[1] - line_start[1]) \
-                    - (point[0] - line_start[0]) * (line_end[1] - line_start[1])
+               - (point[0] - line_start[0]) * (line_end[1] - line_start[1])
 
 
 def crs_mid(crs_left, crs_right):
@@ -1063,7 +1063,7 @@ def crs_is_between(crs, crs_left, crs_right):
     """
 
     is_between = ((crs_left > crs_right) and (crs > crs_left or crs < crs_right)) or \
-                    ((crs_left < crs_right) and (crs > crs_left and crs < crs_right))
+                 ((crs_left < crs_right) and (crs > crs_left and crs < crs_right))
 
     return is_between
 
