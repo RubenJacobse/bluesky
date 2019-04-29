@@ -38,6 +38,7 @@ SIM_TIME_STEP = 0.05    # [s] Simulation time step
 SHOW_AC_TRAILS = True
 ASAS_ON = False
 ASAS_RESO_METHOD = "MVP"
+NUM_EXPERIMENT_AIRCRAFT = 100
 
 random.seed(1)
 
@@ -214,7 +215,7 @@ def main():
         # Create aircaft
         scnfile.write("\n# Create aircraft")
         creation_time = 0
-        for ac_idx in range(20):
+        for ac_idx in range(NUM_EXPERIMENT_AIRCRAFT):
             creation_time = creation_time + random.randint(30,90)
             creation_time_str = time.strftime('%H:%M:%S', time.gmtime(creation_time))
             creation_time_str = "{}.00>".format(creation_time_str)
