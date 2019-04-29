@@ -9,6 +9,7 @@ involving the area_restriction.py module.
 import math
 import sys, os
 import time
+import random
 
 # Third-party imports
 import numpy as np
@@ -61,6 +62,7 @@ def main():
         scnfile.write(zero_time_str + "PAN {},{}\n".format(CENTER_LAT, CENTER_LON))
         scnfile.write(zero_time_str + "DT {}\n".format(SIM_TIME_STEP))
         scnfile.write(zero_time_str + "TRAIL {}\n".format("ON" if SHOW_AC_TRAILS else "OFF"))
+        scnfile.write(zero_time_str + "SWRAD {}\n".format("SYM"))
 
         scnfile.write("\n# Setup circular experiment area and activate it as a traffic area in BlueSky\n")
         scnfile.write(zero_time_str + "PLUGINS LOAD AREA\n")
@@ -114,7 +116,7 @@ def main():
                                                                                    left_outer_lon,
                                                                                    vert_left_bottom_lat,
                                                                                    vert_left_bottom_lon)
-        
+
         left_coords = "{:.6f},{:.6f},{:.6f},{:.6f},{:.6f},{:.6f},{:.6f},{:.6f}"\
                                                 .format(inner_left_top_lat, inner_left_top_lon,
                                                         outer_left_top_lat, outer_left_top_lon,
@@ -175,8 +177,6 @@ def main():
         scnfile.write(zero_time_str + "RAA RAA2,ON,{},{},{}\n".format(0, 0, right_coords))
         scnfile.write(zero_time_str + "DEFWPT RAA_2,{},{},FIX\n".format(CENTER_LAT, (inner_right_bottom_lon + right_outer_lon) / 2))
 
-
-        scnfile.write("\n# Create waypoints\n")
         # First find angle to intersection point of angled restriction edge and experiment area
         # then find angle from center point
         ring_top_right_intersect_lat, ring_top_right_intersect_lon, angle \
@@ -188,32 +188,44 @@ def main():
                                                               outer_right_top_lat,
                                                               outer_right_top_lon)
 
-        # print("lat, lon: {},{} angle: {}".format(ring_top_right_intersect_lat,
-        #                                          ring_top_right_intersect_lon,
-        #                                          angle))
-        # scnfile.write(zero_time_str + "DEFWPT TEST,{:.6f},{:.6f},FIX\n".format(ring_top_right_intersect_lat,
-        #                                                                ring_top_right_intersect_lon))
-
         # Departure waypoints
-        dep_fixes = calc_departure_waypoints(NUM_DEP_DEST_POINTS, CENTER_LAT, CENTER_LON, AREA_RADIUS, angle)
+        scnfile.write("\n# Departure waypoints\n")
+        dep_waypoints = calc_departure_waypoints(NUM_DEP_DEST_POINTS, CENTER_LAT, CENTER_LON, AREA_RADIUS, angle)
 
-        for fix_idx, dep_fix in enumerate(dep_fixes):
+        for fix_idx, dep_fix in enumerate(dep_waypoints):
             fix_lat, fix_lon = dep_fix[0], dep_fix[1]
-            scnfile.write(zero_time_str + "DEFWPT DEP{:03d},{:.6f},{:.6f},FIX\n".format(fix_idx + 1, fix_lat, fix_lon))
+            scnfile.write(zero_time_str + "DEFWPT DEP{:03d},{:.6f},{:.6f},FIX\n".format(fix_idx, fix_lat, fix_lon))
 
-        # Departure waypoints
-        dest_fixes = calc_destination_waypoints(NUM_DEP_DEST_POINTS, CENTER_LAT, CENTER_LON, AREA_RADIUS, angle)
+        # Destination waypoints
+        scnfile.write("\n# Destination waypoints\n")
+        dest_waypoints = calc_destination_waypoints(NUM_DEP_DEST_POINTS, CENTER_LAT, CENTER_LON, AREA_RADIUS, angle)
 
-        for fix_idx, dep_fix in enumerate(dest_fixes):
+        for fix_idx, dep_fix in enumerate(dest_waypoints):
             fix_lat, fix_lon = dep_fix[0], dep_fix[1]
-            scnfile.write(zero_time_str + "DEFWPT DST{:03d},{:.6f},{:.6f},FIX\n".format(fix_idx + 1, fix_lat, fix_lon))
+            scnfile.write(zero_time_str + "DEFWPT DST{:03d},{:.6f},{:.6f},FIX\n".format(fix_idx, fix_lat, fix_lon))
 
         # Corridor waypoints
+        scnfile.write("\n# Corridor waypoints\n")
         scnfile.write(zero_time_str + "DEFWPT COR101,{:.6f},{:.6f},FIX\n".format(inner_left_bottom_lat, CENTER_LON))
         scnfile.write(zero_time_str + "DEFWPT COR201,{:.6f},{:.6f},FIX\n".format(inner_left_top_lat, CENTER_LON))
 
+        # Create aircaft
+        scnfile.write("\n# Create aircraft\n")
+        for ac_idx in [1]:
+            ac_str = create_random_aircraft_at_time(zero_time_str,
+                                                    ac_idx,
+                                                    NUM_DEP_DEST_POINTS,
+                                                    dep_waypoints,
+                                                    dest_waypoints)
+            scnfile.write(ac_str)
 
-def intersect_area_ring(CENTER_LAT, CENTER_LON, AREA_RADIUS, inner_right_top_lat, inner_right_top_lon, outer_right_top_lat, outer_right_top_lon):
+def intersect_area_ring(CENTER_LAT,
+                        CENTER_LON,
+                        AREA_RADIUS,
+                        inner_right_top_lat,
+                        inner_right_top_lon,
+                        outer_right_top_lat,
+                        outer_right_top_lon):
     """
     Calculate the intersection point and angle from the center coordinate
     to that point between the area radius and the upper angled side of the
@@ -224,26 +236,30 @@ def intersect_area_ring(CENTER_LAT, CENTER_LON, AREA_RADIUS, inner_right_top_lat
     (right_lat, right_lon) = (outer_right_top_lat, outer_right_top_lon)
 
     mid_lat, mid_lon = tg.calc_midpoint(left_lat, left_lon, right_lat, right_lon)
-    qdr, dist = bsgeo.qdrdist(CENTER_LAT, CENTER_LAT, mid_lat, mid_lon)
+    qdr_from_center, dist_from_center = bsgeo.qdrdist(CENTER_LAT, CENTER_LAT, mid_lat, mid_lon)
 
     while True:
-        if abs(dist - AREA_RADIUS) < 0.1:
+        if abs(dist_from_center - AREA_RADIUS) < 0.1:
             break
 
-        if dist > AREA_RADIUS:
+        if dist_from_center > AREA_RADIUS:
             right_lat, right_lon = mid_lat, mid_lon
-        elif dist < AREA_RADIUS:
+        elif dist_from_center < AREA_RADIUS:
             left_lat, left_lon = mid_lat, mid_lon
 
         mid_lat, mid_lon = tg.calc_midpoint(left_lat, left_lon, right_lat, right_lon)
-        qdr, dist = bsgeo.qdrdist(CENTER_LAT, CENTER_LON, mid_lat, mid_lon)
+        qdr_from_center, dist_from_center = bsgeo.qdrdist(CENTER_LAT, CENTER_LON, mid_lat, mid_lon)
 
-    angle = ar.ned2crs(qdr)
+    angle = ar.ned2crs(qdr_from_center)
 
     return mid_lat, mid_lon, angle
 
 
-def calc_departure_waypoints(NUM_DEP_DEST_POINTS, CENTER_LAT, CENTER_LON, AREA_RADIUS, angle):
+def calc_departure_waypoints(NUM_DEP_DEST_POINTS,
+                             CENTER_LAT,
+                             CENTER_LON,
+                             AREA_RADIUS,
+                             angle):
     """
     Calculate the locations of all departure waypoints on the area edge.
     """
@@ -255,7 +271,11 @@ def calc_departure_waypoints(NUM_DEP_DEST_POINTS, CENTER_LAT, CENTER_LON, AREA_R
     return waypoints
 
 
-def calc_destination_waypoints(NUM_DEP_DEST_POINTS, CENTER_LAT, CENTER_LON, AREA_RADIUS, angle):
+def calc_destination_waypoints(NUM_DEP_DEST_POINTS,
+                               CENTER_LAT,
+                               CENTER_LON,
+                               AREA_RADIUS,
+                               angle):
     """
     Calculate the locations of all destination waypoints on the area edge.
     """
@@ -266,6 +286,36 @@ def calc_destination_waypoints(NUM_DEP_DEST_POINTS, CENTER_LAT, CENTER_LON, AREA
 
     return waypoints
 
+def create_random_aircraft_at_time(time,
+                                   ac_idx,
+                                   NUM_DEP_DEST_POINTS,
+                                   dep_waypoints,
+                                   dest_waypoints):
+    """ """
+
+    ac_type = "B744"
+    ac_alt = "36000"
+    ac_spd = "280"
+    ac_hdg = "360"
+
+    dep_wp_idx = random.randint(0, NUM_DEP_DEST_POINTS)
+    dest_wp_idx = random.randint(0, NUM_DEP_DEST_POINTS)
+
+    (ac_lat, ac_lon) = dep_waypoints[dep_wp_idx]
+
+    aircraft_str = time + "CRE AC{:03d} {},{:.6f},{:.6f},{},{},{}\n".format(ac_idx,
+                                                                            ac_type,
+                                                                            ac_lat,
+                                                                            ac_lon,
+                                                                            ac_hdg,
+                                                                            ac_alt,
+                                                                            ac_spd)
+
+    aircraft_str += time + "AC{:03d} ADDWPT COR101\n".format(ac_idx)
+    aircraft_str += time + "AC{:03d} ADDWPT COR201\n".format(ac_idx)
+    aircraft_str += time + "AC{:03d} ADDWPT DST{:03d}\n".format(ac_idx, dest_wp_idx)
+
+    return aircraft_str
 
 if __name__ == "__main__":
     main()
