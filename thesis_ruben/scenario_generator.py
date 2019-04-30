@@ -7,7 +7,8 @@ involving the area_restriction.py module.
 
 # Python imports
 import math
-import sys, os
+import sys
+import os
 import time
 import random
 
