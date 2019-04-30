@@ -1,52 +1,49 @@
-""" BlueSky traffic implementation."""
+"""
+This module implements the traffic functionalities of BlueSky through
+the Traffic class.
+"""
+
+# Python imports
 from __future__ import print_function
+from math import *
+from random import randint
 try:
     from collections.abc import Collection
 except ImportError:
     # In python <3.3 collections.abc doesn't exist
     from collections import Collection
+
+# Third-party imports
 import numpy as np
-from math import *
-from random import randint
+
+# BlueSky imports
 import bluesky as bs
+from bluesky import settings
 from bluesky.tools import geo
 from bluesky.tools.misc import latlon2txt
 from bluesky.tools.aero import fpm, kts, ft, g0, Rearth, nm, \
                          vatmos,  vtas2cas, vtas2mach, vcasormach
-
 from bluesky.tools.trafficarrays import TrafficArrays, RegisterElementParameters
 
-from .windsim import WindSim
-from .conditional import Condition
-from .trails import Trails
+# Local imports
 from .adsbmodel import ADSB
-from .asas import ASAS
-from .pilot import Pilot
-from .autopilot import Autopilot
 from .activewpdata import ActiveWaypoint
-from .turbulence import Turbulence
+from .asas import ASAS
+from .autopilot import Autopilot
+from .conditional import Condition
+from .performance import Perf
+from .pilot import Pilot
 from .trafficgroups import TrafficGroups
-
-from bluesky import settings
+from .trails import Trails
+from .turbulence import Turbulence
+from .windsim import WindSim
 
 # Register settings defaults
-settings.set_variable_defaults(performance_model='openap', snapdt=1.0, instdt=1.0, skydt=1.0, asas_pzr=5.0, asas_pzh=1000.0)
-
-if settings.performance_model == 'bada':
-    try:
-        print('Using BADA Performance model')
-        from .performance.bada.perfbada import PerfBADA as Perf
-    except Exception as err:# ImportError as err:
-        print(err)
-        print('Falling back to Open Aircraft Performance (OpenAP) model')
-        settings.performance_model = "openap"
-        from .performance.openap import OpenAP as Perf
-elif settings.performance_model == 'openap':
-    print('Using Open Aircraft Performance (OpenAP) model')
-    from .performance.openap import OpenAP as Perf
-else:
-    print('Using BlueSky legacy performance model')
-    from .performance.legacy.perfbs import PerfBS as Perf
+settings.set_variable_defaults(snapdt=1.0,
+                               instdt=1.0,
+                               skydt=1.0,
+                               asas_pzr=5.0,
+                               asas_pzh=1000.0)
 
 
 class Traffic(TrafficArrays):
