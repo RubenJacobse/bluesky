@@ -1,50 +1,49 @@
-""" BlueSky traffic implementation."""
+"""
+This module implements the traffic functionalities of BlueSky through
+the Traffic class.
+"""
+
+# Python imports
 from __future__ import print_function
+from math import *
+from random import randint
 try:
     from collections.abc import Collection
 except ImportError:
     # In python <3.3 collections.abc doesn't exist
     from collections import Collection
+
+# Third-party imports
 import numpy as np
-from math import *
-from random import randint
+
+# BlueSky imports
 import bluesky as bs
+from bluesky import settings
 from bluesky.tools import geo
 from bluesky.tools.misc import latlon2txt
 from bluesky.tools.aero import fpm, kts, ft, g0, Rearth, nm, \
                          vatmos,  vtas2cas, vtas2mach, vcasormach
-
 from bluesky.tools.trafficarrays import TrafficArrays, RegisterElementParameters
 
-from .windsim import WindSim
-from .conditional import Condition
-from .trails import Trails
+# Local imports
 from .adsbmodel import ADSB
-from .asas import ASAS
-from .pilot import Pilot
-from .autopilot import Autopilot
 from .activewpdata import ActiveWaypoint
+from .asas import ASAS
+from .autopilot import Autopilot
+from .conditional import Condition
+from .performance import Perf
+from .pilot import Pilot
+from .trafficgroups import TrafficGroups
+from .trails import Trails
 from .turbulence import Turbulence
-
-from bluesky import settings
+from .windsim import WindSim
 
 # Register settings defaults
-settings.set_variable_defaults(performance_model='openap', snapdt=1.0, instdt=1.0, skydt=1.0, asas_pzr=5.0, asas_pzh=1000.0)
-
-if settings.performance_model == 'bada':
-    try:
-        print('Using BADA Perfromance model')
-        from .performance.bada.perfbada import PerfBADA as Perf
-    except ImportError as err:
-        print(err.args[0])
-        print('Falling back to Open Aircraft Performance (OpenAP) model')
-        from .performance.openap import OpenAP as Perf
-elif settings.performance_model == 'openap':
-    print('Using Open Aircraft Performance (OpenAP) model')
-    from .performance.openap import OpenAP as Perf
-else:
-    print('Using BlueSky legacy performance model')
-    from .performance.legacy.perfbs import PerfBS as Perf
+settings.set_variable_defaults(snapdt=1.0,
+                               instdt=1.0,
+                               skydt=1.0,
+                               asas_pzr=5.0,
+                               asas_pzh=1000.0)
 
 
 class Traffic(TrafficArrays):
@@ -68,7 +67,7 @@ class Traffic(TrafficArrays):
         super(Traffic, self).__init__()
 
         # Traffic is the toplevel trafficarrays object
-        TrafficArrays.SetRoot(self)
+        TrafficArrays.set_class_root(self)
 
         self.ntraf = 0
 
@@ -85,6 +84,7 @@ class Traffic(TrafficArrays):
             # Positions
             self.lat     = np.array([])  # latitude [deg]
             self.lon     = np.array([])  # longitude [deg]
+            self.distflown = np.array([])  # distance travelled [m]
             self.alt     = np.array([])  # altitude [m]
             self.hdg     = np.array([])  # traffic heading [deg]
             self.trk     = np.array([])  # track angle [deg]
@@ -111,8 +111,9 @@ class Traffic(TrafficArrays):
             self.selvs  = np.array([])  # selected vertical speed [m/s]
 
             # Whether to perform LNAV and VNAV
-            self.swlnav   = np.array([], dtype=np.bool)
-            self.swvnav   = np.array([], dtype=np.bool)
+            self.swlnav    = np.array([], dtype=np.bool)
+            self.swvnav    = np.array([], dtype=np.bool)
+            self.swvnavspd = np.array([], dtype=np.bool)
 
             # Flight Models
             self.asas   = ASAS()
@@ -122,6 +123,9 @@ class Traffic(TrafficArrays):
             self.trails = Trails()
             self.actwp  = ActiveWaypoint()
             self.perf   = Perf()
+            
+            # Group Logic
+            self.groups = TrafficGroups()
 
             # Traffic performance data
             self.apvsdef  = np.array([])  # [m/s]default vertical speed of autopilot
@@ -188,9 +192,9 @@ class Traffic(TrafficArrays):
             if self.id.count(acid.upper()) > 0:
                 return False, acid + " already exists."  # already exists do nothing
             acid = [acid]
-
-        if isinstance(actype, str):
-            actype = n * [actype]
+        else:
+            # TODO: for a list of a/c, check each callsign
+            pass
 
         super(Traffic, self).create(n)
 
@@ -199,9 +203,13 @@ class Traffic(TrafficArrays):
 
         if aclat is None:
             aclat = np.random.rand(n) * (area[1] - area[0]) + area[0]
+        elif isinstance(aclat, (float, int)):
+            aclat = np.array(n * [aclat])
 
         if aclon is None:
             aclon = np.random.rand(n) * (area[3] - area[2]) + area[2]
+        elif isinstance(aclon, (float, int)):
+            aclon = np.array(n * [aclon])
 
         # Limit longitude to [-180.0, 180.0]
         if n == 1:
@@ -213,30 +221,31 @@ class Traffic(TrafficArrays):
 
         if achdg is None:
             achdg = np.random.randint(1, 360, n)
+        elif isinstance(achdg, (float, int)):
+            achdg = np.array(n * [achdg])
 
         if acalt is None:
             acalt = np.random.randint(2000, 39000, n) * ft
+        elif isinstance(acalt, (float, int)):
+            acalt = np.array(n * [acalt])
 
         if acspd is None:
             acspd = np.random.randint(250, 450, n) * kts
+        elif isinstance(acspd,(float, int)):
+            acspd = np.array(n * [acspd])
+
+        actype = n * [actype] if isinstance(actype, str) else actype
+        dest = n * [dest] if isinstance(dest, str) else dest
 
         # SAVEIC: save cre command when filled in
         # Special provision in case SAVEIC is on: then save individual CRE commands
         # Names of aircraft (acid) need to be recorded for saved future commands
         # And positions need to be the same in case of *MCRE"
-
-        if type(aclat)==float or type(aclat)==int:
-            bs.stack.savecmd(" ".join(["CRE", acid[0], actype[0],
-                                       str(aclat), str(aclon), str(int(round(achdg))),
-                                       str(int(round(acalt/ft))),
-                                       str(int(round(acspd/kts)))]))
-        else:
-            for i in range(n):
-                bs.stack.savecmd(" ".join([ "CRE", acid[i], actype[i],
-                                            str(aclat[i]), str(aclon[i]), str(int(round(achdg[i]))),
-                                            str(int(round(acalt[i]/ft))),
-                                            str(int(round(acspd[i]/kts)))]))
-
+        for i in range(n):
+            bs.stack.savecmd(" ".join([ "CRE", acid[i], actype[i],
+                                        str(aclat[i]), str(aclon[i]), str(int(round(achdg[i]))),
+                                        str(int(round(acalt[i]/ft))),
+                                        str(int(round(acspd[i]/kts)))]))
 
         # Aircraft Info
         self.id[-n:]   = acid
@@ -353,7 +362,7 @@ class Traffic(TrafficArrays):
         # If this is a multiple delete, sort first for list delete
         # (which will use list in reverse order to avoid index confusion)
         if isinstance(idx, Collection):
-            idx.sort()
+            idx = np.sort(idx)
 
         # Call the actual delete function
         super(Traffic, self).delete(idx)
@@ -377,13 +386,12 @@ class Traffic(TrafficArrays):
         self.adsb.update(simt)
 
         #---------- Fly the Aircraft --------------------------
-        self.ap.update(simt)     # Autopilot logic
-        self.asas.update(simt)   # Airboren Separation Assurance
+        self.ap.update()  # Autopilot logic
+        self.asas.update()  # Airboren Separation Assurance
         self.pilot.APorASAS()    # Decide autopilot or ASAS
 
-        #---------- OpenAP Performance Update ------------------------
-        if settings.performance_model == 'openap':
-            self.perf.update(simt)
+        #---------- Performance Update ------------------------
+        self.perf.update()
 
         #---------- Limit Speeds ------------------------------
         self.pilot.applylimits()
@@ -392,10 +400,6 @@ class Traffic(TrafficArrays):
         self.UpdateAirSpeed(simdt, simt)
         self.UpdateGroundSpeed(simdt)
         self.UpdatePosition(simdt)
-
-        #---------- Legacy and BADA Performance Update ------------------------
-        if settings.performance_model != 'openap':
-            self.perf.perf(simt)
 
         #---------- Simulate Turbulence -----------------------
         self.turbulence.Woosh(simdt)
@@ -412,8 +416,7 @@ class Traffic(TrafficArrays):
         delta_spd = self.pilot.tas - self.tas
         need_ax = np.abs(delta_spd) > kts     # small threshold
         self.ax = need_ax * np.sign(delta_spd) * self.perf.acceleration()
-        self.delspd = delta_spd  # class object for legacy performance models
-
+        
         # Update velocities
         self.tas = self.tas + self.ax * simdt
         self.cas = vtas2cas(self.tas, self.alt)
@@ -466,6 +469,7 @@ class Traffic(TrafficArrays):
         self.lat = self.lat + np.degrees(simdt * self.gsnorth / Rearth)
         self.coslat = np.cos(np.deg2rad(self.lat))
         self.lon = self.lon + np.degrees(simdt * self.gseast / self.coslat / Rearth)
+        self.distflown += self.gs * simdt
 
     def id2idx(self, acid):
         """Find index of aircraft id"""
@@ -553,7 +557,10 @@ class Traffic(TrafficArrays):
             if self.swlnav[idx] and route.nwp > 0 and route.iactwp >= 0:
 
                 if self.swvnav[idx]:
-                    lines = lines + "VNAV, "
+                    if self.swvnavspd[idx]:
+                        lines = lines + "VNAV (incl.VNAVSPD), "
+                    else:
+                        lines = lines + "VNAV (NOT VNAVSPD), "
 
                 lines += "LNAV to " + route.wpname[route.iactwp] + "\n"
 

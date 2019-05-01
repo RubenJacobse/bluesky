@@ -1,15 +1,18 @@
 #!/usr/bin/env python
 """ Main BlueSky start script """
-from __future__ import print_function
+
 import sys
 import traceback
 import bluesky as bs
 
-# Create custom system-wide exception handler. For now it replicates python's
-# default traceback message. This was added to counter a new PyQt5.5 feature
-# where unhandled exceptions would result in a qFatal with a very uninformative
-# message.
 def exception_handler(exc_type, exc_value, exc_traceback):
+    """
+    Create custom system-wide exception handler. For now it replicates Python's
+    default traceback message. This was added to counter a new PyQt5.5 feature
+    where unhandled exceptions would result in a qFatal with a very uninformative
+    message.
+    """
+
     traceback.print_exception(exc_type, exc_value, exc_traceback)
     sys.exit()
 
@@ -19,95 +22,102 @@ sys.excepthook = exception_handler
 
 def main():
     """
-        Start BlueSky: This is the main entrypoint for BlueSky.
-        Depending on settings and arguments passed it can start in different
-        modes. The central part of BlueSky consists of a server managing all
-        simulations, normally together with a gui. The different modes for this
-        are:
-        - server-gui: Start gui and simulation server
-        - server-headless: start server without gui
-        - client: start gui only, which can connect to an already running server
+    Start BlueSky: This is the main entry point for BlueSky. Depending on
+    settings and arguments passed it can start in different modes. The
+    central part of BlueSky consists of a server managing all simulations,
+    normally together with a gui. The different modes for this are:
 
-        A BlueSky server can start one or more simulation processes, which run
-        the actual simulations. These simulations can also be started completely
-        separate from all other BlueSky functionality, in the detached mode.
-        This is useful when calling bluesky from within another python
-        script/program. The corresponding modes are:
-        - sim: The normal simulation process started by a BlueSky server
-        - sim-detached: An isolated simulation node, without networking
+    - server-gui:       Start gui and simulation server
+    - server-headless:  Start server without gui
+    - client:           Start gui only, which can connect to an already
+                        running server
+
+    A BlueSky server can start one or more simulation processes, which run
+    the actual simulations. These simulations can also be started completely
+    separate from all other BlueSky functionality, in the detached mode.
+    This is useful when calling BlueSky from within another Python
+    script/program. The corresponding modes are:
+
+    - sim:              The normal simulation process started by a BlueSky server
+    - sim-detached:     An isolated simulation node, without networking
     """
-    # When importerror gives different name than (pip) install needs,
-    # also advise latest version
-    missingmodules = {"OpenGL": "pyopengl and pyopengl-accelerate",
-                      "PyQt4": "pyqt5"}
 
-    ### Parse command-line arguments ###
-    # BlueSky.py modes:
-    # server-gui: Start gui and simulation server
-    # client: start gui only, which can connect to an already running server
-    # server-headless: start server only
-    # detached: start only one simulation node, without networking
-    #   ==> useful for calling bluesky from within another python script/program
-    if '--detached' in sys.argv:
-        mode = 'sim-detached'
-    elif '--sim' in sys.argv:
-        mode = 'sim'
-    elif '--client' in sys.argv:
-        mode = 'client'
-    elif '--headless' in sys.argv:
-        mode = 'server-headless'
+    # Store keyword arguments passed to BlueSky during initialization
+    kwargs = {}
+
+    # Parse command-line arguments
+    if "--detached" in sys.argv:
+        mode = "sim-detached"
+    elif "--sim" in sys.argv:
+        mode = "sim"
+    elif "--client" in sys.argv:
+        mode = "client"
+    elif "--headless" in sys.argv:
+        mode = "server-headless"
     else:
-        mode = 'server-gui'
+        mode = "server-gui"
 
-    discovery = ('--discoverable' in sys.argv or mode[-8:] == 'headless')
+    # Determine if the BlueSky process should be discoverable (default is False)
+    if "--discoverable" in sys.argv or "headless" in mode:
+        kwargs["discovery"] = True
 
-    # Check if alternate config file is passed or a default scenfile
-    cfgfile = ''
-    scnfile = ''
-    for i in range(len(sys.argv)):
-        if len(sys.argv) > i + 1:
-            if sys.argv[i] == '--config-file':
-                cfgfile = sys.argv[i + 1]
-            elif sys.argv[i] == '--scenfile':
-                scnfile = sys.argv[i + 1]
+    # Check if alternate config file is passed
+    if "--config-file" in sys.argv:
+        idx = sys.argv.index("--config-file")
+        try:
+            kwargs["cfgfile"] = sys.argv[idx + 1]
+        except IndexError:
+            print("Missing argument for '--config-file', using default config file")
 
-    # Catch import errors
+    # Check if default scenario file is passed
+    if "--scenfile" in sys.argv:
+        idx = sys.argv.index("--scenfile")
+        try:
+            kwargs["scnfile"] = sys.argv[idx + 1]
+        except IndexError:
+            print("Missing argument for '--scenfile', no scenario file will be loaded")
+
+    # Catch Python module import errors
     try:
-        # Initialize bluesky modules
-        bs.init(mode, discovery=discovery, cfgfile=cfgfile, scnfile=scnfile)
+        # Initialize BlueSky modules
+        bs.init(mode, **kwargs)
 
         # Only start a simulation node if called with --sim or --detached
-        if mode[:3] == 'sim':
-            bs.sim.start()
-        else:
-            # Only print start message in the non-sim cases to avoid printing
-            # this for every started node
-            print("   *****   BlueSky Open ATM simulator *****")
-            print("Distributed under GNU General Public License v3")
+        if mode == "sim":
+            bs.sim.connect()
+            bs.sim.run()
+        elif mode == "sim-detached":
+            bs.sim.run()
 
-        # Start server if server/gui or server-headless is started here
-        if mode[:6] == 'server':
-            if mode[-8:] == 'headless':
-                bs.server.run()
-            else:
-                bs.server.start()
+        # Start server if server-gui or server-headless is started here
+        if mode == "server-gui":
+            bs.server.start()
+        elif mode == "server-headless":
+            bs.server.run()
 
         # Start gui if client or main server/gui combination is started here
-        if mode in ('client', 'server-gui'):
+        if mode in ("client", "server-gui"):
             from bluesky.ui import qtgl
             qtgl.start(mode)
 
     # Give info on missing module
     except ImportError as error:
+        # When ImportError gives different name than (pip) install needs,
+        # also advise latest version
+        missingmodules = {"OpenGL": "pyopengl and pyopengl-accelerate"}
+
         modulename = missingmodules.get(error.name) or error.name
+
+        # Will crash program if ImportError source is unknown
         if modulename is None:
             raise error
-        print("Bluesky needs", modulename)
-        print("Install using e.g. pip install", modulename)
+        else:
+            print("BlueSky needs Python package: {}".format(modulename))
+            print("Install using e.g. 'pip install {}'".format(modulename))
 
     print('BlueSky normal end.')
 
 
 if __name__ == "__main__":
-    # Run mainloop if BlueSky is called directly
+    # Run main loop if BlueSky is called directly
     main()
