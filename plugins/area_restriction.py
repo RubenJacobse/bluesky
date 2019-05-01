@@ -185,7 +185,7 @@ class AreaRestrictionManager(TrafficArrays):
         self.num_traf = 0
 
         # Default look-ahead-time in seconds, used to detect aircraft-area conflicts
-        self.t_lookahead = 300
+        self.t_lookahead = 120
 
     def MakeParameterLists(self, keys):
         """
