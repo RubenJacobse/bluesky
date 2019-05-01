@@ -174,7 +174,7 @@ class AreaRestrictionManager(TrafficArrays):
             # =======================
             # Traffic parameter lists
             # =======================
-            self.first_conflict_area_idx = [] # Store index of closest conflicting area
+            self.closest_conflicting_area_idx = [] # Store index of closest conflicting area
             self.current_position = []  # Shapely Point with current aircraft positions
             self.relative_track = []  # Shapely LineString with relative tracks
 
@@ -596,21 +596,20 @@ class AreaRestrictionManager(TrafficArrays):
         # Ensure delta v vectors are reset each time step
         self.reso_dv_east = np.zeros(np.shape(bs.traf.id))
         self.reso_dv_north = np.zeros(np.shape(bs.traf.id))
+        self.closest_conflicting_area_idx = [None] * self.num_traf
 
         # Loop over all aircraft-area combinations and for each aircraft store the
         # index of the area where the time to intrusion is the smallest positive number.
         for ac_idx, t_int_column in enumerate(self.time_to_intrusion.T):
+            curr_lowest_t_int = 1e9
             for area_idx, t_int in enumerate(t_int_column):
-                if not self.first_conflict_area_idx[ac_idx] and t_int > 0:
-                    self.first_conflict_area_idx[ac_idx] = area_idx
-                elif (self.first_conflict_area_idx[ac_idx]
-                      and t_int > 0
-                      and t_int < self.first_conflict_area_idx[ac_idx]):
-                    self.first_conflict_area_idx[ac_idx] = area_idx
+                if t_int >= 0 and t_int < curr_lowest_t_int:
+                    self.closest_conflicting_area_idx[ac_idx] = area_idx
+                    curr_lowest_t_int = t_int
 
         # Find indices of conflicting aircraft-area pairs
         conflict_pairs = [(ac_idx, area_idx) for ac_idx, area_idx \
-                          in enumerate(self.first_conflict_area_idx) if area_idx is not None]
+                          in enumerate(self.closest_conflicting_area_idx) if area_idx is not None]
 
         # Per area, calculate resolution vectors for all aircraft conflicting with that area
         for area_idx in range(self.num_areas):
@@ -775,9 +774,10 @@ class AreaRestrictionManager(TrafficArrays):
         new_v = np.sqrt(new_v_east ** 2 + new_v_north ** 2)
         new_crs = np.degrees(np.arctan2(new_v_east, new_v_north)) % 360
 
-        print("{} in conflict with {}, turning to course {:.2f} degrees"\
-            .format(bs.traf.id[ac_idx], 
-                    self.area_ids[self.first_conflict_area_idx[ac_idx]], 
+        print("t={}s : {} in conflict with {}, turning to course {:.2f} degrees" \
+            .format(int(bs.sim.simt),
+                    bs.traf.id[ac_idx], 
+                    self.area_ids[self.closest_conflicting_area_idx[ac_idx]], 
                     new_crs))
 
         self.stack_reso_apply(ac_idx, new_crs, new_v)
