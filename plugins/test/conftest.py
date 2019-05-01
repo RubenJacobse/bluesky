@@ -15,7 +15,7 @@ class MockTraf(TrafficArrays):
         super().__init__()
 
         # Set this object as the root of the TrafficArrays tree
-        TrafficArrays.SetRoot(self)
+        TrafficArrays.set_class_root(self)
 
         self.ntraf = 0
 

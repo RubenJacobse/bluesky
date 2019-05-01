@@ -187,9 +187,9 @@ class AreaRestrictionManager(TrafficArrays):
         # Default look-ahead-time in seconds, used to detect aircraft-area conflicts
         self.t_lookahead = 120
 
-    def MakeParameterLists(self, keys):
+    def make_parameter_lists(self, keys):
         """
-        Override default TrafficArrays.MakeParameterLists() to include
+        Override default TrafficArrays.make_parameter_lists() to include
         support for n-dimensional numpy arrays.
         """
 
