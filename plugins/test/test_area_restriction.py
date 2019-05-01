@@ -55,11 +55,11 @@ def test_arm_init(MockTraf_, AreaRestrictionManager_, areafilter_, mocktraf_):
     assert AreaRestrictionManager_.area_ids == []
     assert AreaRestrictionManager_.num_areas == 0
     assert AreaRestrictionManager_.num_traf == 0
-    assert AreaRestrictionManager_.t_lookahead == 300
+    assert AreaRestrictionManager_.t_lookahead == 120
 
     # Check that all traffic variables have been registered properly
-    lstVarList = ["first_conflict_area_idx", "current_position", "relative_track"]
-    ArrVarList = ["crs_to_active_wp", "crs_to_next_wp"]
+    lstVarList = ["closest_conflicting_area_idx", "current_position", "relative_track"]
+    ArrVarList = ["idx_active_wp", "idx_next_wp", "crs_to_active_wp", "crs_to_next_wp", "reso_dv_east", "reso_dv_north", "is_in_area_reso", "is_in_aircraft_reso", "commanded_crs", "commanded_spd"]
     ndArrVarList = ["rel_gseast", "rel_gsnorth", "brg_left_tangent", "brg_right_tangent", \
                     "is_in_conflict", "is_inside", "time_to_intrusion"]
     assert all(x in AreaRestrictionManager_._LstVars for x in lstVarList)
@@ -69,7 +69,7 @@ def test_arm_init(MockTraf_, AreaRestrictionManager_, areafilter_, mocktraf_):
 def test_arm_set_t_lookahead(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
     """ Test the set_t_lookahead() setter method. """
 
-    assert AreaRestrictionManager_.t_lookahead == 300
+    assert AreaRestrictionManager_.t_lookahead == 120
 
     # Set new value
     AreaRestrictionManager_.set_t_lookahead(600)
