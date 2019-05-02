@@ -699,13 +699,18 @@ class AreaRestrictionManager(TrafficArrays):
 
             # Determine which aircraft are in an aircraft-aircraft conflict
             # NOTE: To be implemented, for now always set to False
-            self.is_in_aircraft_conflict_mode[ac_idx] = False
+            self.is_in_aircraft_conflict_mode[ac_idx] = bs.traf.asas.active[ac_idx] # Curious what this does
 
             # Can only be in route following mode if not in either aircraft or area conflict
             if self.is_in_area_conflict_mode[ac_idx] or self.is_in_aircraft_conflict_mode[ac_idx]:
                 self.is_in_route_following_mode[ac_idx] = False
             else:
                 self.is_in_route_following_mode[ac_idx] = True
+
+        # print("\nt:{}".format(bs.sim.simt))
+        # print("area mode:     {}".format(self.is_in_area_conflict_mode))
+        # print("aircraft mode: {}".format(self.is_in_aircraft_conflict_mode))
+        # print("route mode:    {}".format(self.is_in_route_following_mode))
 
     def apply_mode_based_action(self):
         """
@@ -744,25 +749,26 @@ class AreaRestrictionManager(TrafficArrays):
                             bs.stack.stack("LNAV {},ON".format(bs.traf.id[ac_idx]))
                     else:
                         # Course not yet within margin of commanded course, continue manoeuver.
-                        print("t={}s : {} is manoeuvring, hdg: {:.2f}!".format(int(bs.sim.simt),
-                                                                         bs.traf.id[ac_idx],
-                                                                         bs.traf.hdg[ac_idx]))
-                        assert not bs.traf.asas.active[ac_idx]
+                        print("t={}s : {} is manoeuvring, hdg: {:.2f}, target: {:.2f}".format(int(bs.sim.simt),
+                                                                                              bs.traf.id[ac_idx],
+                                                                                              bs.traf.hdg[ac_idx],
+                                                                                              bs.traf.ap.trk[ac_idx]))
 
             if self.is_in_aircraft_conflict_mode[ac_idx] \
                     and not self.is_in_area_conflict_mode[ac_idx]:
                 pass
 
             if self.is_in_route_following_mode[ac_idx]:
-                # NOTE: current implementation is naive, could result in all sorts of turning
-                # behaviour if the active waypoint is behind the aircraft.
-                #
-                # Waypoint recovery after conflict: Find the next active waypoint
-                # and send the aircraft to that waypoint.
-                iwpid = bs.traf.ap.route[ac_idx].findact(ac_idx)
-                if iwpid != -1:  # To avoid problems if there are no waypoints
-                    bs.traf.ap.route[ac_idx].direct(ac_idx, bs.traf.ap.route[ac_idx].wpname[iwpid])
-
+                # # NOTE: current implementation is naive, could result in all sorts of turning
+                # # behaviour if the active waypoint is behind the aircraft.
+                # #
+                # # Waypoint recovery after conflict: Find the next active waypoint
+                # # and send the aircraft to that waypoint.
+                # iwpid = bs.traf.ap.route[ac_idx].findact(ac_idx)
+                # if iwpid != -1:  # To avoid problems if there are no waypoints
+                #     bs.traf.ap.route[ac_idx].direct(ac_idx, bs.traf.ap.route[ac_idx].wpname[iwpid])
+                pass
+                
     def perform_manoeuver(self, ac_idx):
         """
         Perform a resolution manoeuver to solve a conflict with a

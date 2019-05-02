@@ -457,29 +457,35 @@ class ASAS(TrafficArrays):
         # active the switch, if there are acids in the list
         self.swnoreso = len(self.noresolst) > 0
 
-    def SetResooff(self, resooffac=""):
+    def SetResooff(self, ac_reso_off=""):
         """
         ADD or Remove aircraft that will not avoid anybody else
         """
 
-        if resooffac is "":
-            return True, "NORESO [ACID]" + \
-                         "\nCurrent list of aircraft will not avoid anybody:" + \
+        if ac_reso_off is "":
+            return True, "RESOOFF [ACID]" + \
+                         "\nCurrent list of aircraft that will not avoid anybody:" + \
                          str(self.resoofflst)
 
-        # Split the input into separate aircraft ids if multiple acids are given
-        acids = resooffac.split(',') if len(resooffac.split(',')) > 1 else resooffac.split(' ')
+        # Split the input into separate aircraft ids if multiple ids are given
+        ac_ids = ac_reso_off.split(',') if len(ac_reso_off.split(',')) > 1 else ac_reso_off.split(' ')
 
-        # Remove acids if they are already in self.resoofflst. This is used to
+        # Remove ids if they are already in self.resoofflst. This is used to
         # delete aircraft from this list.
         # Else, add them to self.resoofflst. These aircraft will not avoid anybody
-        if set(acids) <= set(self.resoofflst):
-            self.resoofflst = [x for x in self.resoofflst if x not in set(acids)]
-        else:
-            self.resoofflst.extend(acids)
+        for ac_id in ac_ids:
+            ac_idx = bs.traf.id2idx(ac_id)
+            if ac_id in self.resoofflst:
+                self.resoofflst.remove(ac_id)
+                self.active[ac_idx] = True
+            else:
+                self.resoofflst.append(ac_id)
+                self.active[ac_idx] = False
 
         # active the switch, if there are acids in the list
         self.swresooff = len(self.resoofflst) > 0
+
+        return True, "RESOOFF set for {}".format(self.resoofflst)
 
     def SetVLimits(self, flag=None, spd=None):
         # Input is in knots
