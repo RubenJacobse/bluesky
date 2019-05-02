@@ -718,18 +718,17 @@ class AreaRestrictionManager(TrafficArrays):
         a resolution manoeuver.
         """
 
+        self.current_crs = ned2crs(bs.traf.trk)
         # NOTE: Some of the branches of the if-statements inside this loop are
         # redundant, but are still explicitly included to improve readability.
         for ac_idx in range(self.num_traf):
-            ac_current_crs = ned2crs(bs.traf.trk[ac_idx])
-
             if self.is_in_area_conflict_mode[ac_idx]:
                 if not self.is_in_area_reso[ac_idx]:
                     # Aircraft is not in a resolution manoeuver, must initiate a new one
                     self.perform_manoeuver(ac_idx)
                 else:
                     # Aircraft is already in a resolution manoeuver, check if it has been completed
-                    if abs(ac_current_crs - self.commanded_crs[ac_idx]) < COMMANDED_CRS_MARGIN:
+                    if abs(self.current_crs[ac_idx] - self.commanded_crs[ac_idx]) < COMMANDED_CRS_MARGIN:
                         if self.is_in_conflict[:, ac_idx].any():
                             # Current course within margin of commanded course, but still in
                             # conflict, perform new manoeuver.
@@ -749,10 +748,11 @@ class AreaRestrictionManager(TrafficArrays):
                             bs.stack.stack("LNAV {},ON".format(bs.traf.id[ac_idx]))
                     else:
                         # Course not yet within margin of commanded course, continue manoeuver.
-                        print("t={}s : {} is manoeuvring, hdg: {:.2f}, target: {:.2f}".format(int(bs.sim.simt),
-                                                                                              bs.traf.id[ac_idx],
-                                                                                              bs.traf.hdg[ac_idx],
-                                                                                              bs.traf.ap.trk[ac_idx]))
+                        print("t={}s : {} is manoeuvring, hdg: {:.2f}, target: {:.2f}, autopilot: {:.2f}".format(int(bs.sim.simt),
+                                                                                                                 bs.traf.id[ac_idx],
+                                                                                                                 bs.traf.hdg[ac_idx],
+                                                                                                                 self.commanded_crs[ac_idx],
+                                                                                                                 bs.traf.ap.trk[ac_idx]))
 
             if self.is_in_aircraft_conflict_mode[ac_idx] \
                     and not self.is_in_area_conflict_mode[ac_idx]:
@@ -762,25 +762,23 @@ class AreaRestrictionManager(TrafficArrays):
                 # # NOTE: current implementation is naive, could result in all sorts of turning
                 # # behaviour if the active waypoint is behind the aircraft.
                 # #
-                # # Waypoint recovery after conflict: Find the next active waypoint
-                # # and send the aircraft to that waypoint.
-                # iwpid = bs.traf.ap.route[ac_idx].findact(ac_idx)
-                # if iwpid != -1:  # To avoid problems if there are no waypoints
-                #     bs.traf.ap.route[ac_idx].direct(ac_idx, bs.traf.ap.route[ac_idx].wpname[iwpid])
-                pass
-                
+                # Waypoint recovery after conflict: Find the next active waypoint
+                # and send the aircraft to that waypoint.
+                iwpid = bs.traf.ap.route[ac_idx].findact(ac_idx)
+                if iwpid != -1:  # To avoid problems if there are no waypoints
+                    bs.traf.ap.route[ac_idx].direct(ac_idx, bs.traf.ap.route[ac_idx].wpname[iwpid])
+
     def perform_manoeuver(self, ac_idx):
         """
         Perform a resolution manoeuver to solve a conflict with a
         restricted airspace.
         """
 
-        # Ensure that autopilot is not in LNAV mode for this aircraft
-        bs.stack.stack("LNAV {},OFF".format(bs.traf.id[ac_idx]))
-
         # When in area resolution, ignore traffic conflicts
         bs.stack.stack("RESOOFF {}".format(bs.traf.id[ac_idx])) # Does not appear to do anything!
-        bs.traf.asas.active[ac_idx] = False
+
+        # Ensure that autopilot is not in LNAV mode for this aircraft
+        bs.stack.stack("LNAV {},OFF".format(bs.traf.id[ac_idx]))
 
         new_v_east = bs.traf.gseast[ac_idx] + self.reso_dv_east[ac_idx]
         new_v_north = bs.traf.gsnorth[ac_idx] + self.reso_dv_north[ac_idx]
