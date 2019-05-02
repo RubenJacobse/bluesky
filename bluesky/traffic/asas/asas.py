@@ -485,7 +485,7 @@ class ASAS(TrafficArrays):
         # active the switch, if there are acids in the list
         self.swresooff = len(self.resoofflst) > 0
 
-        return True, "RESOOFF set for {}".format(self.resoofflst)
+        return True, "RESOOFF is set for: {}".format(self.resoofflst)
 
     def SetVLimits(self, flag=None, spd=None):
         # Input is in knots
@@ -559,8 +559,11 @@ class ASAS(TrafficArrays):
             # Start recovery for ownship if intruder is deleted, or if past CPA
             # and not in horizontal LOS or a bouncing conflict
             if idx2 >= 0 and (not past_cpa or hor_los or is_bouncing):
-                # Enable ASAS for this aircraft
-                self.active[idx1] = True
+                if bs.traf.id[idx1] not in self.resoofflst:
+                    # Enable ASAS for this aircraft
+                    self.active[idx1] = True
+                else:
+                    self.active[idx1] = False
             else:
                 # Switch ASAS off for ownship
                 self.active[idx1] = False
