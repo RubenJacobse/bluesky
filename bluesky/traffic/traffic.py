@@ -5,7 +5,7 @@ the Traffic class.
 
 # Python imports
 from __future__ import print_function
-from math import *
+import math
 from random import randint
 try:
     from collections.abc import Collection
@@ -310,14 +310,14 @@ class Traffic(TrafficArrays):
         latref  = self.lat[targetidx]  # deg
         lonref  = self.lon[targetidx]  # deg
         altref  = self.alt[targetidx]  # m
-        trkref  = radians(self.trk[targetidx])
+        trkref  = math.radians(self.trk[targetidx])
         gsref   = self.gs[targetidx]   # m/s
         vsref   = self.vs[targetidx]   # m/s
         cpa     = cpa * nm
         pzr     = settings.asas_pzr * nm
         pzh     = settings.asas_pzh * ft
 
-        trk     = trkref + radians(dpsi)
+        trk     = trkref + math.radians(dpsi)
         gs      = gsref if spd is None else spd
         if dH is None:
             acalt = altref
@@ -328,20 +328,20 @@ class Traffic(TrafficArrays):
             acvs  = vsref - np.sign(dH) * (abs(dH) - pzh) / tlosv
 
         # Horizontal relative velocity vector
-        gsn, gse     = gs    * cos(trk),          gs    * sin(trk)
-        vreln, vrele = gsref * cos(trkref) - gsn, gsref * sin(trkref) - gse
+        gsn, gse     = gs    * math.cos(trk),          gs    * math.sin(trk)
+        vreln, vrele = gsref * math.cos(trkref) - gsn, gsref * math.sin(trkref) - gse
         # Relative velocity magnitude
-        vrel    = sqrt(vreln * vreln + vrele * vrele)
+        vrel    = math.sqrt(vreln * vreln + vrele * vrele)
         # Relative travel distance to closest point of approach
-        drelcpa = tlosh * vrel + (0 if cpa > pzr else sqrt(pzr * pzr - cpa * cpa))
+        drelcpa = tlosh * vrel + (0 if cpa > pzr else math.sqrt(pzr * pzr - cpa * cpa))
         # Initial intruder distance
-        dist    = sqrt(drelcpa * drelcpa + cpa * cpa)
+        dist    = math.sqrt(drelcpa * drelcpa + cpa * cpa)
         # Rotation matrix diagonal and cross elements for distance vector
         rd      = drelcpa / dist
         rx      = cpa / dist
         # Rotate relative velocity vector to obtain intruder bearing
-        brn     = degrees(atan2(-rx * vreln + rd * vrele,
-                                 rd * vreln + rx * vrele))
+        brn     = math.degrees(math.atan2(-rx * vreln + rd * vrele,
+                                          rd * vreln + rx * vrele))
 
         # Calculate intruder lat/lon
         aclat, aclon = geo.qdrpos(latref, lonref, brn, dist / nm)
@@ -349,8 +349,8 @@ class Traffic(TrafficArrays):
         # convert groundspeed to CAS, and track to heading
         wn, we     = self.wind.getdata(aclat, aclon, acalt)
         tasn, tase = gsn - wn, gse - we
-        acspd      = vtas2cas(sqrt(tasn * tasn + tase * tase), acalt)
-        achdg      = degrees(atan2(tase, tasn))
+        acspd      = vtas2cas(math.sqrt(tasn * tasn + tase * tase), acalt)
+        achdg      = math.degrees(math.atan2(tase, tasn))
 
         # Create and, when necessary, set vertical speed
         self.create(1, actype, acalt, acspd, None, aclat, aclon, achdg, acid)
@@ -387,7 +387,7 @@ class Traffic(TrafficArrays):
 
         #---------- Fly the Aircraft --------------------------
         self.ap.update()  # Autopilot logic
-        self.asas.update()  # Airboren Separation Assurance
+        self.asas.update()  # Airborne Separation Assurance
         self.pilot.APorASAS()    # Decide autopilot or ASAS
 
         #---------- Performance Update ------------------------
