@@ -698,6 +698,11 @@ class AreaRestrictionManager(TrafficArrays):
                 self.is_in_area_conflict_mode[ac_idx] = False
 
             # Determine which aircraft are in an aircraft-aircraft conflict
+            if not self.is_in_area_conflict_mode[ac_idx]:
+                self.is_in_aircraft_conflict_mode[ac_idx] = bs.traf.asas.active[ac_idx]
+            else:
+                self.is_in_aircraft_conflict_mode[ac_idx] = False
+
             # NOTE: To be implemented, for now always set to False
             self.is_in_aircraft_conflict_mode[ac_idx] = bs.traf.asas.active[ac_idx] # Curious what this does
 
