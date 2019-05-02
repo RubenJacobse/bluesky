@@ -3,6 +3,7 @@
 0:00:00.00>DT 0.05
 0:00:00.00>TRAIL ON
 0:00:00.00>SWRAD SYM
+0:00:00.00>SWRAD LABEL
 # First area conflict occurs at this time
 # 0:00:00.00>FF 460 
 

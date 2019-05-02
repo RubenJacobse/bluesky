@@ -68,6 +68,7 @@ def main():
         scnfile.write(zero_time_str + "DT {}\n".format(SIM_TIME_STEP))
         scnfile.write(zero_time_str + "TRAIL {}\n".format("ON" if SHOW_AC_TRAILS else "OFF"))
         scnfile.write(zero_time_str + "SWRAD {}\n".format("SYM"))
+        scnfile.write(zero_time_str + "SWRAD {}\n".format("LABEL"))
         scnfile.write(zero_time_str + "FF\n")
 
         scnfile.write("\n# Setup circular experiment area and activate it" \
@@ -223,7 +224,7 @@ def main():
         scnfile.write("\n# Create aircraft")
         creation_time = 0
         for ac_idx in range(NUM_EXPERIMENT_AIRCRAFT):
-            creation_time = creation_time + random.randint(30,90)
+            creation_time = creation_time + random.randint(30,60)
             creation_time_str = time.strftime('%H:%M:%S', time.gmtime(creation_time))
             creation_time_str = "{}.00>".format(creation_time_str)
             ac_str = create_random_aircraft_at_time(creation_time_str,
