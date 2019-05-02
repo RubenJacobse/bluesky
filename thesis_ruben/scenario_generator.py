@@ -76,6 +76,7 @@ def main():
         scnfile.write(zero_time_str + "CIRCLE EXPERIMENT {},{},{}\n"\
             .format(CENTER_LAT, CENTER_LON, AREA_RADIUS))
         scnfile.write(zero_time_str + "AREA EXPERIMENT\n")
+        scnfile.write(zero_time_str + "COLOR EXPERIMENT 0,128,0\n")
 
         scnfile.write("\n# Setup BlueSky ASAS module options\n")
         scnfile.write(zero_time_str + "ASAS {}\n".format("ON" if ASAS_ON else "OFF"))
@@ -130,6 +131,7 @@ def main():
                                                         outer_left_bottom_lat, outer_left_bottom_lon,
                                                         inner_left_bottom_lat, inner_left_bottom_lon)
         scnfile.write(zero_time_str + "RAA RAA1,ON,{},{},{}\n".format(0, 0, left_coords))
+        scnfile.write(zero_time_str + "COLOR RAA1,164,0,0\n")
         scnfile.write(zero_time_str + "DEFWPT RAA_1,{},{},FIX\n".format(CENTER_LAT, (inner_left_bottom_lon + left_outer_lon) / 2))
 
         # Calculate all coordinate values
@@ -182,6 +184,7 @@ def main():
                                                         outer_right_bottom_lat, outer_right_bottom_lon,
                                                         inner_right_bottom_lat, inner_right_bottom_lon)
         scnfile.write(zero_time_str + "RAA RAA2,ON,{},{},{}\n".format(0, 0, right_coords))
+        scnfile.write(zero_time_str + "COLOR RAA2,164,0,0\n")
         scnfile.write(zero_time_str + "DEFWPT RAA_2,{},{},FIX\n".format(CENTER_LAT, (inner_right_bottom_lon + right_outer_lon) / 2))
 
         # First find angle to intersection point of angled restriction edge and experiment area
