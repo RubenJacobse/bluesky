@@ -4,8 +4,14 @@
 0:00:00.00>TRAIL ON
 0:00:00.00>SWRAD SYM
 0:00:00.00>SWRAD LABEL
+# 0:00:00.00>FF
+
 # First area conflict occurs at this time
 # 0:00:00.00>FF 460 
+
+# AC006 Fails to complete manoeuver
+0:00:00.00>FF 879
+0:14:11.00>DEL AC001
 
 # Setup circular experiment area and activate it as a traffic area in BlueSky
 0:00:00.00>PLUGINS LOAD AREA
