@@ -492,8 +492,6 @@ class ASAS(TrafficArrays):
         # active the switch, if there are acids in the list
         self.swresooff = len(self.resoofflst) > 0
 
-        return True, "RESOOFF is set for: {}".format(self.resoofflst)
-
     def SetVLimits(self, flag=None, spd=None):
         # Input is in knots
         if flag is None:
