@@ -88,11 +88,11 @@ def main():
 
         # Area on left side of corridor
         #
-        inner_left_top_lat, _ = bsgeo.qdrpos(CENTER_LAT, CENTER_LON, 0, CORRIDOR_LENGTH)
-        _, inner_left_top_lon = bsgeo.qdrpos(CENTER_LAT, CENTER_LON, 270, CORRIDOR_WIDTH)
+        inner_left_top_lat, _ = bsgeo.qdrpos(CENTER_LAT, CENTER_LON, 0, CORRIDOR_LENGTH / 2)
+        _, inner_left_top_lon = bsgeo.qdrpos(CENTER_LAT, CENTER_LON, 270, CORRIDOR_WIDTH / 2 )
 
-        inner_left_bottom_lat, _ = bsgeo.qdrpos(CENTER_LAT, CENTER_LON, 180, CORRIDOR_LENGTH)
-        _, inner_left_bottom_lon = bsgeo.qdrpos(CENTER_LAT, CENTER_LON, 270, CORRIDOR_WIDTH)
+        inner_left_bottom_lat, _ = bsgeo.qdrpos(CENTER_LAT, CENTER_LON, 180, CORRIDOR_LENGTH / 2)
+        _, inner_left_bottom_lon = bsgeo.qdrpos(CENTER_LAT, CENTER_LON, 270, CORRIDOR_WIDTH / 2)
 
         ext_dist = AREA_RADIUS / math.sin(math.radians(RESTRICTION_ANGLE))
         ext_left_top_lat, ext_left_top_lon = bsgeo.qdrpos(inner_left_top_lat, inner_left_top_lon, 360 - RESTRICTION_ANGLE, ext_dist)
@@ -138,11 +138,11 @@ def main():
         # Calculate all coordinate values
         # Area on right side of corridor
         #
-        inner_right_top_lat, _ = bsgeo.qdrpos(CENTER_LAT, CENTER_LON, 0, CORRIDOR_LENGTH)
-        _, inner_right_top_lon = bsgeo.qdrpos(CENTER_LAT, CENTER_LON, 90, CORRIDOR_WIDTH)
+        inner_right_top_lat, _ = bsgeo.qdrpos(CENTER_LAT, CENTER_LON, 0, CORRIDOR_LENGTH / 2)
+        _, inner_right_top_lon = bsgeo.qdrpos(CENTER_LAT, CENTER_LON, 90, CORRIDOR_WIDTH / 2)
 
-        inner_right_bottom_lat, _ = bsgeo.qdrpos(CENTER_LAT, CENTER_LON, 180, CORRIDOR_LENGTH)
-        _, inner_right_bottom_lon = bsgeo.qdrpos(CENTER_LAT, CENTER_LON, 90, CORRIDOR_WIDTH)
+        inner_right_bottom_lat, _ = bsgeo.qdrpos(CENTER_LAT, CENTER_LON, 180, CORRIDOR_LENGTH / 2)
+        _, inner_right_bottom_lon = bsgeo.qdrpos(CENTER_LAT, CENTER_LON, 90, CORRIDOR_WIDTH / 2)
 
         ext_dist = AREA_RADIUS / math.sin(math.radians(RESTRICTION_ANGLE))
         ext_right_top_lat, ext_right_top_lon = bsgeo.qdrpos(inner_right_top_lat, inner_right_top_lon, RESTRICTION_ANGLE, ext_dist)
