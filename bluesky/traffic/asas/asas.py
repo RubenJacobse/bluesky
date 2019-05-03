@@ -592,11 +592,14 @@ class ASAS(TrafficArrays):
                 # Switch ASAS off for ownship
                 self.active[idx1] = False
 
-                # Waypoint recovery after conflict: Find the next active waypoint
-                # and send the aircraft to that waypoint.
-                iwpid = bs.traf.ap.route[idx1].findact(idx1)
-                if iwpid != -1:  # To avoid problems if there are no waypoints
-                    bs.traf.ap.route[idx1].direct(idx1, bs.traf.ap.route[idx1].wpname[iwpid])
+                if bs.traf.id[idx1] not in self.resoofflst:
+                    # This if statement is supposed to fix issue where resooff setting is ignored
+
+                    # Waypoint recovery after conflict: Find the next active waypoint
+                    # and send the aircraft to that waypoint.
+                    iwpid = bs.traf.ap.route[idx1].findact(idx1)
+                    if iwpid != -1:  # To avoid problems if there are no waypoints
+                        bs.traf.ap.route[idx1].direct(idx1, bs.traf.ap.route[idx1].wpname[iwpid])
 
                 # If conflict is solved, remove it from the resopairs list
                 delpairs.add(conflict)
