@@ -165,7 +165,6 @@ class ASAS(TrafficArrays):
         self.swasas = flag
         if not self.swasas:
             self.clear_conflict_database()
-            self.inconf = False
 
         return True, "ASAS module set to: {}".format("ON" if self.swasas else "OFF")
 
