@@ -689,9 +689,8 @@ class AreaRestrictionManager(TrafficArrays):
             - "lnav" :  in route following mode
         """
 
+        self.current_control_mode = [None] * self.num_traf
         for ac_idx in range(self.num_traf):
-            self.current_control_mode[ac_idx] = None
-
             if self.is_in_conflict[:, ac_idx].any() or self.is_in_area_reso[ac_idx]:
                 self.current_control_mode[ac_idx] = "area"
             elif bs.traf.asas.active[ac_idx]:
@@ -762,7 +761,7 @@ class AreaRestrictionManager(TrafficArrays):
                         bs.traf.ap.route[ac_idx].direct(ac_idx, bs.traf.ap.route[ac_idx].wpname[iwpid])
 
         # Remember current control mode for use in next time step
-        self.previous_control_mode = self.current_control_mode
+        self.previous_control_mode = [x for x in self.current_control_mode]
 
     def perform_manoeuver(self, ac_idx):
         """
