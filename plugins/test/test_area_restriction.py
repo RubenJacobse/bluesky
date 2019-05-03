@@ -614,23 +614,23 @@ def test_raa_is_left_of_line_true(areafilter_):
 ##################################################################################################
 # Tests for other functions defined in area_restriction.py
 ##################################################################################################
-def test_crs_mid():
-    """ Test the crs_mid function that returns the bisector course
+def test_crs_middle():
+    """ Test the crs_middle function that returns the bisector course
         dividing the angle between two courses in half. """
 
     # Test result when crs_left_tangent < crs_right_tangent
-    assert ar.crs_mid(0, 360) == 180
-    assert ar.crs_mid(10, 50) == 30
-    assert ar.crs_mid(160, 200) == 180
+    assert ar.crs_middle(0, 360) == 180
+    assert ar.crs_middle(10, 50) == 30
+    assert ar.crs_middle(160, 200) == 180
 
     # Test result when crs_right_tangent < crs_left_tangent
-    assert ar.crs_mid(350, 10) == 0
-    assert ar.crs_mid(330, 0) == 345
-    assert ar.crs_mid(340, 40) == 10
+    assert ar.crs_middle(350, 10) == 0
+    assert ar.crs_middle(330, 0) == 345
+    assert ar.crs_middle(340, 40) == 10
 
     # Test rsult when crs_left_tangent = crs_right_tangent
-    assert ar.crs_mid(220, 220) == 220
-    assert ar.crs_mid(360, 360) == 0
+    assert ar.crs_middle(220, 220) == 220
+    assert ar.crs_middle(360, 360) == 0
 
 def test_crs_is_between_true():
     """ Test the crs_is_between function that checks if a given course

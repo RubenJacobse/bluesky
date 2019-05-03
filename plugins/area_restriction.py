@@ -1065,7 +1065,7 @@ class RestrictedAirspaceArea():
                - (point[0] - line_start[0]) * (line_end[1] - line_start[1])
 
 
-def crs_mid(crs_left, crs_right):
+def crs_middle(crs_left, crs_right):
     """
     Find the course that forms the bisector of the angle
     between crs_left and crs_right (in clockwise direction).
