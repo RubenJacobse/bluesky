@@ -713,7 +713,7 @@ class Traffic(TrafficArrays):
         if key == "":
             return False, "AIRWAY needs waypoint or airway"
 
-        if bs.navdb.awid.count(key) > :
+        if bs.navdb.awid.count(key) > 0:
             return self.poscommand(key.upper())
         else:
             # Find connecting airway legs
@@ -728,7 +728,7 @@ class Traffic(TrafficArrays):
             if len(connect) > 0:
                 lines = ""
                 for c in connect:
-                    if len(c) > = 2:
+                    if len(c) >= 2:
                         # Add airway, direction, waypoint
                         lines = lines + c[0] + ": to " + c[1] + "\n"
                 return True, lines[:-1]  # exclude final newline
