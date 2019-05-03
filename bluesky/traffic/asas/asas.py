@@ -4,6 +4,13 @@ conflict detection and conflict resolution methods defined in separate
 modules.
 """
 
+# Python imports
+try:
+    from collections.abc import Collection
+except ImportError:
+    # In python <3.3 collections.abc doesn't exist
+    from collections import Collection
+
 # Third-party imports
 import numpy as np
 
@@ -509,8 +516,27 @@ class ASAS(TrafficArrays):
         self.tas[-n:] = bs.traf.tas[-n:]
         self.alt[-n:] = bs.traf.alt[-n:]
 
+    def delete(self, idx):
+        """
+        Delete one or more aircraft elements
+        """
+
+        if isinstance(idx, Collection):
+            idx = np.sort(idx)
+
+            for ac_idx in idx:
+                ac_id = bs.traf.id[ac_idx]
+                if ac_id in self.resoofflst:
+                    self.resoofflst.remove(ac_id)
+        else:
+            ac_id = bs.traf.id[ac_idx]
+            if ac_id in self.resoofflst:
+                self.resoofflst.remove(ac_id)
+
+        super().delete(idx)
+
     def ResumeNav(self):
-        """ 
+        """
         Decide for each aircraft in the conflict list whether the ASAS
         should be followed or not, based on if the aircraft pairs passed
         their CPA.
