@@ -40,6 +40,7 @@ SHOW_AC_TRAILS = True
 ASAS_ON = False
 ASAS_RESO_METHOD = "MVP"
 NUM_EXPERIMENT_AIRCRAFT = 100
+RMETHH = "BOTH"
 
 random.seed(1)
 
@@ -50,14 +51,14 @@ def main():
     """
 
     file_name = "C{}_{}_L{}_W{}_AR{}_A{}_NP{}_D-{}_R-{}.scn".format(CENTER_LAT,
-                                                        CENTER_LON,
-                                                        CORRIDOR_LENGTH,
-                                                        CORRIDOR_WIDTH,
-                                                        AREA_RADIUS,
-                                                        RESTRICTION_ANGLE,
-                                                        NUM_DEP_DEST_POINTS,
-                                                        "ON" if ASAS_ON else "OFF",
-                                                        ASAS_RESO_METHOD)
+                                                                    CENTER_LON,
+                                                                    CORRIDOR_LENGTH,
+                                                                    CORRIDOR_WIDTH,
+                                                                    AREA_RADIUS,
+                                                                    RESTRICTION_ANGLE,
+                                                                    NUM_DEP_DEST_POINTS,
+                                                                    "ON" if ASAS_ON else "OFF",
+                                                                    ASAS_RESO_METHOD)
 
     # Open file, overwrite if existing
     with open(file_name, "w+") as scnfile:
@@ -69,6 +70,7 @@ def main():
         scnfile.write(zero_time_str + "TRAIL {}\n".format("ON" if SHOW_AC_TRAILS else "OFF"))
         scnfile.write(zero_time_str + "SWRAD {}\n".format("SYM"))
         scnfile.write(zero_time_str + "SWRAD {}\n".format("LABEL"))
+        scnfile.write(zero_time_str + "SWRAD {}\n".format("WPT"))           
         scnfile.write(zero_time_str + "FF\n")
 
         scnfile.write("\n# Setup circular experiment area and activate it" \
@@ -82,6 +84,7 @@ def main():
         scnfile.write("\n# Setup BlueSky ASAS module options\n")
         scnfile.write(zero_time_str + "ASAS {}\n".format("ON" if ASAS_ON else "OFF"))
         scnfile.write(zero_time_str + "RESO {}\n".format(ASAS_RESO_METHOD))
+        scnfile.write(zero_time_str + "RMETHH {}\n".format(RMETHH))
 
         scnfile.write("\n# LOAD RAA plugin and create area restrictions\n")
         scnfile.write(zero_time_str + "PLUGINS LOAD {}\n".format(PLUGIN_NAME))
@@ -133,7 +136,7 @@ def main():
                                                         inner_left_bottom_lat, inner_left_bottom_lon)
         scnfile.write(zero_time_str + "RAA RAA1,ON,{},{},{}\n".format(0, 0, left_coords))
         scnfile.write(zero_time_str + "COLOR RAA1,164,0,0\n")
-        scnfile.write(zero_time_str + "DEFWPT RAA_1,{},{},FIX\n".format(CENTER_LAT, (inner_left_bottom_lon + left_outer_lon) / 2))
+        scnfile.write(zero_time_str + "DEFWPT RAA_1,{:.6f},{:.6f},FIX\n".format(CENTER_LAT, (inner_left_bottom_lon + left_outer_lon) / 2))
 
         # Calculate all coordinate values
         # Area on right side of corridor
@@ -186,7 +189,7 @@ def main():
                                                         inner_right_bottom_lat, inner_right_bottom_lon)
         scnfile.write(zero_time_str + "RAA RAA2,ON,{},{},{}\n".format(0, 0, right_coords))
         scnfile.write(zero_time_str + "COLOR RAA2,164,0,0\n")
-        scnfile.write(zero_time_str + "DEFWPT RAA_2,{},{},FIX\n".format(CENTER_LAT, (inner_right_bottom_lon + right_outer_lon) / 2))
+        scnfile.write(zero_time_str + "DEFWPT RAA_2,{:.6f},{:.6f},FIX\n".format(CENTER_LAT, (inner_right_bottom_lon + right_outer_lon) / 2))
 
         # First find angle to intersection point of angled restriction edge and experiment area
         # then find angle from center point
@@ -221,19 +224,86 @@ def main():
         scnfile.write(zero_time_str + "DEFWPT COR201,{:.6f},{:.6f},FIX\n".format(inner_left_top_lat, CENTER_LON))
 
         # Create aircaft
-        scnfile.write("\n# Create aircraft")
-        creation_time = 0
-        for ac_idx in range(NUM_EXPERIMENT_AIRCRAFT):
-            creation_time = creation_time + random.randint(30,60)
-            creation_time_str = time.strftime('%H:%M:%S', time.gmtime(creation_time))
-            creation_time_str = "{}.00>".format(creation_time_str)
-            ac_str = create_random_aircraft_at_time(creation_time_str,
-                                                    ac_idx,
-                                                    NUM_DEP_DEST_POINTS,
-                                                    dep_waypoints,
-                                                    dest_waypoints,
-                                                    [inner_left_bottom_lat, CENTER_LON])
-            scnfile.write('\n' + ac_str)
+        scnfile.write("\n# Create aircraft\n")
+
+        ac_spd = 280 # [kts] Speed
+        min_dist_diff = 6 # [nm]  Minimum distance at creation
+        min_time_diff = min_dist_diff / 280 * 3600 # [s] Minimum time difference at creation
+
+        # Store parameters of created aircraft
+        creation_time = []
+        creation_pos = []
+        creation_hdg = []
+        creation_dest = []
+        creation_dest_idx = []
+
+        num_created_ac = 0
+        while num_created_ac < NUM_EXPERIMENT_AIRCRAFT:
+            # Will be set True if creation results in a conflict
+            conflict = False
+
+            # Create an aircraft at random time and position
+            prev_time = creation_time[-1] if num_created_ac else 0
+            curr_time = prev_time + random.randint(30, 60)
+
+            curr_dep_wp_idx = random.randint(0, NUM_DEP_DEST_POINTS - 1) # dep wp idx
+            (curr_lat, curr_lon) = dep_waypoints[curr_dep_wp_idx]
+
+            curr_dest_wp_idx = random.randint(0, NUM_DEP_DEST_POINTS - 1) # dest wp idx
+            (dest_lat, dest_lon) = dest_waypoints[curr_dest_wp_idx]
+
+            # Heading to waypoint at start of corridor
+            curr_hdg, _ = bsgeo.qdrdist(curr_lat, curr_lon, inner_left_bottom_lat,  CENTER_LON)
+
+            # First generated aircraft is always accepted. Each aircraft thereafter has
+            # to have at least minimum separation (in space OR time) with all preceeding
+            # aircraft at the time its creation.
+            if num_created_ac > 0:
+                time_diff_lst = [curr_time - t for t in creation_time]
+                dist_diff_lst = [bsgeo.kwikdist(lat, lon, curr_lat, curr_lon) \
+                                     for (lat, lon) in creation_pos]
+
+                for time_diff, dist_diff in zip(time_diff_lst, dist_diff_lst):
+                    # Dist and time differences cannot both be smaller than minimum simultaneously
+                    if not (((dist_diff < min_dist_diff) and (time_diff > min_time_diff)) \
+                            or ((dist_diff > min_dist_diff) and (time_diff < min_time_diff))\
+                            or ((dist_diff > min_dist_diff) and (time_diff > min_time_diff))):
+                        conflict = True
+                        break # Break for loop
+
+            if conflict:
+                continue # Current aircraft is created in a conflict, try again...
+
+            # Keep track of created aircraft
+            creation_time.append(curr_time)
+            creation_pos.append((curr_lat, curr_lon))
+            creation_hdg.append(curr_hdg % 360)
+            creation_dest.append((dest_lat, dest_lon))
+            creation_dest_idx.append(curr_dest_wp_idx)
+
+            num_created_ac += 1
+
+        for ac_idx in range(num_created_ac):
+            # Type and altitude are always the same
+            ac_type = "B744"
+            ac_alt = "36000"
+
+            time_str = time.strftime('%H:%M:%S', time.gmtime(creation_time[ac_idx]))
+            time_str = "{}.00>".format(time_str)
+            aircraft_str = time_str + "CRE AC{:03d} {},{:.6f},{:.6f},{:.2f},{},{}\n"\
+                                            .format(ac_idx,
+                                                    ac_type,
+                                                    creation_pos[ac_idx][0],
+                                                    creation_pos[ac_idx][1],
+                                                    creation_hdg[ac_idx],
+                                                    ac_alt,
+                                                    ac_spd)
+
+            aircraft_str += time_str + "AC{:03d} ADDWPT COR101\n".format(ac_idx)
+            aircraft_str += time_str + "AC{:03d} ADDWPT COR201\n".format(ac_idx)
+            aircraft_str += time_str + "AC{:03d} ADDWPT DST{:03d}\n".format(ac_idx, creation_dest_idx[ac_idx])
+
+            scnfile.write("\n" + aircraft_str)
 
 def intersect_area_ring(CENTER_LAT,
                         CENTER_LON,
@@ -302,38 +372,6 @@ def calc_destination_waypoints(NUM_DEP_DEST_POINTS,
 
     return waypoints
 
-def create_random_aircraft_at_time(time,
-                                   ac_idx,
-                                   NUM_DEP_DEST_POINTS,
-                                   dep_waypoints,
-                                   dest_waypoints,
-                                   cor_entrypoint):
-    """ """
-
-    ac_type = "B744"
-    ac_alt = "36000"
-    ac_spd = "280"
-
-    dep_wp_idx = random.randint(0, NUM_DEP_DEST_POINTS - 1)
-    dest_wp_idx = random.randint(0, NUM_DEP_DEST_POINTS - 1)
-    (ac_lat, ac_lon) = dep_waypoints[dep_wp_idx]
-
-    ac_hdg, _ = bsgeo.qdrdist(ac_lat, ac_lon, cor_entrypoint[0], cor_entrypoint[1])
-    ac_hdg = ar.ned2crs(ac_hdg)
-
-    aircraft_str = time + "CRE AC{:03d} {},{:.6f},{:.6f},{:.2f},{},{}\n".format(ac_idx,
-                                                                            ac_type,
-                                                                            ac_lat,
-                                                                            ac_lon,
-                                                                            ac_hdg,
-                                                                            ac_alt,
-                                                                            ac_spd)
-
-    aircraft_str += time + "AC{:03d} ADDWPT COR101\n".format(ac_idx)
-    aircraft_str += time + "AC{:03d} ADDWPT COR201\n".format(ac_idx)
-    aircraft_str += time + "AC{:03d} ADDWPT DST{:03d}\n".format(ac_idx, dest_wp_idx)
-
-    return aircraft_str
 
 if __name__ == "__main__":
     main()
