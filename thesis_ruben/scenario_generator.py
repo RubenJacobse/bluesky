@@ -17,6 +17,7 @@ import numpy as np
 
 # Enable BlueSky imports by adding the project folder to the path
 sys.path.append(os.path.abspath(os.path.join('..')))
+sys.path.append(os.path.abspath(os.path.join('../plugins')))
 
 # BlueSky imports
 import plugins.area_restriction as ar
