@@ -29,10 +29,16 @@ from bluesky.tools.trafficarrays import TrafficArrays, RegisterElementParameters
 import tempgeo as tg
 
 # Default variable values for numpy arrays
-VAR_DEFAULTS = {"float": 0.0, "int": 0, "bool": False, "S": "", "str": "", "object": None}
-AREA_AVOIDANCE_CRS_MARGIN = 1 # [deg] Course margin for area avoidance
-COMMANDED_CRS_MARGIN = 0.2 # [deg] Used to verify if a commanded heading has been reached
-NM_TO_M = 1852. # Conversion factor nautical miles to metres
+VAR_DEFAULTS = {"float": 0.0,
+                "int": 0,
+                "bool": False,
+                "S": "",
+                "str": "",
+                "object": None}
+DEFAULT_AREA_T_LOOKAHEAD = 120  # [s]
+AREA_AVOIDANCE_CRS_MARGIN = 2  # [deg]
+COMMANDED_CRS_MARGIN = 0.2  # [deg] Used to verify if a commanded heading has been reached
+NM_TO_M = 1852.  # Conversion factor nautical miles to metres
 
 
 def init_plugin():
@@ -184,7 +190,7 @@ class AreaRestrictionManager(TrafficArrays):
         self.num_traf = 0
 
         # Default look-ahead-time in seconds, used to detect aircraft-area conflicts
-        self.t_lookahead = 120
+        self.t_lookahead = DEFAULT_AREA_T_LOOKAHEAD
 
     def make_parameter_lists(self, keys):
         """
@@ -332,7 +338,7 @@ class AreaRestrictionManager(TrafficArrays):
         self.area_ids = []
         self.num_areas = 0
         self.num_traf = 0
-        self.t_lookahead = 300
+        self.t_lookahead = DEFAULT_AREA_T_LOOKAHEAD
 
     def remove(self):
         """ Called when plugin is removed. """
@@ -452,14 +458,19 @@ class AreaRestrictionManager(TrafficArrays):
 
             return True, "Sucessfully deleted airspace restriction {}".format(area_id)
 
-    def set_t_lookahead(self, t):
+    def set_t_lookahead(self, new_t_lookahead):
         """ Change the look-ahead-time used for aircraft-area conflict detection. """
 
-        if not isinstance(t, int):
-            return False, "Error: Look-ahead-time should be an integer value"
+        if isinstance(new_t_lookahead, int):
+            self.t_lookahead = new_t_lookahead
+            is_set_to_new = True
+            console_str = "Aircraft-area conflict look-ahead-time set to {} seconds"\
+                .format(new_t_lookahead)
         else:
-            self.t_lookahead = t
-            return True, "Aircraft-area conflict look-ahead-time set to {} seconds".format(t)
+            is_set_to_new = False
+            console_str = "Error: Look-ahead-time should be an integer value"
+
+        return is_set_to_new, console_str
 
     def calculate_courses_to_waypoints(self):
         """
