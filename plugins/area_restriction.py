@@ -136,52 +136,62 @@ class AreaRestrictionManager(TrafficArrays):
         # Initialize TrafficArrays base class
         super().__init__()
 
+        # Store variable names of multidimensional numpy arrays
         self._ndArrVars = []
 
         # Register all traffic parameters relevant for this class
         with RegisterElementParameters(self):
-            # =================================================================================
-            # N-dimensional parameters where each column is an aircraft and each row is an area
-            # =================================================================================
-            self.rel_gseast = np.array([[]]) # [m/s] East component of relative velocity wrt areas
-            self.rel_gsnorth = np.array([[]]) # [m/s] North component of relative velocity wrt areas
-            self.rel_gs = np.array([[]]) # [m/s] Magnitude of ac relative velocity wrt areas
-            self.brg_left_tangent = np.array([[]]) # [deg] Bearing from ac to leftmost vertex in N-E-D [-180..180]
-            self.brg_right_tangent = np.array([[]]) # [deg] Bearing from ac to rightmost vertex in N-E-D [-180..180]
-            self.crs_left_tangent = np.array([[]]) # [deg] Compass course from ac to leftmost vertex [0..360]
-            self.crs_right_tangent = np.array([[]]) # [deg] Compass course from ac to rightmost vertex [0..360]
-            self.is_inside = np.array([[]], dtype=bool) # Stores whether ac is inside area
-            self.is_in_conflict = np.array([[]], dtype=bool) # Stores whether ac is in conflict with each area
-            self.time_to_intrusion = np.array([[]])  # [s] Time to area intrusion
+            # =========================================================
+            # N-dimensional parameters where each column is an aircraft
+            # and each row is an area
+            # =========================================================
+            # Relative ground speed and its components in [m/s]
+            self.rel_gs = np.array([[]])
+            self.rel_gseast = np.array([[]])
+            self.rel_gsnorth = np.array([[]])
+            # Bearings from ac tangent to each area in [deg] on [-180..180]
+            self.brg_left_tangent = np.array([[]])
+            self.brg_right_tangent = np.array([[]])
+            # Compass courses from ac tangent to each area in [deg]
+            self.crs_left_tangent = np.array([[]])
+            self.crs_right_tangent = np.array([[]])
+            # Conflict and intrusion variables
+            self.is_inside = np.array([[]], dtype=bool)
+            self.is_in_conflict = np.array([[]], dtype=bool)
+            self.time_to_intrusion = np.array([[]])  # [s]
 
             # ======================================================
             # Traffic parameters that are 1-dimensional numpy arrays
             # ======================================================
-
-            # Waypoint related
-            self.idx_active_wp = np.array([], dtype=int) # index of active waypoint
-            self.idx_next_wp = np.array([], dtype=int) # index of next waypoint
-            self.crs_to_active_wp = np.array([]) # [deg] Magnetic course to current waypoint
-            self.crs_to_next_wp = np.array([]) # [deg] Magnetic course to current waypoint
-
-            # Resolution related
-            self.reso_dv_east = np.array([]) # [m/s] Resolution velocity change east component
-            self.reso_dv_north = np.array([]) # [m/s] Resolution velocity change north component
+            # Waypoint indices in aircraft route
+            self.idx_active_wp = np.array([], dtype=int)
+            self.idx_next_wp = np.array([], dtype=int)
+            # Compass courses to waypoints on route in [deg]
+            self.crs_to_active_wp = np.array([])
+            self.crs_to_next_wp = np.array([])
+            # Resolution flags
             self.is_in_area_reso = np.array([], dtype=bool)
             self.is_in_aircraft_reso = np.array([], dtype=bool)
-            self.commanded_crs = np.array([])
-            self.commanded_spd = np.array([])
+            # Resolution-required velocity change components in [m/s]
+            self.reso_dv_east = np.array([])
+            self.reso_dv_north = np.array([])
+            # New course and speed commanded by resolution method
+            self.commanded_crs = np.array([])  # [deg]
+            self.commanded_spd = np.array([])  # [m/s]
 
             # =======================
             # Traffic parameter lists
             # =======================
-            self.closest_conflicting_area_idx = [] # Store index of closest conflicting area
-            self.current_position = []  # Shapely Point with current aircraft positions
-            self.relative_track = []  # Shapely LineString with relative tracks
-            
-            # Keep track of the avoidance state of each aircraft
-            self.current_control_mode = [] # Heading control mode in current time step
-            self.previous_control_mode = [] # Heading control mode in previous time step
+            self.closest_conflicting_area_idx = []
+            self.current_position = []  # Shapely Point (lon, lat)
+
+            # Aircraft track relative to each area. For n aircraft and m areas
+            # this will be filled with n lists each with m LineString elements
+            self.relative_track = []  # Shapely LineString [(lon, lat), (lon, lat)]
+
+            # Control mode for each aircraft during current and previous time step
+            self.current_control_mode = []
+            self.previous_control_mode = []
 
         # Keep track of all restricted areas in list and by ID (same order)
         self.areas = []
@@ -189,7 +199,8 @@ class AreaRestrictionManager(TrafficArrays):
         self.num_areas = 0
         self.num_traf = 0
 
-        # Default look-ahead-time in seconds, used to detect aircraft-area conflicts
+        # Default look-ahead-time in seconds, used to
+        # detect aircraft-area conflicts
         self.t_lookahead = DEFAULT_AREA_T_LOOKAHEAD
 
     def make_parameter_lists(self, keys):
@@ -331,7 +342,7 @@ class AreaRestrictionManager(TrafficArrays):
         # Make sure all areas are deleted
         for area in self.areas:
             area.delete()
-            self.areas.remove(area) # Probably redundant
+            self.areas.remove(area)  # Probably redundant
 
         # Reset default values
         self.areas = []
@@ -511,12 +522,12 @@ class AreaRestrictionManager(TrafficArrays):
         """
 
         # Represent each aircraft position as shapely point
-        self.current_position = [spgeom.Point(lon, lat) \
+        self.current_position = [spgeom.Point(lon, lat)
                                  for (lon, lat) in zip(bs.traf.lon, bs.traf.lat)]
 
-        # NOTE: we need to build this list of lists iteratively, otherwise each sub-element
-        # is a pointer to the same list, and the relative_track[idx].append() will append to ALL
-        # sub lists...
+        # NOTE: we need to build this list of lists iteratively, otherwise each
+        # sub-element is a pointer to the same list, and the relative_track[idx].append()
+        # will append to ALL sub lists...
         relative_track = [[] for i in range(self.num_traf)]
 
         # NOTE: Could this be vectorized instead of looped over all aircraft-area combinations?
@@ -533,11 +544,12 @@ class AreaRestrictionManager(TrafficArrays):
                                 self.rel_gsnorth[area_idx, :])
 
             # Create shapely points for future relative position
-            future_relative_position = [spgeom.Point(lon, lat) for (lon, lat) \
+            future_relative_position = [spgeom.Point(lon, lat) for (lon, lat)
                                         in zip(future_relative_lon, future_relative_lat)]
 
             # Use current and future relative position to calculate relative track
-            for ac_idx, (curr, fut) in enumerate(zip(self.current_position, future_relative_position)):
+            for ac_idx, (curr, fut) in enumerate(zip(self.current_position,
+                                                     future_relative_position)):
                 relative_track[ac_idx].append(spgeom.LineString([curr, fut]))
 
         self.relative_track = relative_track
@@ -578,7 +590,7 @@ class AreaRestrictionManager(TrafficArrays):
 
         for ac_idx in range(self.num_traf):
             if self.is_inside[area_idx, ac_idx]:
-                t_int = 0 # NOTE: If area avoidance works properly, this should never happen!
+                t_int = 0  # NOTE: If area avoidance works properly, this should never happen!
             elif self.is_in_conflict[area_idx, ac_idx]:
                 # Find intersection points of the relative vector with the area and use the
                 # distance to the closest point to calculate time-to-intersection. (We cannot
@@ -606,6 +618,7 @@ class AreaRestrictionManager(TrafficArrays):
         # Ensure delta v vectors are reset each time step
         self.reso_dv_east = np.zeros(np.shape(bs.traf.id))
         self.reso_dv_north = np.zeros(np.shape(bs.traf.id))
+
         self.closest_conflicting_area_idx = [None] * self.num_traf
 
         # Loop over all aircraft-area combinations and for each aircraft store the
@@ -618,7 +631,7 @@ class AreaRestrictionManager(TrafficArrays):
                     curr_lowest_t_int = t_int
 
         # Find indices of conflicting aircraft-area pairs
-        conflict_pairs = [(ac_idx, area_idx) for ac_idx, area_idx \
+        conflict_pairs = [(ac_idx, area_idx) for ac_idx, area_idx
                           in enumerate(self.closest_conflicting_area_idx) if area_idx is not None]
 
         # Per area, calculate resolution vectors for all aircraft conflicting with that area
@@ -643,39 +656,41 @@ class AreaRestrictionManager(TrafficArrays):
         u_r_east = np.sin(np.radians(self.brg_right_tangent[area_idx, ac_indices]))
         u_r_north = np.cos(np.radians(self.brg_right_tangent[area_idx, ac_indices]))
 
-        # For heading-change-only resolution maneuvers, the resolution vector lies on the edge of
-        # the Velocity Obstacle (or Collision Cone if area is non-moving). The vector magnitudes
-        # are the same as the current aircraft ground speeds (assuming zero wind).
+        # For heading-change-only resolution maneuvers, the resolution vector lies
+        # on the edge of the Velocity Obstacle (or Collision Cone if area is non-moving).
+        # The vector magnitudes are the same as the current aircraft ground speeds
+        # (assuming zero wind).
         if area.gs:
             # Find angles between -vrel and left- and right edges of VO using dot
             # product of -vrel and the unit vectors along the VO edges
-            beta_l_rad = np.arccos(-1 * (u_l_east * area.gseast + \
+            beta_l_rad = np.arccos(-1 * (u_l_east * area.gseast +
                                          u_l_north * area.gsnorth) / (area.gs ** 2))
-            beta_r_rad = np.arccos(-1 * (u_r_east * area.gseast + \
+            beta_r_rad = np.arccos(-1 * (u_r_east * area.gseast +
                                          u_r_north * area.gsnorth) / (area.gs ** 2))
 
             # Calculate relative resolution velocity component along the VO edges
             v_ul = ac_gs * np.cos(beta_l_rad) + ac_gs \
-                   * np.cos(np.arcsin(ac_gs * np.sin(beta_l_rad) / ac_gs))
+                * np.cos(np.arcsin(ac_gs * np.sin(beta_l_rad) / ac_gs))
             v_ur = ac_gs * np.cos(beta_r_rad) + ac_gs \
-                   * np.cos(np.arcsin(ac_gs * np.sin(beta_r_rad) / ac_gs))
+                * np.cos(np.arcsin(ac_gs * np.sin(beta_r_rad) / ac_gs))
         else:
             # Resolution velocity magnitudes on left- and right edges of CC
             v_ul = ac_gs
             v_ur = ac_gs
 
-        # Calculate north and east components of left- and right resolution absolute velocities
-        # (For a non moving area, area.gseast and area.gsnorth are simply 0, but for a moving area
-        # these terms are required to get the absolute resolution velocity of each aircraft.)
+        # Calculate north and east components of left- and right resolution
+        # absolute velocities (For a non moving area, area.gseast and area.gsnorth
+        # are simply 0, but for a moving area these terms are required to get the
+        # absolute resolution velocity of each aircraft.)
         vres_l_east = u_l_east * v_ul - area.gseast
         vres_l_north = u_l_north * v_ul - area.gsnorth
         vres_r_east = u_r_east * v_ur - area.gseast
         vres_r_north = u_r_north * v_ur - area.gsnorth
 
         # Calculate magnetic tracks of left- and right resolution vectors
-        vres_l_crs = (np.degrees(np.arctan2(vres_l_east, vres_l_north)) \
+        vres_l_crs = (np.degrees(np.arctan2(vres_l_east, vres_l_north))
                       - AREA_AVOIDANCE_CRS_MARGIN) % 360
-        vres_r_crs = (np.degrees(np.arctan2(vres_r_east, vres_r_north)) \
+        vres_r_crs = (np.degrees(np.arctan2(vres_r_east, vres_r_north))
                       + AREA_AVOIDANCE_CRS_MARGIN) % 360
 
         # Determine which of the two resolution vectors should be used based on the course to
@@ -709,9 +724,6 @@ class AreaRestrictionManager(TrafficArrays):
             else:
                 self.current_control_mode[ac_idx] = "lnav"
 
-        # print("\nt:{}".format(bs.sim.simt))
-        # print("control mode:  {}".format(self.current_control_mode))
-
     def apply_mode_based_action(self):
         """
         Apply the new velocities for all aircraft that need to perform
@@ -727,8 +739,9 @@ class AreaRestrictionManager(TrafficArrays):
                     # Aircraft is not in a resolution manoeuver, must initiate a new one
                     self.perform_manoeuver(ac_idx)
                 else:
-                    # Aircraft is already in a resolution manoeuver, check if it has been completed
-                    if abs(current_crs[ac_idx] - self.commanded_crs[ac_idx]) < COMMANDED_CRS_MARGIN:
+                    # Check if resolution manoeuver has been completed
+                    if abs(current_crs[ac_idx] - self.commanded_crs[ac_idx])\
+                            < COMMANDED_CRS_MARGIN:
                         if self.is_in_conflict[:, ac_idx].any():
                             # Current course within margin of commanded course, but still in
                             # conflict, perform new manoeuver.
@@ -738,7 +751,7 @@ class AreaRestrictionManager(TrafficArrays):
                             self.is_in_area_reso[ac_idx] = False
                             self.commanded_crs[ac_idx] = 1e9
                             self.commanded_spd[ac_idx] = 1e9
-                            print("t={}s : {} resolution manoeuver completed!".format(int(bs.sim.simt), bs.traf.id[ac_idx]))
+                            # print("t={}s : {} resolution manoeuver completed!".format(int(bs.sim.simt), bs.traf.id[ac_idx]))
 
                             # When no longer in area resolution, stop ignoring traffic conflicts
                             bs.stack.stack("RESOOFF {}".format(bs.traf.id[ac_idx]))
@@ -769,7 +782,8 @@ class AreaRestrictionManager(TrafficArrays):
                 if self.previous_control_mode[ac_idx] != "lnav":
                     iwpid = bs.traf.ap.route[ac_idx].findact(ac_idx)
                     if iwpid != -1:  # To avoid problems if there are no waypoints
-                        bs.traf.ap.route[ac_idx].direct(ac_idx, bs.traf.ap.route[ac_idx].wpname[iwpid])
+                        bs.traf.ap.route[ac_idx].direct(ac_idx,
+                                                        bs.traf.ap.route[ac_idx].wpname[iwpid])
 
         # Remember current control mode for use in next time step
         self.previous_control_mode = [x for x in self.current_control_mode]
@@ -780,10 +794,8 @@ class AreaRestrictionManager(TrafficArrays):
         restricted airspace.
         """
 
-        # When in area resolution, ignore traffic conflicts
-        bs.stack.stack("RESOOFF {}".format(bs.traf.id[ac_idx])) # Does not appear to do anything!
-
-        # Ensure that autopilot is not in LNAV mode for this aircraft
+        # Ignore traffic conflicts and route following
+        bs.stack.stack("RESOOFF {}".format(bs.traf.id[ac_idx]))
         bs.stack.stack("LNAV {},OFF".format(bs.traf.id[ac_idx]))
 
         new_v_east = bs.traf.gseast[ac_idx] + self.reso_dv_east[ac_idx]
@@ -791,11 +803,11 @@ class AreaRestrictionManager(TrafficArrays):
         new_v = np.sqrt(new_v_east ** 2 + new_v_north ** 2)
         new_crs = np.degrees(np.arctan2(new_v_east, new_v_north)) % 360
 
-        print("t={}s : {} in conflict with {}, turning to course {:.2f} degrees" \
-            .format(int(bs.sim.simt),
-                    bs.traf.id[ac_idx], 
-                    self.area_ids[self.closest_conflicting_area_idx[ac_idx]], 
-                    new_crs))
+        # print("t={}s : {} in conflict with {}, turning to course {:.2f} degrees" \
+        #     .format(int(bs.sim.simt),
+        #             bs.traf.id[ac_idx],
+        #             self.area_ids[self.closest_conflicting_area_idx[ac_idx]],
+        #             new_crs))
 
         self.stack_reso_apply(ac_idx, new_crs, new_v)
         self.is_in_area_reso[ac_idx] = True
@@ -1073,7 +1085,7 @@ class RestrictedAirspaceArea():
         """
 
         return (line_end[0] - line_start[0]) * (point[1] - line_start[1]) \
-               - (point[0] - line_start[0]) * (line_end[1] - line_start[1])
+            - (point[0] - line_start[0]) * (line_end[1] - line_start[1])
 
 
 def crs_middle(crs_left, crs_right):
