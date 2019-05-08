@@ -136,7 +136,8 @@ def main():
                          180 + RESTRICTION_ANGLE, ext_dist)
 
         vert_dist = ext_dist * 2
-        _, left_outer_lon = bsgeo.qdrpos(CENTER_LAT, CENTER_LON, 270, AREA_RADIUS)
+        _, left_outer_lon = bsgeo.qdrpos(CENTER_LAT, CENTER_LON,
+                                         270, AREA_RADIUS)
         vert_left_bottom_lat, vert_left_bottom_lon = \
             bsgeo.qdrpos(CENTER_LAT, left_outer_lon, 180, vert_dist)
 
@@ -161,11 +162,15 @@ def main():
             CENTER_LAT, (inner_left_bottom_lon + left_outer_lon) / 2))
 
         # Area on right side of corridor
-        inner_right_top_lat, _ = bsgeo.qdrpos(CENTER_LAT, CENTER_LON, 0, CORRIDOR_LENGTH / 2)
-        _, inner_right_top_lon = bsgeo.qdrpos(CENTER_LAT, CENTER_LON, 90, CORRIDOR_WIDTH / 2)
+        inner_right_top_lat, _ = bsgeo.qdrpos(CENTER_LAT, CENTER_LON,
+                                              0, CORRIDOR_LENGTH / 2)
+        _, inner_right_top_lon = bsgeo.qdrpos(CENTER_LAT, CENTER_LON,
+                                              90, CORRIDOR_WIDTH / 2)
 
-        inner_right_bottom_lat, _ = bsgeo.qdrpos(CENTER_LAT, CENTER_LON, 180, CORRIDOR_LENGTH / 2)
-        _, inner_right_bottom_lon = bsgeo.qdrpos(CENTER_LAT, CENTER_LON, 90, CORRIDOR_WIDTH / 2)
+        inner_right_bottom_lat, _ = bsgeo.qdrpos(CENTER_LAT, CENTER_LON,
+                                                 180, CORRIDOR_LENGTH / 2)
+        _, inner_right_bottom_lon = bsgeo.qdrpos(CENTER_LAT, CENTER_LON,
+                                                 90, CORRIDOR_WIDTH / 2)
 
         ext_dist = AREA_RADIUS / math.sin(math.radians(RESTRICTION_ANGLE))
         ext_right_top_lat, ext_right_top_lon = bsgeo.qdrpos(
@@ -216,10 +221,10 @@ def main():
         scnfile.write(zero_time + "DEFWPT RAA_2,{:.6f},{:.6f},FIX\n".format(
             CENTER_LAT, (inner_right_bottom_lon + right_outer_lon) / 2))
 
-        # First find angle to intersection point of angled restriction edge and experiment area
-        # then find angle from center point
-        ring_top_right_intersect_lat, ring_top_right_intersect_lon, angle = \
-            calculate_area_ring_intersection(CENTER_LAT,
+        # First find angle to intersection point of angled restriction
+        # edge and experiment area then find angle from center point
+        _, _, angle = \
+            calculate_line_ring_intersection(CENTER_LAT,
                                              CENTER_LON,
                                              AREA_RADIUS,
                                              inner_right_top_lat,
@@ -341,42 +346,42 @@ def main():
             scnfile.write("\n" + aircraft_str)
 
 
-def calculate_area_ring_intersection(CENTER_LAT,
-                                     CENTER_LON,
-                                     AREA_RADIUS,
-                                     inner_right_top_lat,
-                                     inner_right_top_lon,
-                                     outer_right_top_lat,
-                                     outer_right_top_lon):
+def calculate_line_ring_intersection(ring_center_lat,
+                                     ring_center_lon,
+                                     ring_radius,
+                                     line_start_lat,
+                                     line_start_lon,
+                                     line_end_lat,
+                                     line_end_lon):
     """
     Calculate the intersection point and angle from the center coordinate
     to that point between the area radius and the upper angled side of the
     restricted area to the right of the corridor.
     """
 
-    (left_lat, left_lon) = (inner_right_top_lat, inner_right_top_lon)
-    (right_lat, right_lon) = (outer_right_top_lat, outer_right_top_lon)
-
-    mid_lat, mid_lon = tg.calc_midpoint(left_lat, left_lon, right_lat, right_lon)
-    qdr_from_center, dist_from_center = bsgeo.qdrdist(CENTER_LAT, CENTER_LAT,
-                                                      mid_lat, mid_lon)
+    # First guess is midpoint of line
+    intersect_lat, intersect_lon = tg.calc_midpoint(line_start_lat, line_start_lon,
+                                                    line_end_lat, line_end_lon)
+    qdr_from_center, dist_from_center = bsgeo.qdrdist(ring_center_lat, ring_center_lat,
+                                                      intersect_lat, intersect_lon)
 
     while True:
-        if abs(dist_from_center - AREA_RADIUS) < 0.1:
+        if abs(dist_from_center - ring_radius) < 0.1:
             break
 
-        if dist_from_center > AREA_RADIUS:
-            right_lat, right_lon = mid_lat, mid_lon
-        elif dist_from_center < AREA_RADIUS:
-            left_lat, left_lon = mid_lat, mid_lon
+        if dist_from_center > ring_radius:
+            line_end_lat, line_end_lon = intersect_lat, intersect_lon
+        elif dist_from_center < ring_radius:
+            line_start_lat, line_start_lon = intersect_lat, intersect_lon
 
-        mid_lat, mid_lon = tg.calc_midpoint(left_lat, left_lon, right_lat, right_lon)
-        qdr_from_center, dist_from_center = bsgeo.qdrdist(CENTER_LAT, CENTER_LON,
-                                                          mid_lat, mid_lon)
+        intersect_lat, intersect_lon = tg.calc_midpoint(line_start_lat, line_start_lon,
+                                                        line_end_lat, line_end_lon)
+        qdr_from_center, dist_from_center = bsgeo.qdrdist(ring_center_lat, ring_center_lon,
+                                                          intersect_lat, intersect_lon)
 
-    angle = ar.ned2crs(qdr_from_center)
+    angle_from_center = ar.ned2crs(qdr_from_center)
 
-    return mid_lat, mid_lon, angle
+    return intersect_lat, intersect_lon, angle_from_center
 
 
 def calc_departure_waypoints(NUM_DEP_DEST_POINTS,
