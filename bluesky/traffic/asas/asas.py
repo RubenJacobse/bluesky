@@ -541,6 +541,7 @@ class ASAS(TrafficArrays):
 
         # Conflict pairs to be deleted
         delpairs = set()
+        changeactive = dict()
 
         # Look at all conflicts, also the ones that are solved but CPA is yet to come
         for conflict in self.resopairs:
@@ -584,24 +585,28 @@ class ASAS(TrafficArrays):
             if idx2 >= 0 and (not past_cpa or hor_los or is_bouncing):
                 if bs.traf.id[idx1] not in self.resoofflst:
                     # Enable ASAS for this aircraft
-                    self.active[idx1] = True
+                    changeactive[idx1] = True
                 else:
-                    self.active[idx1] = False
+                    changeactive[idx1] = False
             else:
-                # Switch ASAS off for ownship
-                self.active[idx1] = False
-
-                if bs.traf.id[idx1] not in self.resoofflst:
-                    # This if statement is supposed to fix issue where resooff setting is ignored
-
-                    # Waypoint recovery after conflict: Find the next active waypoint
-                    # and send the aircraft to that waypoint.
-                    iwpid = bs.traf.ap.route[idx1].findact(idx1)
-                    if iwpid != -1:  # To avoid problems if there are no waypoints
-                        bs.traf.ap.route[idx1].direct(idx1, bs.traf.ap.route[idx1].wpname[iwpid])
-
+                # Switch ASAS off for ownship if there are no other conflicts
+                # that this aircraft is involved in.
+                changeactive[idx1] = changeactive.get(idx1, False)
                 # If conflict is solved, remove it from the resopairs list
                 delpairs.add(conflict)
+
+        for idx, active in changeactive.items():
+            # Loop a second time: this is to avoid that ASAS resolution is
+            # turned off for an aircraft that is involved simultaneously in
+            # multiple conflicts, where the first, but not all conflicts are
+            # resolved.
+            self.active[idx] = active
+            if not active:
+                # Waypoint recovery after conflict: Find the next active waypoint
+                # and send the aircraft to that waypoint.
+                iwpid = bs.traf.ap.route[idx].findact(idx)
+                if iwpid != -1:  # To avoid problems if there are no waypoints
+                    bs.traf.ap.route[idx].direct(idx, bs.traf.ap.route[idx].wpname[iwpid])
 
         # Remove pairs from the list that are past CPA or have deleted aircraft
         self.resopairs -= delpairs
