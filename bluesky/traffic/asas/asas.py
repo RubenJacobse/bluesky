@@ -263,7 +263,7 @@ class ASAS(TrafficArrays):
     def SetPZHm(self, height_margin=None):
         """
         Set the protected zone height margin in feet. If no argument is
-        given,the current value is returned.
+        given, the current value is returned.
         """
 
         if height_margin is None:
@@ -300,28 +300,34 @@ class ASAS(TrafficArrays):
 
     def SetResoHoriz(self, value=None):
         """
-        Processes the RMETHH command. Sets swresovert = False
+        Processes the RMETHH command. Sets vertical resolution flag to False
+        if horizontal resolution method is not NONE or OFF. If no argument
+        is given, the current settings are returned.
         """
 
         # Acceptable arguments for this command
         options = ["BOTH", "SPD", "HDG", "NONE", "ON", "OFF", "OF"]
 
         if value is None:
-            return True, "RMETHH [ON / BOTH / OFF / NONE / SPD / HDG]" + \
-                         "\nHorizontal resolution limitation is currently " + ("ON" if self.swresohoriz else "OFF") + \
-                         "\nSpeed resolution limitation is currently " + ("ON" if self.swresospd else "OFF") + \
-                         "\nHeading resolution limitation is currently " + ("ON" if self.swresohdg else "OFF")
+            return True, "RMETHH [ON / BOTH / OFF / NONE / SPD / HDG]" \
+                         + "\nHorizontal resolution limitation is currently " \
+                         + ("ON" if self.swresohoriz else "OFF") \
+                         + "\nSpeed resolution limitation is currently " \
+                         + ("ON" if self.swresospd else "OFF") \
+                         + "\nHeading resolution limitation is currently " \
+                         + ("ON" if self.swresohdg else "OFF")
 
         if str(value) not in options:
-            return False, "RMETH Not Understood" + "\nRMETHH [ON / BOTH / OFF / NONE / SPD / HDG]"
+            return False, "RMETHH command not understood, use:" \
+                          + "\nRMETHH [ON / BOTH / OFF / NONE / SPD / HDG]"
         else:
-            if value == "ON" or value == "BOTH":
+            if value in ("ON", "BOTH"):
                 self.swresohoriz = True
                 self.swresospd   = True
                 self.swresohdg   = True
                 self.swresovert  = False
-            elif value == "OFF" or value == "OF" or value == "NONE":
-                # Do NOT swtich off self.swresovert if value == OFF
+            elif value in ("OFF", "OF", "NONE"):
+                # Do NOT switch off self.swresovert if value == OFF
                 self.swresohoriz = False
                 self.swresospd   = False
                 self.swresohdg   = False
@@ -338,60 +344,69 @@ class ASAS(TrafficArrays):
 
     def SetResoVert(self, value=None):
         """
-        Processes the RMETHV command. Sets swresohoriz = False
+        Processes the RMETHV command. Sets horizontal resolution flag to False
+        if the vertical resolution method is not NONE or OFF. If no argument
+        is given, the current settings are returned.
         """
 
         # Acceptable arguments for this command
         options = ["NONE", "ON", "OFF", "OF", "V/S"]
+
         if value is None:
-            return True, "RMETHV [ON / V/S / OFF / NONE]" + \
-                         "\nVertical resolution limitation is currently " + ("ON" if self.swresovert else "OFF")
+            return True, "RMETHV [ON / V/S / OFF / NONE]" \
+                         + "\nVertical resolution limitation is currently " \
+                         + ("ON" if self.swresovert else "OFF")
 
         if str(value) not in options:
-            return False, "RMETV Not Understood" + "\nRMETHV [ON / V/S / OFF / NONE]"
+            return False, "RMETHV command not understood, use:" \
+                          + "\nRMETHV [ON / V/S / OFF / NONE]"
         else:
-            if value == "ON" or value == "V/S":
+            if value in ("ON", "V/S"):
                 self.swresovert  = True
                 self.swresohoriz = False
                 self.swresospd   = False
                 self.swresohdg   = False
-            elif value == "OFF" or value == "OF" or value == "NONE":
+            elif value in ("OFF", "OF", "NONE"):
                 # Do NOT swtich off self.swresohoriz if value == OFF
                 self.swresovert  = False
 
     def SetResoFacH(self, value=None):
         """
-        Set the horizontal resolution factor
+        Set the horizontal resolution factor. If no argument is given, the
+        current setting is returned.
         """
 
         if value is None:
-            return True, ("RFACH [FACTOR]\nCurrent horizontal resolution factor is: %.1f" % self.resoFacH)
+            return True, ("RFACH [FACTOR]\nCurrent horizontal resolution factor is: {:.1f}"
+                          .format(self.resoFacH))
 
         self.resoFacH = np.abs(value)
         self.R  = self.R * self.resoFacH
         self.Rm = self.R * self.mar
 
-        return True, "IMPORTANT NOTE: " + \
-                     "\nCurrent horizontal resolution factor is: " + str(self.resoFacH) + \
-                     "\nCurrent PZ radius:" + str(self.R / nm) + " NM" + \
-                     "\nCurrent resolution PZ radius: " + str(self.Rm / nm) + " NM\n"
+        return True, "IMPORTANT NOTE: " \
+                     + "\nCurrent horizontal resolution factor is: {}".format(self.resoFacH) \
+                     + "\nCurrent PZ radius: {} NM".format(self.R / nm) \
+                     + "\nCurrent resolution PZ radius: {} NM\n".format(self.Rm / nm)
 
     def SetResoFacV(self, value=None):
         """
-        Set the vertical resolution factor
+        Set the vertical resolution factor. If no argument is given, the
+        current setting is returned.
         """
 
         if value is None:
-            return True, ("RFACV [FACTOR]\nCurrent vertical resolution factor is: %.1f" % self.resoFacV)
+            return True, ("RFACV [FACTOR]\nCurrent vertical resolution factor is: {:.1f}" 
+                          .format(self.resoFacV))
 
         self.resoFacV = np.abs(value)
         self.dh  = self.dh * self.resoFacV
         self.dhm = self.dh * self.mar
 
-        return True, "IMPORTANT NOTE: " + \
-                     "\nCurrent vertical resolution factor is: " + str(self.resoFacV) + \
-                     "\nCurrent PZ height:" + str(self.dh / ft) + " ft" + \
-                     "\nCurrent resolution PZ height: " + str(self.dhm / ft) + " ft\n"
+        return True, "IMPORTANT NOTE: " \
+                     + "\nCurrent vertical resolution factor is: {}".format(self.resoFacV) \
+                     + "\nCurrent PZ height: {} ft".format(self.dh / ft) \
+                     + "\nCurrent resolution PZ height: {} ft\n".format(self.dhm / ft)
 
     def SetPrio(self, flag=None, priocode="FF1"):
         """
@@ -436,15 +451,18 @@ class ASAS(TrafficArrays):
             self.priocode = priocode
 
     def SetNoreso(self, noresoac=''):
-        '''ADD or Remove aircraft that nobody will avoid.
-        Multiple aircraft can be sent to this function at once '''
-        if noresoac is '':
+        """
+        ADD or Remove aircraft that nobody will avoid.
+        Multiple aircraft can be sent to this function at once
+        """
+
+        if noresoac is "":
             return True, "NORESO [ACID]" + \
                          "\nCurrent list of aircraft nobody will avoid:" + \
                          str(self.noresolst)
 
         # Split the input into separate aircraft ids if multiple acids are given
-        acids = noresoac.split(',') if len(noresoac.split(',')) > 1 else noresoac.split(' ')
+        acids = noresoac.split(",") if len(noresoac.split(",")) > 1 else noresoac.split(" ")
 
         # Remove acids if they are already in self.noresolst. This is used to
         # delete aircraft from this list.
@@ -454,7 +472,7 @@ class ASAS(TrafficArrays):
         else:
             self.noresolst.extend(acids)
 
-        # active the switch, if there are acids in the list
+        # Activate the switch, if there are acids in the list
         self.swnoreso = len(self.noresolst) > 0
 
     def SetResooff(self, resooffac=""):
