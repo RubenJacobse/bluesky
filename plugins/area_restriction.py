@@ -785,6 +785,16 @@ class AreaRestrictionManager(TrafficArrays):
                         bs.traf.ap.route[ac_idx].direct(ac_idx,
                                                         bs.traf.ap.route[ac_idx].wpname[iwpid])
 
+        # For debugging purposes only
+        # for ac_idx in range(self.num_traf):
+        #     if self.previous_control_mode[ac_idx] \
+        #             and self.current_control_mode[ac_idx] != self.previous_control_mode[ac_idx]:
+
+        #         print("t={}s : {} mode change: {} -> {}".format(int(bs.sim.simt),
+        #                                                         bs.traf.id[ac_idx],
+        #                                                         self.previous_control_mode[ac_idx],
+        #                                                         self.current_control_mode[ac_idx]))
+
         # Remember current control mode for use in next time step
         self.previous_control_mode = [x for x in self.current_control_mode]
 
