@@ -42,6 +42,7 @@ ASAS_ON = True
 ASAS_RESO_METHOD = "MVP"
 NUM_EXPERIMENT_AIRCRAFT = 100
 RMETHH = "BOTH"
+LOOKAHEAD_TIME = 120
 
 random.seed(1)
 
@@ -93,6 +94,7 @@ def main():
 
         scnfile.write("\n# LOAD RAA plugin and create area restrictions\n")
         scnfile.write(zero_time + "PLUGINS LOAD {}\n".format(PLUGIN_NAME))
+        scnfile.write(zero_time + "RAACONF {}\n".format(LOOKAHEAD_TIME))
 
         # Area on left side of corridor
         inner_left_top_lat, _ = bsgeo.qdrpos(CENTER_LAT, CENTER_LON,
