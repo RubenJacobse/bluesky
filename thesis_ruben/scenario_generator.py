@@ -77,6 +77,8 @@ def main():
         scnfile.write(zero_time + "SWRAD {}\n".format("SYM"))
         scnfile.write(zero_time + "SWRAD {}\n".format("LABEL"))
         scnfile.write(zero_time + "SWRAD {}\n".format("WPT"))
+        scnfile.write(zero_time + "SWRAD {}\n".format("SAT"))
+        scnfile.write(zero_time + "SWRAD {}\n".format("APT"))
         scnfile.write(zero_time + "FF\n")
 
         scnfile.write("\n# Setup circular experiment area and activate it"
@@ -354,15 +356,19 @@ def calculate_line_ring_intersection(ring_center_lat,
                                      line_end_lat,
                                      line_end_lon):
     """
-    Calculate the intersection point and angle from the center coordinate
-    to that point between the area radius and the upper angled side of the
-    restricted area to the right of the corridor.
+    For a ring defined by a center latitude, longitude, and radius calculate
+    the latitude and longitude of the intersection point of this ring with a
+    line defined by a start and end point. Also calculate the angle to that
+    intersection point from the ring center.
+
+    Returns:
+        lat [deg], lon [deg], angle [deg]
     """
 
     # First guess is midpoint of line
     intersect_lat, intersect_lon = tg.calc_midpoint(line_start_lat, line_start_lon,
                                                     line_end_lat, line_end_lon)
-    qdr_from_center, dist_from_center = bsgeo.qdrdist(ring_center_lat, ring_center_lat,
+    qdr_from_center, dist_from_center = bsgeo.qdrdist(ring_center_lat, ring_center_lon,
                                                       intersect_lat, intersect_lon)
 
     while True:
