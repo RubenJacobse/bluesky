@@ -97,10 +97,10 @@ class ASAS(TrafficArrays):
         super(ASAS, self).reset()
 
         # ASAS constructor
-        self.cd_name      = "STATEBASED"
-        self.cr_name      = "OFF"
-        self.cd           = ASAS.cd_methods[self.cd_name]
-        self.cr           = ASAS.cr_methods[self.cr_name]
+        self.cd_name = "STATEBASED"
+        self.cr_name = "OFF"
+        self.cd = ASAS.cd_methods[self.cd_name]
+        self.cr = ASAS.cr_methods[self.cr_name]
 
         self.dtasas       = settings.asas_dt
         self.dtlookahead  = settings.asas_dtlookahead # [s] lookahead time
@@ -144,24 +144,6 @@ class ASAS(TrafficArrays):
         # NOTE: Should this also be moved to inside clear_conflict_database()?
         self.dcpa = np.array([])  # CPA distance
 
-    def toggle(self, flag=None):
-        """
-        Switch the ASAS module ON or OFF, and reset the conflict database.
-        If no argument is provided, returns only the current state and does
-        not perform database reset.
-        """
-
-        if flag is None:
-            return True, "ASAS module is currently {}".format("ON" if self.swasas else "OFF")
-
-        # Clear conflict list when switched off
-        self.swasas = flag
-        if not self.swasas:
-            self.clear_conflict_database()
-            self.inconf = False
-
-        return True, "ASAS module set to: {}".format("ON" if self.swasas else "OFF")
-
     def clear_conflict_database(self):
         """
         Clear the ASAS conflict database and reset the intial state.
@@ -180,6 +162,38 @@ class ASAS(TrafficArrays):
         self.tLOS = np.array([])  # Time to start LoS
         self.qdr = np.array([])  # Bearing from ownship to intruder
         self.dist = np.array([])  # Horizontal distance between ""
+
+    def create(self, n=1):
+        """
+        Create n new aircraft elements.
+        """
+
+        # Call actual create function
+        super(ASAS, self).create(n)
+
+        # On creation, no asas calculation have been performed, so set
+        # track, tas and altitude parameters equal to those of bs.traf
+        self.trk[-n:] = bs.traf.trk[-n:]
+        self.tas[-n:] = bs.traf.tas[-n:]
+        self.alt[-n:] = bs.traf.alt[-n:]
+
+    def toggle(self, flag=None):
+        """
+        Switch the ASAS module ON or OFF, and reset the conflict database.
+        If no argument is provided, returns only the current state and does
+        not perform database reset.
+        """
+
+        if flag is None:
+            return True, "ASAS module is currently {}".format("ON" if self.swasas else "OFF")
+
+        # Clear conflict list when switched off
+        self.swasas = flag
+        if not self.swasas:
+            self.clear_conflict_database()
+            self.inconf = False
+
+        return True, "ASAS module set to: {}".format("ON" if self.swasas else "OFF")
 
     def SetCDmethod(self, method=""):
         """
@@ -229,7 +243,7 @@ class ASAS(TrafficArrays):
             return True, "ZONER [radius (nm)]\n" \
                          + "Current PZ radius: {:.2f} NM".format(self.R / nm)
 
-        self.R  = radius * nm
+        self.R = radius * nm
         self.Rm = np.maximum(self.mar * self.R, self.Rm)
 
     def SetPZH(self, height=None):
@@ -242,7 +256,7 @@ class ASAS(TrafficArrays):
             return True, "ZONEDH [height (ft)]\n" \
                          + "Current PZ height: {:.2f} ft".format(self.dh / ft)
 
-        self.dh  = height * ft
+        self.dh = height * ft
         self.dhm = np.maximum(self.mar * self.dh, self.dhm)
 
     def SetPZRm(self, radius_margin=None):
@@ -258,7 +272,7 @@ class ASAS(TrafficArrays):
         if radius_margin < self.R / nm:
             return False, "PZ radius margin may not be smaller than PZ radius"
 
-        self.Rm  = radius_margin * nm
+        self.Rm = radius_margin * nm
 
     def SetPZHm(self, height_margin=None):
         """
@@ -273,7 +287,7 @@ class ASAS(TrafficArrays):
         if height_margin < self.dh / ft:
             return False, "PZ height margin may not be smaller than PZ height"
 
-        self.dhm  = height_margin * ft
+        self.dhm = height_margin * ft
 
     def SetDtLook(self, detection_time=None):
         """
@@ -323,24 +337,24 @@ class ASAS(TrafficArrays):
         else:
             if value in ("ON", "BOTH"):
                 self.swresohoriz = True
-                self.swresospd   = True
-                self.swresohdg   = True
-                self.swresovert  = False
+                self.swresospd = True
+                self.swresohdg = True
+                self.swresovert = False
             elif value in ("OFF", "OF", "NONE"):
                 # Do NOT switch off self.swresovert if value == OFF
                 self.swresohoriz = False
-                self.swresospd   = False
-                self.swresohdg   = False
+                self.swresospd = False
+                self.swresohdg = False
             elif value == "SPD":
                 self.swresohoriz = True
-                self.swresospd   = True
-                self.swresohdg   = False
-                self.swresovert  = False
+                self.swresospd = True
+                self.swresohdg = False
+                self.swresovert = False
             elif value == "HDG":
                 self.swresohoriz = True
-                self.swresospd   = False
-                self.swresohdg   = True
-                self.swresovert  = False
+                self.swresospd = False
+                self.swresohdg = True
+                self.swresovert = False
 
     def SetResoVert(self, value=None):
         """
@@ -362,13 +376,13 @@ class ASAS(TrafficArrays):
                           + "\nRMETHV [ON / V/S / OFF / NONE]"
         else:
             if value in ("ON", "V/S"):
-                self.swresovert  = True
+                self.swresovert = True
                 self.swresohoriz = False
-                self.swresospd   = False
-                self.swresohdg   = False
+                self.swresospd = False
+                self.swresohdg = False
             elif value in ("OFF", "OF", "NONE"):
                 # Do NOT swtich off self.swresohoriz if value == OFF
-                self.swresovert  = False
+                self.swresovert = False
 
     def SetResoFacH(self, value=None):
         """
@@ -381,7 +395,7 @@ class ASAS(TrafficArrays):
                           .format(self.resoFacH))
 
         self.resoFacH = np.abs(value)
-        self.R  = self.R * self.resoFacH
+        self.R = self.R * self.resoFacH
         self.Rm = self.R * self.mar
 
         return True, "IMPORTANT NOTE: " \
@@ -396,11 +410,11 @@ class ASAS(TrafficArrays):
         """
 
         if value is None:
-            return True, ("RFACV [FACTOR]\nCurrent vertical resolution factor is: {:.1f}" 
+            return True, ("RFACV [FACTOR]\nCurrent vertical resolution factor is: {:.1f}"
                           .format(self.resoFacV))
 
         self.resoFacV = np.abs(value)
-        self.dh  = self.dh * self.resoFacV
+        self.dh = self.dh * self.resoFacV
         self.dhm = self.dh * self.mar
 
         return True, "IMPORTANT NOTE: " \
@@ -414,13 +428,13 @@ class ASAS(TrafficArrays):
         """
 
         if self.cr_name == "SSD":
-            options = ["RS1","RS2","RS3","RS4","RS5","RS6","RS7","RS8","RS9"]
+            options = ["RS1", "RS2", "RS3", "RS4", "RS5", "RS6", "RS7", "RS8", "RS9"]
         else:
             options = ["FF1", "FF2", "FF3", "LAY1", "LAY2"]
 
         if flag is None:
             if self.cr_name == "SSD":
-                return True, "PRIORULES [ON/OFF] [PRIOCODE]"  + \
+                return True, "PRIORULES [ON/OFF] [PRIOCODE]" + \
                              "\nAvailable priority codes: " + \
                              "\n     RS1:  Shortest way out" + \
                              "\n     RS2:  Clockwise turning" + \
@@ -434,7 +448,7 @@ class ASAS(TrafficArrays):
                              "\nPriority is currently " + ("ON" if self.swprio else "OFF") + \
                              "\nPriority code is currently: " + str(self.priocode)
             else:
-                return True, "PRIORULES [ON/OFF] [PRIOCODE]"  + \
+                return True, "PRIORULES [ON/OFF] [PRIOCODE]" + \
                              "\nAvailable priority codes: " + \
                              "\n     FF1:  Free Flight Primary (No Prio) " + \
                              "\n     FF2:  Free Flight Secondary (Cruising has priority)" + \
@@ -444,7 +458,7 @@ class ASAS(TrafficArrays):
                              "\nPriority is currently " + ("ON" if self.swprio else "OFF") + \
                              "\nPriority code is currently: " + str(self.priocode)
         self.swprio = flag
-        
+
         if priocode not in options:
             return False, "Priority code Not Understood. Available Options: " + str(options)
         else:
@@ -502,100 +516,13 @@ class ASAS(TrafficArrays):
     def SetVLimits(self, flag=None, spd=None):
         # Input is in knots
         if flag is None:
-            return True, "ASAS limits in kts are currently [" + str(self.vmin * 3600 / 1852) + ";" + str(self.vmax * 3600 / 1852) + "]"
+            return True, "ASAS limits are currently [{};{}] kts" \
+                         .format(str(self.vmin * 3600 / 1852), str(self.vmax * 3600 / 1852))
 
         if flag == "MAX":
             self.vmax = spd * nm / 3600.
         else:
             self.vmin = spd * nm / 3600.
-
-    def create(self, n=1):
-        """
-        Create n new aircraft elements.
-        """
-
-        # Call actual create function
-        super(ASAS, self).create(n)
-
-        self.trk[-n:] = bs.traf.trk[-n:]
-        self.tas[-n:] = bs.traf.tas[-n:]
-        self.alt[-n:] = bs.traf.alt[-n:]
-
-    def ResumeNav(self):
-        """ 
-        Decide for each aircraft in the conflict list whether the ASAS
-        should be followed or not, based on if the aircraft pairs passed
-        their CPA.
-        """
-
-        # Conflict pairs to be deleted
-        delpairs = set()
-        changeactive = dict()
-
-        # Look at all conflicts, also the ones that are solved but CPA is yet to come
-        for conflict in self.resopairs:
-            idx1, idx2 = bs.traf.id2idx(conflict)
-            
-            # If the ownship aircraft is deleted remove its conflict from the list
-            if idx1 < 0:
-                delpairs.add(conflict)
-                continue
-
-            if idx2 >= 0:
-                # Distance vector using flat earth approximation
-                re = 6371000.
-                dist = re * np.array([np.radians(bs.traf.lon[idx2] - bs.traf.lon[idx1]) *
-                                      np.cos(0.5 * np.radians(bs.traf.lat[idx2] +
-                                                              bs.traf.lat[idx1])),
-                                      np.radians(bs.traf.lat[idx2] - bs.traf.lat[idx1])])
-
-                # Relative velocity vector
-                vrel = np.array([bs.traf.gseast[idx2] - bs.traf.gseast[idx1],
-                                 bs.traf.gsnorth[idx2] - bs.traf.gsnorth[idx1]])
-
-                # Check if conflict is past CPA
-                past_cpa = np.dot(dist, vrel) > 0.0
-
-                # hor_los:
-                # Aircraft should continue to resolve until there is no horizontal
-                # LOS. This is particularly relevant when vertical resolutions
-                # are used.
-                hdist = np.linalg.norm(dist)
-                hor_los = hdist < self.R
-
-                # Bouncing conflicts:
-                # If two aircraft are getting in and out of conflict continously,
-                # then they it is a bouncing conflict. ASAS should stay active until
-                # the bouncing stops.
-                is_bouncing = abs(bs.traf.trk[idx1] - bs.traf.trk[idx2]) < 30.0 and hdist < self.Rm
-
-            # Start recovery for ownship if intruder is deleted, or if past CPA
-            # and not in horizontal LOS or a bouncing conflict
-            if idx2 >= 0 and (not past_cpa or hor_los or is_bouncing):
-                # Enable ASAS for this aircraft
-                changeactive[idx1] = True
-            else:
-                # Switch ASAS off for ownship if there are no other conflicts
-                # that this aircraft is involved in.
-                changeactive[idx1] = changeactive.get(idx1, False)
-                # If conflict is solved, remove it from the resopairs list
-                delpairs.add(conflict)
-
-        for idx, active in changeactive.items():
-            # Loop a second time: this is to avoid that ASAS resolution is
-            # turned off for an aircraft that is involved simultaneously in
-            # multiple conflicts, where the first, but not all conflicts are
-            # resolved.
-            self.active[idx] = active
-            if not active:
-                # Waypoint recovery after conflict: Find the next active waypoint
-                # and send the aircraft to that waypoint.
-                iwpid = bs.traf.ap.route[idx].findact(idx)
-                if iwpid != -1:  # To avoid problems if there are no waypoints
-                    bs.traf.ap.route[idx].direct(idx, bs.traf.ap.route[idx].wpname[iwpid])
-
-        # Remove pairs from the list that are past CPA or have deleted aircraft
-        self.resopairs -= delpairs
 
     @timed_function('asas', dt=settings.asas_dt)
     def update(self, dt):
@@ -626,7 +553,80 @@ class ASAS(TrafficArrays):
         self.confpairs_unique = confpairs_unique
         self.lospairs_unique = lospairs_unique
 
-        self.ResumeNav()
+        self.resume_navigation()
 
-        # iconf0 = np.array(self.iconf)
-        #
+    def resume_navigation(self):
+        """
+        Decide for each aircraft in the conflict list whether the ASAS
+        should be followed or not, based on if the aircraft pairs passed
+        their CPA.
+        """
+
+        # Conflict pairs to be deleted
+        delpairs = set()
+        changeactive = dict()
+
+        # Look at all conflicts, also the ones that are solved but CPA is yet to come
+        for conflict_pair in self.resopairs:
+            idx1, idx2 = bs.traf.id2idx(conflict_pair)
+
+            # If the ownship aircraft is deleted remove its conflict from the list
+            if idx1 < 0:
+                delpairs.add(conflict_pair)
+                continue
+
+            if idx2 >= 0:
+                # Distance vector using flat earth approximation
+                re = 6371000.
+                dist = re * np.array([np.radians(bs.traf.lon[idx2] - bs.traf.lon[idx1]) *
+                                      np.cos(0.5 * np.radians(bs.traf.lat[idx2] +
+                                                              bs.traf.lat[idx1])),
+                                      np.radians(bs.traf.lat[idx2] - bs.traf.lat[idx1])])
+
+                # Relative velocity vector
+                vrel = np.array([bs.traf.gseast[idx2] - bs.traf.gseast[idx1],
+                                 bs.traf.gsnorth[idx2] - bs.traf.gsnorth[idx1]])
+
+                # Check if conflict is past CPA
+                is_past_cpa = np.dot(dist, vrel) > 0.0
+
+                # Aircraft should continue to resolve until there is no horizontal
+                # LOS. This is particularly relevant when vertical resolutions
+                # are used.
+                hdist = np.linalg.norm(dist)
+                is_hor_los = hdist < self.R
+
+                # Bouncing conflicts:
+                # If two aircraft are getting in and out of conflict continously,
+                # then they it is a bouncing conflict. ASAS should stay active until
+                # the bouncing stops.
+                is_bouncing = abs(bs.traf.trk[idx1] - bs.traf.trk[idx2]) < 30.0 and hdist < self.Rm
+
+            # Start recovery for ownship if intruder is deleted, or if past CPA
+            # and not in horizontal LOS or a bouncing conflict
+            if idx2 >= 0 and (not is_past_cpa or is_hor_los or is_bouncing):
+                # Enable ASAS for this aircraft
+                changeactive[idx1] = True
+            else:
+                # Switch ASAS off for ownship if there are no other conflicts
+                # that this aircraft is involved in.
+                changeactive[idx1] = changeactive.get(idx1, False)
+
+                # If conflict is solved, remove it from the resopairs list
+                delpairs.add(conflict_pair)
+
+        for idx, active in changeactive.items():
+            # Loop a second time: this is to avoid that ASAS resolution is
+            # turned off for an aircraft that is involved simultaneously in
+            # multiple conflicts, where the first, but not all conflicts are
+            # resolved.
+            self.active[idx] = active
+            if not active:
+                # Waypoint recovery after conflict: Find the next active waypoint
+                # and send the aircraft to that waypoint.
+                iwpid = bs.traf.ap.route[idx].findact(idx)
+                if iwpid != -1:  # To avoid problems if there are no waypoints
+                    bs.traf.ap.route[idx].direct(idx, bs.traf.ap.route[idx].wpname[iwpid])
+
+        # Remove pairs that are past CPA or have deleted aircraft from the list
+        self.resopairs -= delpairs
