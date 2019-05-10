@@ -30,6 +30,7 @@ from . import Eby
 from . import MVP
 from . import Swarm
 from . import SSD
+from . import LF
 
 # Register default settings
 settings.set_variable_defaults(asas_dt=1.0,
@@ -55,7 +56,8 @@ class ASAS(TrafficArrays):
     cr_methods = {"OFF": DoNothing,
                   "MVP": MVP,
                   "EBY": Eby,
-                  "SWARM": Swarm}
+                  "SWARM": Swarm,
+                  "LF": LF}
 
     # The SSD method requires the pyclipper module for its visualizations
     if SSD.loaded_pyclipper():
