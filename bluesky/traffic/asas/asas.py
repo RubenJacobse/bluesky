@@ -640,7 +640,7 @@ class ASAS(TrafficArrays):
 
             # Start recovery for ownship if intruder is deleted, or if past CPA
             # and not in horizontal LOS or a bouncing conflict
-            if idx2 >= 0 and (not past_cpa or hor_los or is_bouncing):
+            if idx2 >= 0 and (not is_past_cpa or is_hor_los or is_bouncing):
                 if bs.traf.id[idx1] not in self.resoofflst:
                     # Enable ASAS for this aircraft
                     changeactive[idx1] = True
