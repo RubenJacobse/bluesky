@@ -17,6 +17,7 @@ import numpy as np
 # BlueSky imports
 import bluesky as bs
 from bluesky import settings
+from bluesky.tools import geo
 from bluesky.tools.simtime import timed_function
 from bluesky.tools.aero import ft, nm
 from bluesky.tools.trafficarrays import TrafficArrays, RegisterElementParameters
@@ -612,13 +613,13 @@ class ASAS(TrafficArrays):
                 continue
 
             if idx2 >= 0:
-                # Distance vector using flat earth approximation
-                re = 6371000.
-                dist = re * np.array([np.radians(bs.traf.lon[idx2] - bs.traf.lon[idx1]) *
-                                      np.cos(0.5 * np.radians(bs.traf.lat[idx2] +
-                                                              bs.traf.lat[idx1])),
-                                      np.radians(bs.traf.lat[idx2] - bs.traf.lat[idx1])])
-
+                # Distance vector using spherical earth qdr and distance
+                qdr, dist_nm = geo.qdrdist(bs.traf.lat[idx1], bs.traf.lon[idx1],
+                                           bs.traf.lat[idx2], bs.traf.lon[idx2])
+                
+                dist = dist_nm * 1852.0 * np.array([np.sin(np.radians(qdr)),
+                                                    np.cos(np.radians(qdr))])
+                
                 # Relative velocity vector
                 vrel = np.array([bs.traf.gseast[idx2] - bs.traf.gseast[idx1],
                                  bs.traf.gsnorth[idx2] - bs.traf.gsnorth[idx1]])
@@ -629,14 +630,14 @@ class ASAS(TrafficArrays):
                 # Aircraft should continue to resolve until there is no horizontal
                 # LOS. This is particularly relevant when vertical resolutions
                 # are used.
-                hdist = np.linalg.norm(dist)
-                is_hor_los = hdist < self.R
+                hor_dist = np.linalg.norm(dist)
+                is_hor_los = hor_dist < self.R
 
                 # Bouncing conflicts:
                 # If two aircraft are getting in and out of conflict continously,
                 # then they it is a bouncing conflict. ASAS should stay active until
                 # the bouncing stops.
-                is_bouncing = abs(bs.traf.trk[idx1] - bs.traf.trk[idx2]) < 30.0 and hdist < self.Rm
+                is_bouncing = abs(bs.traf.trk[idx1] - bs.traf.trk[idx2]) < 30.0 and hor_dist < self.Rm
 
             # Start recovery for ownship if intruder is deleted, or if past CPA
             # and not in horizontal LOS or a bouncing conflict
