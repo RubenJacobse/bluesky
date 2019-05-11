@@ -23,16 +23,18 @@ def resolve(asas, traf):
         return
 
     # Initialize an array to store the resolution velocity vector for all A/C
-    dv = np.zeros((traf.ntraf, 3))
+    delta_v = np.zeros((traf.ntraf, 3))
+    
     # Stores resolution vector, also used in visualization
     asas.asasn = np.zeros(traf.ntraf, dtype=np.float32)
     asas.asase = np.zeros(traf.ntraf, dtype=np.float32)
 
     # Initialize an array to store time needed to resolve vertically
-    timesolveV = np.ones(traf.ntraf)*1e9
+    t_solve_vertical = np.ones(traf.ntraf) * 1e9
 
     # Call MVP function to resolve conflicts-----------------------------------
-    for ((ac1, ac2), qdr, dist, tcpa, tLOS) in zip(asas.confpairs, asas.qdr, asas.dist, asas.tcpa, asas.tLOS):
+    for ((ac1, ac2), qdr, dist, tcpa, tLOS) in zip(asas.confpairs, asas.qdr, 
+                                                   asas.dist, asas.tcpa, asas.tLOS):
         idx1 = traf.id.index(ac1)
         idx2 = traf.id.index(ac2)
 
@@ -46,70 +48,72 @@ def resolve(asas, traf):
                 continue
 
             dv_mvp, tsolV = MVP(traf, asas, qdr, dist, tcpa, tLOS, idx1, idx2)
-            if tsolV < timesolveV[idx1]:
-                timesolveV[idx1] = tsolV
+            if tsolV < t_solve_vertical[idx1]:
+                t_solve_vertical[idx1] = tsolV
 
             # Use priority rules if activated
             if asas.swprio:
-                dv[idx1], _ = prioRules(traf, asas.priocode, dv_mvp, dv[idx1], dv[idx2], idx1, idx2)
+                delta_v[idx1], _ = prioRules(traf, asas.priocode, dv_mvp,
+                                             delta_v[idx1], delta_v[idx2], idx1, idx2)
             else:
-                # since cooperative, the vertical resolution component can be halved, and then dv_mvp can be added
+                # Since cooperative, the vertical resolution component can be
+                # halved, and then dv_mvp can be added
                 dv_mvp[2] = 0.5 * dv_mvp[2]
-                dv[idx1] = dv[idx1] - dv_mvp
+                delta_v[idx1] = delta_v[idx1] - dv_mvp
 
     # Determine new speed and limit resolution direction for all aicraft-------
 
     # Resolution vector for all aircraft, cartesian coordinates
-    dv = np.transpose(dv)
+    delta_v = np.transpose(delta_v)
 
     # The old speed vector, cartesian coordinates
     v = np.array([traf.gseast, traf.gsnorth, traf.vs])
 
     # The new speed vector, cartesian coordinates
-    newv = dv + v
+    new_v = v + delta_v
 
     # Get indices of aircraft that have a resolution
-    ids = dv[0, :]**2 + dv[1, :]**2 > 0
+    idxs = delta_v[0, :]**2 + delta_v[1, :]**2 > 0
 
     # Limit resolution direction if required-----------------------------------
 
     # Compute new speed vector in polar coordinates based on desired resolution
     if asas.swresohoriz:  # horizontal resolutions
         if asas.swresospd and not asas.swresohdg:  # SPD only
-            newtrack = traf.trk
-            newgs = np.sqrt(newv[0, :]**2 + newv[1, :]**2)
-            newvs = traf.vs
+            new_track = traf.trk
+            new_gs = np.sqrt(new_v[0, :]**2 + new_v[1, :]**2)
+            new_vs = traf.vs
         elif asas.swresohdg and not asas.swresospd:  # HDG only
-            newtrack = (np.arctan2(newv[0, :], newv[1, :])*180/np.pi) % 360
-            newgs = traf.gs
-            newvs = traf.vs
+            new_track = np.degrees(np.arctan2(new_v[0, :], new_v[1, :])) % 360
+            new_gs = traf.gs
+            new_vs = traf.vs
         else:  # SPD + HDG
-            newtrack = (np.arctan2(newv[0, :], newv[1, :])*180/np.pi) % 360
-            newgs = np.sqrt(newv[0, :]**2 + newv[1, :]**2)
-            newvs = traf.vs
+            new_track = np.degrees(np.arctan2(new_v[0, :], new_v[1, :])) % 360
+            new_gs = np.sqrt(new_v[0, :]**2 + new_v[1, :]**2)
+            new_vs = traf.vs
     elif asas.swresovert:  # vertical resolutions
-        newtrack = traf.trk
-        newgs = traf.gs
-        newvs = newv[2, :]
+        new_track = traf.trk
+        new_gs = traf.gs
+        new_vs = new_v[2, :]
     else:  # horizontal + vertical
-        newtrack = (np.arctan2(newv[0, :], newv[1, :])*180/np.pi) % 360
-        newgs = np.sqrt(newv[0, :]**2 + newv[1, :]**2)
-        newvs = newv[2, :]
+        new_track = np.degrees(np.arctan2(new_v[0, :], new_v[1, :])) % 360
+        new_gs = np.sqrt(new_v[0, :]**2 + new_v[1, :]**2)
+        new_vs = new_v[2, :]
 
     # Determine ASAS module commands for all aircraft--------------------------
 
     # Cap the horizontal and vrtical speed
-    newgs_capped = np.maximum(asas.vmin, np.minimum(asas.vmax, newgs))
-    vs_capped = np.maximum(asas.vsmin, np.minimum(asas.vsmax, newvs))
+    new_gs_capped = np.clip(new_gs, asas.vmin, asas.vmax)
+    new_vs_capped = np.clip(new_vs, asas.vsmin, asas.vsmax)
 
     # Now assign resolutions to variables in the ASAS class
-    asas.trk = newtrack
-    asas.tas = newgs_capped
-    asas.vs = vs_capped
+    asas.trk = new_track
+    asas.tas = new_gs_capped
+    asas.vs = new_vs_capped
 
     # Stores resolution vector
-    asas.asase[ids] = asas.tas[ids] * np.sin(asas.trk[ids] / 180 * np.pi)
-    asas.asasn[ids] = asas.tas[ids] * np.cos(asas.trk[ids] / 180 * np.pi)
+    asas.asase[idxs] = asas.tas[idxs] * np.sin(asas.trk[idxs] / 180 * np.pi)
+    asas.asasn[idxs] = asas.tas[idxs] * np.cos(asas.trk[idxs] / 180 * np.pi)
     # asaseval should be set to True now
     if not asas.asaseval:
         asas.asaseval = True
@@ -126,14 +130,14 @@ def resolve(asas, traf):
     # To compute asas alt, timesolveV is used. timesolveV is a really big value (1e9)
     # when there is no conflict. Therefore asas alt is only updated when its
     # value is less than the look-ahead time, because for those aircraft are in conflict
-    altCondition = np.logical_and(timesolveV < asas.dtlookahead, np.abs(dv[2, :]) > 0.0)
-    asasalttemp = asas.vs * timesolveV + traf.alt
+    altCondition = np.logical_and(t_solve_vertical < asas.dtlookahead, np.abs(delta_v[2, :]) > 0.0)
+    asasalttemp = asas.vs * t_solve_vertical + traf.alt
     asas.alt[altCondition] = asasalttemp[altCondition]
 
     # If resolutions are limited in the horizontal direction, then asasalt should
     # be equal to auto pilot alt (aalt). This is to prevent a new asasalt being computed
-    # using the auto pilot vertical speed (traf.avs) using the code in line 106 (asasalttemp) when only
-    # horizontal resolutions are allowed.
+    # using the auto pilot vertical speed (traf.avs) using the code in line 106 (asasalttemp)
+    # when only horizontal resolutions are allowed.
     asas.alt = asas.alt*(1-asas.swresohoriz) + traf.selalt*asas.swresohoriz
 
 
