@@ -39,6 +39,12 @@ def resolve(asas, traf):
         # If A/C indexes are found, then apply MVP on this conflict pair
         # Because ADSB is ON, this is done for each aircraft separately
         if idx1 > -1 and idx2 > -1:
+            # If ac1 is resooff or ac2 is noreso, then ac1 does not perform
+            # any manoeuver
+            if ((asas.swresooff and ac1 in asas.resoofflst)
+                    or (asas.swnoreso and ac2 in asas.noresolst)):
+                continue
+
             dv_mvp, tsolV = MVP(traf, asas, qdr, dist, tcpa, tLOS, idx1, idx2)
             if tsolV < timesolveV[idx1]:
                 timesolveV[idx1] = tsolV
@@ -50,17 +56,6 @@ def resolve(asas, traf):
                 # since cooperative, the vertical resolution component can be halved, and then dv_mvp can be added
                 dv_mvp[2] = 0.5 * dv_mvp[2]
                 dv[idx1] = dv[idx1] - dv_mvp
-
-            # Check the noreso aircraft. Nobody avoids noreso aircraft.
-            # But noreso aircraft will avoid other aircraft
-            if asas.swnoreso:
-                if ac2 in asas.noresolst:  # -> Then id1 does not avoid id2.
-                    dv[idx1] = dv[idx1] + dv_mvp
-
-            # Check the resooff aircraft. These aircraft will not do resolutions.
-            if asas.swresooff:
-                if ac1 in asas.resoofflst:  # -> Then id1 does not do any resolutions
-                    dv[idx1] = 0.0
 
     # Determine new speed and limit resolution direction for all aicraft-------
 
