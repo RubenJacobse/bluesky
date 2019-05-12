@@ -218,7 +218,7 @@ class ASAS(TrafficArrays):
         if flag is None:
             return True, "ASAS module is currently {}".format("ON" if self.swasas else "OFF")
 
-        # When ASAS is switched off, reset the conflict database and set all 
+        # When ASAS is switched off, reset the conflict database and set all
         # elements of self.inconf to False.
         self.swasas = flag
         if not self.swasas:
@@ -413,7 +413,7 @@ class ASAS(TrafficArrays):
                 self.swresospd = False
                 self.swresohdg = False
             elif value in ("OFF", "OF", "NONE"):
-                # Do NOT swtich off self.swresohoriz if value == OFF
+                # Do NOT switch off self.swresohoriz if value == OFF
                 self.swresovert = False
 
     def SetResoFacH(self, value=None):
@@ -496,60 +496,65 @@ class ASAS(TrafficArrays):
         else:
             self.priocode = priocode
 
-    def SetNoreso(self, noresoac=''):
+    def SetNoreso(self, ac_no_reso=""):
         """
         ADD or Remove aircraft that nobody will avoid.
         Multiple aircraft can be sent to this function at once
         """
 
-        if noresoac is "":
+        if ac_no_reso is "":
             return True, "NORESO [ACID]" + \
                          "\nCurrent list of aircraft nobody will avoid:" + \
                          str(self.noresolst)
 
         # Split the input into separate aircraft ids if multiple acids are given
-        acids = noresoac.split(",") if len(noresoac.split(",")) > 1 else noresoac.split(" ")
+        ac_ids = (ac_no_reso.split(",") if len(ac_no_reso.split(",")) > 1
+                  else ac_no_reso.split(" "))
 
         # Remove acids if they are already in self.noresolst. This is used to
         # delete aircraft from this list.
         # Else, add them to self.noresolst. Nobody will avoid these aircraft
-        if set(acids) <= set(self.noresolst):
-            self.noresolst = [x for x in self.noresolst if x not in set(acids)]
+        if set(ac_ids) <= set(self.noresolst):
+            self.noresolst = [x for x in self.noresolst if x not in set(ac_ids)]
         else:
-            self.noresolst.extend(acids)
+            self.noresolst.extend(ac_ids)
 
         # Activate the switch, if there are acids in the list
         self.swnoreso = len(self.noresolst) > 0
 
-    def SetResooff(self, resooffac=""):
+    def SetResooff(self, ac_reso_off=""):
         """
         ADD or Remove aircraft that will not avoid anybody else
         """
 
-        if resooffac is "":
+        if ac_reso_off is "":
             return True, "NORESO [ACID]" + \
                          "\nCurrent list of aircraft will not avoid anybody:" + \
                          str(self.resoofflst)
 
-        # Split the input into separate aircraft ids if multiple acids are given
-        acids = resooffac.split(',') if len(resooffac.split(',')) > 1 else resooffac.split(' ')
+        # Split the input into separate aircraft ids if multiple ids are given
+        ac_ids = (ac_reso_off.split(',') if len(ac_reso_off.split(',')) > 1
+                  else ac_reso_off.split(' '))
 
         # Remove acids if they are already in self.resoofflst. This is used to
         # delete aircraft from this list.
         # Else, add them to self.resoofflst. These aircraft will not avoid anybody
-        if set(acids) <= set(self.resoofflst):
-            self.resoofflst = [x for x in self.resoofflst if x not in set(acids)]
+        if set(ac_ids) <= set(self.resoofflst):
+            self.resoofflst = [x for x in self.resoofflst if x not in set(ac_ids)]
         else:
-            self.resoofflst.extend(acids)
+            self.resoofflst.extend(ac_ids)
 
         # active the switch, if there are acids in the list
         self.swresooff = len(self.resoofflst) > 0
 
     def SetVLimits(self, flag=None, spd=None):
+        """ """
+
         # Input is in knots
         if flag is None:
             return True, "ASAS limits are currently [{};{}] kts" \
-                         .format(str(self.vmin * 3600 / 1852), str(self.vmax * 3600 / 1852))
+                         .format(str(self.vmin * 3600 / 1852),
+                                 str(self.vmax * 3600 / 1852))
 
         if flag == "MAX":
             self.vmax = spd * nm / 3600.
@@ -611,10 +616,10 @@ class ASAS(TrafficArrays):
                 # Distance vector using spherical earth qdr and distance
                 qdr, dist_nm = geo.qdrdist(bs.traf.lat[idx1], bs.traf.lon[idx1],
                                            bs.traf.lat[idx2], bs.traf.lon[idx2])
-                
+
                 dist = dist_nm * 1852.0 * np.array([np.sin(np.radians(qdr)),
                                                     np.cos(np.radians(qdr))])
-                
+
                 # Relative velocity vector
                 vrel = np.array([bs.traf.gseast[idx2] - bs.traf.gseast[idx1],
                                  bs.traf.gsnorth[idx2] - bs.traf.gsnorth[idx1]])
@@ -632,7 +637,8 @@ class ASAS(TrafficArrays):
                 # If two aircraft are getting in and out of conflict continously,
                 # then they it is a bouncing conflict. ASAS should stay active until
                 # the bouncing stops.
-                is_bouncing = abs(bs.traf.trk[idx1] - bs.traf.trk[idx2]) < 30.0 and hor_dist < self.Rm
+                is_bouncing = (abs(bs.traf.trk[idx1] - bs.traf.trk[idx2]) < 30.0
+                               and hor_dist < self.Rm)
 
             # Start recovery for ownship if intruder is deleted, or if past CPA
             # and not in horizontal LOS or a bouncing conflict
