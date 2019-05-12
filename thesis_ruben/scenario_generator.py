@@ -69,11 +69,10 @@ def main():
         zero_time = "0:00:00.00>"
 
         scnfile.write("# Sim commands\n")
-        scnfile.write(zero_time + "PAN {},{}\n".format(CENTER_LAT,
-                                                       CENTER_LON))
+        scnfile.write(zero_time + "PAN {},{}\n".format(CENTER_LAT, CENTER_LON))
         scnfile.write(zero_time + "DT {}\n".format(SIM_TIME_STEP))
-        scnfile.write(zero_time + "TRAIL {}\n".format(
-            "ON" if SHOW_AC_TRAILS else "OFF"))
+        scnfile.write(zero_time + "TRAIL {}\n".format("ON" if SHOW_AC_TRAILS
+                                                           else "OFF"))
         scnfile.write(zero_time + "SWRAD {}\n".format("SYM"))
         scnfile.write(zero_time + "SWRAD {}\n".format("LABEL"))
         scnfile.write(zero_time + "SWRAD {}\n".format("WPT"))
@@ -390,33 +389,33 @@ def calculate_line_ring_intersection(ring_center_lat,
     return intersect_lat, intersect_lon, angle_from_center
 
 
-def calc_departure_waypoints(NUM_DEP_DEST_POINTS,
-                             CENTER_LAT,
-                             CENTER_LON,
-                             AREA_RADIUS,
+def calc_departure_waypoints(num_dep_points,
+                             area_center_lat,
+                             area_center_lon,
+                             area_radius,
                              angle):
     """
     Calculate the locations of all departure waypoints on the area edge.
     """
 
-    angles = list(np.linspace(180 - angle + 3, 180 + angle - 3, NUM_DEP_DEST_POINTS))
-    waypoints = [bsgeo.qdrpos(CENTER_LAT, CENTER_LON, angle, AREA_RADIUS)
+    angles = list(np.linspace(180 - angle + 3, 180 + angle - 3, num_dep_points))
+    waypoints = [bsgeo.qdrpos(area_center_lat, area_center_lon, angle, area_radius)
                  for angle in angles]
 
     return waypoints
 
 
-def calc_destination_waypoints(NUM_DEP_DEST_POINTS,
-                               CENTER_LAT,
-                               CENTER_LON,
-                               AREA_RADIUS,
+def calc_destination_waypoints(num_dest_points,
+                               area_center_lat,
+                               area_center_lon,
+                               area_radius,
                                angle):
     """
     Calculate the locations of all destination waypoints on the area edge.
     """
 
-    angles = list(np.linspace(-angle + 3, angle - 3, NUM_DEP_DEST_POINTS))
-    waypoints = [bsgeo.qdrpos(CENTER_LAT, CENTER_LON, angle, AREA_RADIUS)
+    angles = list(np.linspace(-angle + 3, angle - 3, num_dest_points))
+    waypoints = [bsgeo.qdrpos(area_center_lat, area_center_lon, angle, area_radius)
                  for angle in angles]
 
     return waypoints
