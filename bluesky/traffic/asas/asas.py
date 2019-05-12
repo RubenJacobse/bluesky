@@ -218,11 +218,12 @@ class ASAS(TrafficArrays):
         if flag is None:
             return True, "ASAS module is currently {}".format("ON" if self.swasas else "OFF")
 
-        # Clear conflict list when switched off
+        # When ASAS is switched off, reset the conflict database and set all 
+        # elements of self.inconf to False.
         self.swasas = flag
         if not self.swasas:
             self.clear_conflict_database()
-            self.inconf = False
+            self.inconf = self.inconf & False
 
         return True, "ASAS module set to: {}".format("ON" if self.swasas else "OFF")
 
