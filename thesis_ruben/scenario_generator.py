@@ -262,89 +262,101 @@ def main():
 
         # Create aircaft
         scnfile.write("\n# Create aircraft\n")
+        create_aircraft(scnfile, dep_waypoints, dest_waypoints,
+                        inner_left_bottom_lat, CENTER_LON)
 
-        ac_spd = 280  # [kts] Speed
 
-        # Minimum distance and time differences at creation
-        min_dist_diff = 6  # [nm]
-        min_time_diff = min_dist_diff / 280 * 3600  # [s]
+def create_aircraft(scnfile,
+                    dep_waypoints,
+                    dest_waypoints,
+                    corridor_entry_lat,
+                    corridor_entry_lon):
+    """
+    Create all aircraft
+    """
 
-        # Store parameters of created aircraft
-        creation_time = []
-        creation_pos = []
-        creation_hdg = []
-        creation_dest = []
-        creation_dest_idx = []
+    ac_spd = 280  # [kts] Speed
 
-        num_created_ac = 0
-        while num_created_ac < NUM_EXPERIMENT_AIRCRAFT:
-            # Will be set True if creation results in a conflict
-            conflict = False
+    # Minimum distance and time differences at creation
+    min_dist_diff = 6  # [nm]
+    min_time_diff = min_dist_diff / ac_spd * 3600  # [s]
 
-            # Create an aircraft at random time and position
-            prev_time = creation_time[-1] if num_created_ac else 0
-            curr_time = prev_time + random.randint(30, 60)
+    # Store parameters of created aircraft
+    creation_time = []
+    creation_pos = []
+    creation_hdg = []
+    creation_dest = []
+    creation_dest_idx = []
 
-            curr_dep_wp_idx = random.randint(0, NUM_DEP_DEST_POINTS - 1)
-            (curr_lat, curr_lon) = dep_waypoints[curr_dep_wp_idx]
-            curr_dest_wp_idx = random.randint(0, NUM_DEP_DEST_POINTS - 1)
-            (dest_lat, dest_lon) = dest_waypoints[curr_dest_wp_idx]
+    num_created_ac = 0
+    while num_created_ac < NUM_EXPERIMENT_AIRCRAFT:
+        # Will be set True if creation results in a conflict
+        in_conflict_at_creation = False
 
-            # Heading to waypoint at start of corridor
-            curr_hdg, _ = bsgeo.qdrdist(curr_lat, curr_lon,
-                                        inner_left_bottom_lat, CENTER_LON)
+        # Create an aircraft at random time and position
+        prev_time = creation_time[-1] if num_created_ac else 0
+        curr_time = prev_time + random.randint(30, 60)
 
-            # First generated aircraft is always accepted. Each aircraft
-            # thereafter has to have at least minimum separation (in space
-            # OR time) with ALL preceeding aircraft at the time of its creation.
-            if num_created_ac > 0:
-                time_diff_list = [curr_time - t for t in creation_time]
-                dist_diff_list = [bsgeo.kwikdist(lat, lon, curr_lat, curr_lon)
-                                  for (lat, lon) in creation_pos]
+        curr_dep_wp_idx = random.randint(0, NUM_DEP_DEST_POINTS - 1)
+        (curr_lat, curr_lon) = dep_waypoints[curr_dep_wp_idx]
+        curr_dest_wp_idx = random.randint(0, NUM_DEP_DEST_POINTS - 1)
+        (dest_lat, dest_lon) = dest_waypoints[curr_dest_wp_idx]
 
-                for time_diff, dist_diff in zip(time_diff_list, dist_diff_list):
-                    # Either time OR distance difference must be smaller than minimum
-                    if not (((dist_diff < min_dist_diff) and (time_diff > min_time_diff))
-                            or ((dist_diff > min_dist_diff) and (time_diff < min_time_diff))
-                            or ((dist_diff > min_dist_diff) and (time_diff > min_time_diff))):
-                        conflict = True
-                        break
+        # Heading to waypoint at start of corridor
+        curr_hdg, _ = bsgeo.qdrdist(curr_lat, curr_lon,
+                                    corridor_entry_lat, corridor_entry_lon)
 
-                # If the current aircraft is in conflict, continue the while loop
-                if conflict:
-                    continue
+        # The first generated aircraft is always accepted. Each aircraft
+        # thereafter has to have at least minimum separation (in space
+        # OR time) with ALL existing aircraft at the time of its creation.
+        if num_created_ac > 0:
+            time_diff_list = [curr_time - t for t in creation_time]
+            dist_diff_list = [bsgeo.kwikdist(lat, lon, curr_lat, curr_lon)
+                              for (lat, lon) in creation_pos]
 
-            # Keep track of created aircraft that are not in conflict
-            creation_time.append(curr_time)
-            creation_pos.append((curr_lat, curr_lon))
-            creation_hdg.append(curr_hdg % 360)
-            creation_dest.append((dest_lat, dest_lon))
-            creation_dest_idx.append(curr_dest_wp_idx)
+            for time_diff, dist_diff in zip(time_diff_list, dist_diff_list):
+                # Either time OR distance difference must be smaller than minimum
+                if not (((dist_diff < min_dist_diff) and (time_diff > min_time_diff))
+                        or ((dist_diff > min_dist_diff) and (time_diff < min_time_diff))
+                        or ((dist_diff > min_dist_diff) and (time_diff > min_time_diff))):
+                    in_conflict_at_creation = True
+                    break
 
-            num_created_ac += 1
+            # If the current aircraft is in conflict, continue the while loop
+            # and try another random creation.
+            if in_conflict_at_creation:
+                continue
 
-        for ac_idx in range(num_created_ac):
-            # Type and altitude are always the same
-            ac_type = "B744"
-            ac_alt = "36000"
+        # Keep track of created aircraft that are not in conflict
+        creation_time.append(curr_time)
+        creation_pos.append((curr_lat, curr_lon))
+        creation_hdg.append(curr_hdg % 360)
+        creation_dest.append((dest_lat, dest_lon))
+        creation_dest_idx.append(curr_dest_wp_idx)
+        num_created_ac += 1
 
-            time_str = time.strftime('%H:%M:%S', time.gmtime(creation_time[ac_idx]))
-            time_str = "{}.00>".format(time_str)
-            aircraft_str = time_str + "CRE AC{:03d} {},{:.6f},{:.6f},{:.2f},{},{}\n"\
-                .format(ac_idx,
-                        ac_type,
-                        creation_pos[ac_idx][0],
-                        creation_pos[ac_idx][1],
-                        creation_hdg[ac_idx],
-                        ac_alt,
-                        ac_spd)
+    for ac_idx in range(num_created_ac):
+        # Type and altitude are always the same
+        ac_type = "B744"
+        ac_alt = "36000"
 
-            aircraft_str += time_str + "AC{:03d} ADDWPT COR101\n".format(ac_idx)
-            aircraft_str += time_str + "AC{:03d} ADDWPT COR201\n".format(ac_idx)
-            aircraft_str += time_str + "AC{:03d} ADDWPT DST{:03d}\n".format(
-                ac_idx, creation_dest_idx[ac_idx])
+        time_str = time.strftime('%H:%M:%S', time.gmtime(creation_time[ac_idx]))
+        time_str = "{}.00>".format(time_str)
+        aircraft_str = time_str + "CRE AC{:03d} {},{:.6f},{:.6f},{:.2f},{},{}\n"\
+            .format(ac_idx,
+                    ac_type,
+                    creation_pos[ac_idx][0],
+                    creation_pos[ac_idx][1],
+                    creation_hdg[ac_idx],
+                    ac_alt,
+                    ac_spd)
 
-            scnfile.write("\n" + aircraft_str)
+        aircraft_str += time_str + "AC{:03d} ADDWPT COR101\n".format(ac_idx)
+        aircraft_str += time_str + "AC{:03d} ADDWPT COR201\n".format(ac_idx)
+        aircraft_str += time_str + "AC{:03d} ADDWPT DST{:03d}\n" \
+            .format(ac_idx, creation_dest_idx[ac_idx])
+
+        scnfile.write("\n" + aircraft_str)
 
 
 def calculate_line_ring_intersection(ring_center_lat,
