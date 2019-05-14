@@ -101,7 +101,8 @@ def main(use_restriction_angle=False):
         scnfile.write(zero_time + "RAACONF {}\n".format(AREA_LOOKAHEAD_TIME))
 
         _ = create_area(scnfile, zero_time, "LEFT", use_restriction_angle)
-        angle_to_ring_intersect = create_area(scnfile, zero_time, "RIGHT", use_restriction_angle)
+        angle_to_ring_intersect = create_area(scnfile, zero_time,
+                                              "RIGHT", use_restriction_angle)
 
         # Angle range for traffic creation
         if use_restriction_angle:
@@ -111,33 +112,42 @@ def main(use_restriction_angle=False):
 
         # Departure waypoints
         scnfile.write("\n# Departure waypoints\n")
-        dep_waypoints = calc_departure_waypoints(
-            NUM_DEP_DEST_POINTS, CENTER_LAT, CENTER_LON, AREA_RADIUS, angle_from_centerpoint)
+        dep_waypoints = calc_departure_waypoints(NUM_DEP_DEST_POINTS,
+                                                 CENTER_LAT,
+                                                 CENTER_LON,
+                                                 AREA_RADIUS,
+                                                 angle_from_centerpoint)
 
         for fix_idx, (fix_lat, fix_lon) in enumerate(dep_waypoints):
-            scnfile.write(zero_time + "DEFWPT DEP{:03d},{:.6f},{:.6f},FIX\n".format(
-                fix_idx, fix_lat, fix_lon))
+            scnfile.write(zero_time + "DEFWPT DEP{:03d},{:.6f},{:.6f},FIX\n"
+                          .format(fix_idx, fix_lat, fix_lon))
 
         # Destination waypoints
         scnfile.write("\n# Destination waypoints\n")
-        dest_waypoints = calc_destination_waypoints(
-            NUM_DEP_DEST_POINTS, CENTER_LAT, CENTER_LON, AREA_RADIUS, angle_from_centerpoint)
+        dest_waypoints = calc_destination_waypoints(NUM_DEP_DEST_POINTS,
+                                                    CENTER_LAT,
+                                                    CENTER_LON,
+                                                    AREA_RADIUS,
+                                                    angle_from_centerpoint)
 
         for fix_idx, (fix_lat, fix_lon) in enumerate(dest_waypoints):
-            scnfile.write(zero_time + "DEFWPT DST{:03d},{:.6f},{:.6f},FIX\n".format(
-                fix_idx, fix_lat, fix_lon))
+            scnfile.write(zero_time + "DEFWPT DST{:03d},{:.6f},{:.6f},FIX\n"
+                          .format(fix_idx, fix_lat, fix_lon))
 
         # Corridor waypoints
         scnfile.write("\n# Corridor waypoints\n")
-        corridor_top_lat, _ = bsgeo.qdrpos(CENTER_LAT, CENTER_LON, 0, corridor_length/2)
-        corridor_bottom_lat, _ = bsgeo.qdrpos(CENTER_LAT, CENTER_LON, 180, corridor_length/2)
+        corridor_top_lat, _ = bsgeo.qdrpos(CENTER_LAT, CENTER_LON,
+                                           0, corridor_length/2)
+        corridor_bottom_lat, _ = bsgeo.qdrpos(CENTER_LAT, CENTER_LON,
+                                              180, corridor_length/2)
+
         scnfile.write(zero_time + "DEFWPT COR101,{:.6f},{:.6f},FIX\n"
                       .format(corridor_bottom_lat, CENTER_LON))
         scnfile.write(zero_time + "DEFWPT COR201,{:.6f},{:.6f},FIX\n"
                       .format(corridor_top_lat, CENTER_LON))
 
         # Create aircaft
-        scnfile.write("\n# Create aircraft\n")
+        scnfile.write("\n# Create {} aircraft".format(NUM_EXPERIMENT_AIRCRAFT))
         create_aircraft(scnfile, dep_waypoints, dest_waypoints,
                         corridor_bottom_lat, CENTER_LON)
 
@@ -168,9 +178,9 @@ def create_area(scnfile, zero_time, corridor_side, use_restriction_angle=False):
         arc_ext_lat, arc_ext_lon = bsgeo.qdrpos(CENTER_LAT, CENTER_LON,
                                                 arc_angle, AREA_RADIUS * 1.1)
         arc_point_lat, arc_point_lon, _ \
-            = calculate_line_ring_intersection(CENTER_LAT, CENTER_LON, AREA_RADIUS,
-                                               CENTER_LAT, CENTER_LON,
-                                               arc_ext_lat, arc_ext_lon)
+            = calc_line_ring_intersection(CENTER_LAT, CENTER_LON, AREA_RADIUS,
+                                          CENTER_LAT, CENTER_LON,
+                                          arc_ext_lat, arc_ext_lon)
         edge_angle, _ = bsgeo.qdrdist(inner_top_lat, inner_top_lon,
                                       arc_point_lat, arc_point_lon)
 
@@ -216,7 +226,8 @@ def create_area(scnfile, zero_time, corridor_side, use_restriction_angle=False):
                 outer_top_lat, outer_top_lon,
                 outer_bottom_lat, outer_bottom_lon,
                 inner_bottom_lat, inner_bottom_lon)
-    scnfile.write(zero_time + "RAA RAA{},ON,{},{},{}\n".format(area_idx, 0, 0, area_coords))
+    scnfile.write(zero_time + "RAA RAA{},ON,{},{},{}\n"
+                  .format(area_idx, 0, 0, area_coords))
     scnfile.write(zero_time + "COLOR RAA{},164,0,0\n".format(area_idx))
     scnfile.write(zero_time + "DEFWPT RAA_{},{:.6f},{:.6f},FIX\n".format(
         area_idx, CENTER_LAT, (inner_bottom_lon + outer_lon) / 2))
@@ -224,9 +235,9 @@ def create_area(scnfile, zero_time, corridor_side, use_restriction_angle=False):
     # Calculate angle from the center point to intersection between ring and
     # area edge
     _, _, top_angle_from_center \
-        = calculate_line_ring_intersection(CENTER_LAT, CENTER_LON, AREA_RADIUS,
-                                           inner_top_lat, inner_top_lon,
-                                           outer_top_lat, outer_top_lon)
+        = calc_line_ring_intersection(CENTER_LAT, CENTER_LON, AREA_RADIUS,
+                                      inner_top_lat, inner_top_lon,
+                                      outer_top_lat, outer_top_lon)
     return top_angle_from_center
 
 
@@ -323,13 +334,13 @@ def create_aircraft(scnfile,
         scnfile.write("\n" + aircraft_str)
 
 
-def calculate_line_ring_intersection(ring_center_lat,
-                                     ring_center_lon,
-                                     ring_radius,
-                                     line_start_lat,
-                                     line_start_lon,
-                                     line_end_lat,
-                                     line_end_lon):
+def calc_line_ring_intersection(ring_center_lat,
+                                ring_center_lon,
+                                ring_radius,
+                                line_start_lat,
+                                line_start_lon,
+                                line_end_lat,
+                                line_end_lon):
     """
     For a ring defined by a center latitude, longitude, and radius calculate
     the latitude and longitude of the intersection point of this ring with a
