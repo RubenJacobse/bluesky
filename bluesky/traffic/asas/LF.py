@@ -91,7 +91,7 @@ def resolve(asas, traf):
     new_v = current_v + delta_v
 
     # Get indices of aircraft that perform a resolution
-    ids = delta_v[0, :] ** 2 + delta_v[1, :] ** 2 > 0
+    idxs = delta_v[0, :] ** 2 + delta_v[1, :] ** 2 > 0
 
     # Compute new speed in polar coordinates
     new_track = np.degrees(np.arctan2(new_v[0, :], new_v[1, :])) % 360
@@ -108,8 +108,8 @@ def resolve(asas, traf):
     asas.vs = new_vs_capped
 
     # Stores resolution vector
-    asas.asase[ids] = asas.tas[ids] * np.sin(np.radians(asas.trk[ids]))
-    asas.asasn[ids] = asas.tas[ids] * np.cos(np.radians(asas.trk[ids]))
+    asas.asase[idxs] = asas.tas[idxs] * np.sin(np.radians(asas.trk[idxs]))
+    asas.asasn[idxs] = asas.tas[idxs] * np.cos(np.radians(asas.trk[idxs]))
 
     # asaseval should be set to True now
     if not asas.asaseval:
@@ -184,7 +184,7 @@ def LF(traf, asas, qdr, dist, tcpa, tLOS, idx_leader, idx_follower):
     dcpa = drel + vrel*tcpa
     mindist = np.sqrt(dcpa[0]**2 + dcpa[1]**2)
 
-    t_manv = max(30, tLOS)
+    t_manv = max(30, tcpa)
 
     # Calculate CI vector
     v_f1 = mindist / t_manv
