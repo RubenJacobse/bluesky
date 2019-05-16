@@ -24,16 +24,8 @@ import plugins.area_restriction as ar
 import bluesky.tools.geo as bsgeo
 import plugins.tempgeo as tg
 
-# Using these as constants for now, will probably become
-# function arguments later.
-corridor_length = 50  # [NM]
-corridor_width = 20  # [NM]
-restriction_angle = 45  # [deg]
-ac_creation_arc_angle = 120  # [deg]
-asas_reso_method = "MVP"
-
-
 # Module level constants
+SEED = 1
 CENTER_LAT = 0.0  # [deg]
 CENTER_LON = 0.0  # [deg]
 RMETHH = "BOTH"
@@ -46,8 +38,15 @@ EXPERIMENT_RADIUS = 75  # [NM]
 NUM_DEP_DEST_POINTS = 10  # Number of departure and destination points
 NUM_EXPERIMENT_AIRCRAFT = 100
 
+# Using these as constants for now, will probably become
+# function arguments later.
+corridor_length = 50  # [NM]
+corridor_width = 25  # [NM]
+restriction_angle = 45  # [deg]
+ac_creation_arc_angle = 90  # [deg]
+asas_reso_method = "MVP"
 
-random.seed(1)
+random.seed(SEED)
 
 
 def main(use_restriction_angle=False):
@@ -153,6 +152,9 @@ def main(use_restriction_angle=False):
 
 
 def create_area(scnfile, zero_time, corridor_side, use_restriction_angle=False):
+    """
+    Create the restricted area on a given coridor side
+    """
 
     # Area on left side is located at 270 and right side at 90
     # degrees relative to the corridor center.
