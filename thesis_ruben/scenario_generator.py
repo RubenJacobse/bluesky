@@ -37,18 +37,21 @@ AREA_RADIUS = 100  # [NM]
 EXPERIMENT_RADIUS = 75  # [NM]
 NUM_DEP_DEST_POINTS = 10  # Number of departure and destination points
 NUM_EXPERIMENT_AIRCRAFT = 100
+# AC_TYPES = ["B744", "A320", "B737", "A343"]
+# AC_TYPES_SPD = [286, 258, 260, 273]
+AC_TYPES = ["B744"]
+AC_TYPES_SPD = [280]
 
 # Passing these as arguments to create() when called as __main__
-temp_corridor_length = 40  # [NM]
-temp_corridor_width = 15  # [NM]
-temp_restriction_angle = 45  # [deg]
-temp_ac_creation_arc_angle = 90  # [deg]
-temp_asas_reso_method = "MVP"
-
-random.seed(SEED)
+CORRIDOR_LENGTH = 40  # [NM]
+CORRIDOR_WIDTH = 15  # [NM]
+RESTRICTION_ANGLE = 45  # [deg]
+ARC_ANGLE = 90  # [deg]
+RESO_METHOD = "MVP"
 
 
-def create(asas_reso_method,
+def create(random_seed,
+           asas_reso_method,
            corridor_length,
            corridor_width,
            angle,
@@ -57,6 +60,8 @@ def create(asas_reso_method,
     Create a scenario file which name reflects the properties of the
     experiment geometry.
     """
+
+    random.seed(random_seed)
 
     # Use different file name format for restriction angle source
     if is_restriction_angle:
@@ -277,9 +282,12 @@ def create_aircraft(scnfile,
     min_dist_diff = 6  # [nm]
     min_time_diff = min_dist_diff / ac_spd * 3600  # [s]
 
-    # Store parameters of created aircraft
+    # Store parameters of all created aircraft
     creation_time = []
-    creation_pos = []
+    creation_type = []
+    creation_spd = []
+    creation_lat = []
+    creation_lon = []
     creation_hdg = []
     creation_dest = []
     creation_dest_idx = []
@@ -293,6 +301,12 @@ def create_aircraft(scnfile,
         prev_time = creation_time[-1] if num_created_ac else 0
         curr_time = prev_time + random.randint(30, 60)
 
+        # Select an aircraft type and velocity
+        type_idx = random.randint(0, len(AC_TYPES) - 1)
+        curr_type = AC_TYPES[type_idx]
+        curr_spd = random.gauss(AC_TYPES_SPD[type_idx], 10)
+
+        # Select random departure and destination waypoint
         curr_dep_wp_idx = random.randint(0, NUM_DEP_DEST_POINTS - 1)
         (curr_lat, curr_lon) = dep_waypoints[curr_dep_wp_idx]
         curr_dest_wp_idx = random.randint(0, NUM_DEP_DEST_POINTS - 1)
@@ -308,7 +322,7 @@ def create_aircraft(scnfile,
         if num_created_ac > 0:
             time_diff_list = [curr_time - t for t in creation_time]
             dist_diff_list = [bsgeo.kwikdist(lat, lon, curr_lat, curr_lon)
-                              for (lat, lon) in creation_pos]
+                              for (lat, lon) in zip(creation_lat, creation_lon)]
 
             for time_diff, dist_diff in zip(time_diff_list, dist_diff_list):
                 # Either time OR distance difference must be smaller than minimum
@@ -325,7 +339,10 @@ def create_aircraft(scnfile,
 
         # Keep track of created aircraft that are not in conflict
         creation_time.append(curr_time)
-        creation_pos.append((curr_lat, curr_lon))
+        creation_type.append(curr_type)
+        creation_spd.append(curr_spd)
+        creation_lat.append(curr_lat)
+        creation_lon.append(curr_lon)
         creation_hdg.append(curr_hdg % 360)
         creation_dest.append((dest_lat, dest_lon))
         creation_dest_idx.append(curr_dest_wp_idx)
@@ -338,14 +355,14 @@ def create_aircraft(scnfile,
 
         time_str = time.strftime('%H:%M:%S', time.gmtime(creation_time[ac_idx]))
         time_str = "{}.00>".format(time_str)
-        aircraft_str = time_str + "CRE AC{:03d} {},{:.6f},{:.6f},{:.2f},{},{}\n"\
+        aircraft_str = time_str + "CRE AC{:03d} {},{:.6f},{:.6f},{:.2f},{},{:.0f}\n"\
             .format(ac_idx,
-                    ac_type,
-                    creation_pos[ac_idx][0],
-                    creation_pos[ac_idx][1],
+                    creation_type[ac_idx],
+                    creation_lat[ac_idx],
+                    creation_lon[ac_idx],
                     creation_hdg[ac_idx],
                     ac_alt,
-                    ac_spd)
+                    creation_spd[ac_idx])
 
         aircraft_str += time_str + "AC{:03d} ADDWPT COR101\n".format(ac_idx)
         aircraft_str += time_str + "AC{:03d} ADDWPT COR201\n".format(ac_idx)
@@ -431,16 +448,18 @@ def calc_destination_waypoints(num_dest_points,
 
 
 if __name__ == "__main__":
-    # If using arc
-    create(temp_asas_reso_method,
-           temp_corridor_length,
-           temp_corridor_width,
-           temp_ac_creation_arc_angle,
+    # If using arc angle
+    create(1,
+           RESO_METHOD,
+           CORRIDOR_LENGTH,
+           CORRIDOR_WIDTH,
+           ARC_ANGLE,
            is_restriction_angle=False)
 
     # If using restriction angle
-    create(temp_asas_reso_method,
-           temp_corridor_length,
-           temp_corridor_width,
-           temp_restriction_angle,
+    create(1,
+           RESO_METHOD,
+           CORRIDOR_LENGTH,
+           CORRIDOR_WIDTH,
+           RESTRICTION_ANGLE,
            is_restriction_angle=True)
