@@ -38,32 +38,49 @@ EXPERIMENT_RADIUS = 75  # [NM]
 NUM_DEP_DEST_POINTS = 10  # Number of departure and destination points
 NUM_EXPERIMENT_AIRCRAFT = 100
 
-# Using these as constants for now, will probably become
-# function arguments later.
-corridor_length = 50  # [NM]
-corridor_width = 25  # [NM]
-restriction_angle = 45  # [deg]
-ac_creation_arc_angle = 90  # [deg]
-asas_reso_method = "MVP"
+# Passing these as arguments to create() when called as __main__
+temp_corridor_length = 40  # [NM]
+temp_corridor_width = 15  # [NM]
+temp_restriction_angle = 45  # [deg]
+temp_ac_creation_arc_angle = 90  # [deg]
+temp_asas_reso_method = "MVP"
 
 random.seed(SEED)
 
 
-def main(use_restriction_angle=False):
+def create(asas_reso_method,
+           corridor_length,
+           corridor_width,
+           angle,
+           is_restriction_angle=False):
     """
     Create a scenario file which name reflects the properties of the
     experiment geometry.
     """
 
-    file_name = "C{}_{}_L{}_W{}_AR{}_A{}_NP{}_RESO-{}.scn"\
-        .format(CENTER_LAT,
-                CENTER_LON,
-                corridor_length,
-                corridor_width,
-                AREA_RADIUS,
-                restriction_angle,
-                NUM_DEP_DEST_POINTS,
-                asas_reso_method)
+    # Use different file name format for restriction angle source
+    if is_restriction_angle:
+        file_name = "SEED{}_C{}_{}_L{}_W{}_R{}_ANG{}_NP{}_RESO-{}.scn"\
+            .format(SEED,
+                    CENTER_LAT,
+                    CENTER_LON,
+                    corridor_length,
+                    corridor_width,
+                    AREA_RADIUS,
+                    angle,
+                    NUM_DEP_DEST_POINTS,
+                    asas_reso_method)
+    else:
+        file_name = "SEED{}_C{}_{}_L{}_W{}_R{}_ARC{}_NP{}_RESO-{}.scn"\
+            .format(SEED,
+                    CENTER_LAT,
+                    CENTER_LON,
+                    corridor_length,
+                    corridor_width,
+                    AREA_RADIUS,
+                    angle,
+                    NUM_DEP_DEST_POINTS,
+                    asas_reso_method)
 
     # Open file, overwrite if existing
     with open(file_name, "w+") as scnfile:
@@ -99,15 +116,18 @@ def main(use_restriction_angle=False):
         scnfile.write(zero_time + "PLUGINS LOAD {}\n".format(PLUGIN_NAME))
         scnfile.write(zero_time + "RAACONF {}\n".format(AREA_LOOKAHEAD_TIME))
 
-        _ = create_area(scnfile, zero_time, "LEFT", use_restriction_angle)
-        angle_to_ring_intersect = create_area(scnfile, zero_time,
-                                              "RIGHT", use_restriction_angle)
+        _ = create_area(scnfile, zero_time, corridor_width,
+                        corridor_length, "LEFT",
+                        angle, is_restriction_angle)
+        angle_to_ring_intersect = create_area(scnfile, zero_time, corridor_width,
+                                              corridor_length, "RIGHT",
+                                              angle, is_restriction_angle)
 
         # Angle range for traffic creation
-        if use_restriction_angle:
+        if is_restriction_angle:
             angle_from_centerpoint = angle_to_ring_intersect
         else:
-            angle_from_centerpoint = ac_creation_arc_angle / 2
+            angle_from_centerpoint = angle / 2
 
         # Departure waypoints
         scnfile.write("\n# Departure waypoints\n")
@@ -151,7 +171,8 @@ def main(use_restriction_angle=False):
                         corridor_bottom_lat, CENTER_LON)
 
 
-def create_area(scnfile, zero_time, corridor_side, use_restriction_angle=False):
+def create_area(scnfile, zero_time, corridor_width, corridor_length,
+                corridor_side, angle, is_restriction_angle=False):
     """
     Create the restricted area on a given coridor side
     """
@@ -171,12 +192,10 @@ def create_area(scnfile, zero_time, corridor_side, use_restriction_angle=False):
                                        east_west_angle, corridor_width / 2)
 
     # Determine the angle of the area edge
-    if use_restriction_angle:
-        edge_angle = (restriction_angle if corridor_side == "RIGHT"
-                      else -restriction_angle)
+    if is_restriction_angle:
+        edge_angle = (angle if corridor_side == "RIGHT" else -angle)
     else:
-        arc_angle = (ac_creation_arc_angle / 2 if corridor_side == "RIGHT"
-                     else -ac_creation_arc_angle / 2)
+        arc_angle = (angle / 2 if corridor_side == "RIGHT" else -angle / 2)
         arc_ext_lat, arc_ext_lon = bsgeo.qdrpos(CENTER_LAT, CENTER_LON,
                                                 arc_angle, AREA_RADIUS * 1.1)
         arc_point_lat, arc_point_lon, _ \
@@ -412,4 +431,16 @@ def calc_destination_waypoints(num_dest_points,
 
 
 if __name__ == "__main__":
-    main()
+    # If using arc
+    create(temp_asas_reso_method,
+           temp_corridor_length,
+           temp_corridor_width,
+           temp_ac_creation_arc_angle,
+           is_restriction_angle=False)
+
+    # If using restriction angle
+    create(temp_asas_reso_method,
+           temp_corridor_length,
+           temp_corridor_width,
+           temp_restriction_angle,
+           is_restriction_angle=True)
