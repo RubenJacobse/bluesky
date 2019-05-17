@@ -37,7 +37,7 @@ VAR_DEFAULTS = {"float": 0.0,
                 "object": None}
 DEFAULT_AREA_T_LOOKAHEAD = 120  # [s]
 AREA_AVOIDANCE_CRS_MARGIN = 2  # [deg]
-COMMANDED_CRS_MARGIN = 0.2  # [deg] Used to verify if a commanded heading has been reached
+COMMANDED_CRS_MARGIN = 0.2  # [deg] Verify if commanded heading has been reached
 NM_TO_M = 1852.  # Conversion factor nautical miles to metres
 
 
@@ -49,81 +49,33 @@ def init_plugin():
 
     # Configuration parameters
     config = {
-        # The name of your plugin
         "plugin_name": "RAA",
-
-        # The type of this plugin. For now, only simulation plugins are possible.
         "plugin_type": "sim",
-
-        # Update interval in seconds. By default, your plugin's update function(s)
-        # are called every timestep of the simulation. If your plugin needs less
-        # frequent updates provide an update interval.
         "update_interval": 1.0,
-
-        # The update function is called after traffic is updated. Use this if you
-        # want to do things as a result of what happens in traffic. If you need to
-        # something before traffic is updated please use preupdate.
         "update": areas.update,
-
-        # The preupdate function is called before traffic is updated. Use this
-        # function to provide settings that need to be used by traffic in the current
-        # timestep. Examples are ASAS, which can give autopilot commands to resolve
-        # a conflict.
         "preupdate": areas.preupdate,
-
-        # If your plugin has a state, you will probably need a reset function to
-        # clear the state in between simulations.
         "reset": areas.reset,
-
-        # The remove functin is called before the plugin is removed and can be used to
-        # clear any references to the plugin.
         "remove": areas.remove,
     }
 
     stackfunctions = {
-        # The command name for your function
         "RAA": [
-            # A short usage string. This will be printed if you type HELP <name> in the
-            # BlueSky console
             "RAA name, ON/OFF, gsnorth, gseast, [lat1,lon1,lat2,lon2,...]",
-
-            # A list of the argument types your function accepts. For a description of this, see...
             "txt,onoff,spd,spd,[latlon,...]",
-
-            # The name of your function in this plugin
             areas.create_area,
-
-            # A longer help text of your function.
             "Create restricted airspace areas that are to be avoided by all traffic."],
         "DELRAA": [
-            # A short usage string. This will be printed if you type HELP <name> in the
-            # BlueSky console
             "DELRAA name",
-
-            # A list of the argument types your function accepts. For a description of this, see...
             "txt",
-
-            # The name of your function in this plugin
             areas.delete_area,
-
-            # a longer help text of your function.
             "Delete a given restricted airspace area."],
         "RAACONF": [
-            # A short usage string. This will be printed if you type HELP <name> in the
-            # BlueSky console
             "RAACONF t_lookahead",
-
-            # A list of the argument types your function accepts. For a description of this, see ...
             "int",
-
-            # The name of your function in this plugin
             areas.set_t_lookahead,
-
-            # a longer help text of your function.
             "Set the lookahead time used for area avoidance in seconds."]
     }
 
-    # init_plugin() should always return these two dicts.
     return config, stackfunctions
 
 
@@ -187,9 +139,9 @@ class AreaRestrictionManager(TrafficArrays):
 
             # Aircraft track relative to each area. For n aircraft and m areas
             # this will be filled with n lists each with m LineString elements
-            self.relative_track = []  # Shapely LineString [(lon, lat), (lon, lat)]
+            self.relative_track = []  # LineString [(lon, lat), (lon, lat)]
 
-            # Control mode for each aircraft during current and previous time step
+            # Aircraft control mode during current and previous time step
             self.current_control_mode = []
             self.previous_control_mode = []
 
@@ -393,16 +345,20 @@ class AreaRestrictionManager(TrafficArrays):
         """ Create a new restricted airspace area """
 
         if area_id in self.area_ids:
-            return False, "Error: Airspace restriction {} already exists".format(area_id)
+            return False, "Error: Airspace restriction {} already exists" \
+                .format(area_id)
 
         # Create new RestrictedAirspaceArea instance and add to internal lists
-        new_area = RestrictedAirspaceArea(area_id, area_status, gseast, gsnorth, list(coords))
+        new_area = RestrictedAirspaceArea(area_id,
+                                          area_status,
+                                          gseast,
+                                          gsnorth,
+                                          list(coords))
 
         self.areas.append(new_area)
         self.area_ids.append(area_id)
 
         for var in self._LstVars:  # Lists (mostly used for strings)
-
             # Get type
             vartype = None
             lst = self.__dict__.get(var)
@@ -470,13 +426,15 @@ class AreaRestrictionManager(TrafficArrays):
             return True, "Sucessfully deleted airspace restriction {}".format(area_id)
 
     def set_t_lookahead(self, new_t_lookahead):
-        """ Change the look-ahead-time used for aircraft-area conflict detection. """
+        """ 
+        Change the look-ahead-time used for aircraft-area conflict detection.
+        """
 
         if isinstance(new_t_lookahead, int):
             self.t_lookahead = new_t_lookahead
             is_set_to_new = True
-            console_str = "Aircraft-area conflict look-ahead-time set to {} seconds"\
-                .format(new_t_lookahead)
+            console_str = "Aircraft-area conflict look-ahead-time set to " \
+                          + "{} seconds".format(new_t_lookahead)
         else:
             is_set_to_new = False
             console_str = "Error: Look-ahead-time should be an integer value"
@@ -485,15 +443,12 @@ class AreaRestrictionManager(TrafficArrays):
 
     def calculate_courses_to_waypoints(self):
         """
-        For all aircraft calculate the course to the active and next
-        waypoint.
+        For all aircraft calculate the course to the active and next waypoint.
         """
 
         # Find course to active waypoint
-        qdr_to_active_wp, _ = qdrdist(bs.traf.lat,
-                                      bs.traf.lon,
-                                      bs.traf.actwp.lat,
-                                      bs.traf.actwp.lon)
+        qdr_to_active_wp, _ = qdrdist(bs.traf.lat, bs.traf.lon,
+                                      bs.traf.actwp.lat, bs.traf.actwp.lon)
 
         self.crs_to_active_wp = ned2crs(qdr_to_active_wp)
 
@@ -512,7 +467,8 @@ class AreaRestrictionManager(TrafficArrays):
             nextwp_lat[ac_idx] = bs.traf.ap.route[ac_idx].wplat[self.idx_next_wp[ac_idx]]
             nextwp_lon[ac_idx] = bs.traf.ap.route[ac_idx].wplon[self.idx_next_wp[ac_idx]]
 
-        qdr_to_next_wp, _ = qdrdist(bs.traf.lat, bs.traf.lon, nextwp_lat, nextwp_lon)
+        qdr_to_next_wp, _ = qdrdist(bs.traf.lat, bs.traf.lon,
+                                    nextwp_lat, nextwp_lon)
         self.crs_to_next_wp = ned2crs(qdr_to_next_wp)
 
     def calculate_positions_and_relative_tracks(self):
@@ -526,26 +482,29 @@ class AreaRestrictionManager(TrafficArrays):
                                  for (lon, lat) in zip(bs.traf.lon, bs.traf.lat)]
 
         # NOTE: we need to build this list of lists iteratively, otherwise each
-        # sub-element is a pointer to the same list, and the relative_track[idx].append()
+        # sub-element is a pointer to the same list, and relative_track[idx].append()
         # will append to ALL sub lists...
         relative_track = [[] for i in range(self.num_traf)]
 
-        # NOTE: Could this be vectorized instead of looped over all aircraft-area combinations?
+        # NOTE: Could this be vectorized instead of looped over all
+        # aircraft-area combinations?
         for area_idx, area in enumerate(self.areas):
             self.rel_gseast[area_idx, :] = bs.traf.gseast - area.gseast
             self.rel_gsnorth[area_idx, :] = bs.traf.gsnorth - area.gsnorth
 
-            # Calculate position of each aircraft relative to the area after lookahead time
-            future_relative_lon, future_relative_lat = \
-                calc_future_pos(self.t_lookahead,
-                                bs.traf.lon,
-                                bs.traf.lat,
-                                self.rel_gseast[area_idx, :],
-                                self.rel_gsnorth[area_idx, :])
+            # Calculate position of each aircraft relative to the area after
+            # lookahead time
+            future_relative_lon, future_relative_lat \
+                = calc_future_pos(self.t_lookahead,
+                                  bs.traf.lon,
+                                  bs.traf.lat,
+                                  self.rel_gseast[area_idx, :],
+                                  self.rel_gsnorth[area_idx, :])
 
             # Create shapely points for future relative position
-            future_relative_position = [spgeom.Point(lon, lat) for (lon, lat)
-                                        in zip(future_relative_lon, future_relative_lat)]
+            future_relative_position \
+                = [spgeom.Point(lon, lat) for (lon, lat)
+                   in zip(future_relative_lon, future_relative_lat)]
 
             # Use current and future relative position to calculate relative track
             for ac_idx, (curr, fut) in enumerate(zip(self.current_position,
@@ -565,8 +524,10 @@ class AreaRestrictionManager(TrafficArrays):
             = area.calc_rhumb_tangents(bs.traf.ntraf, bs.traf.lon, bs.traf.lat)
 
         # Convert to course on [0..360] degrees
-        self.crs_left_tangent[area_idx, :] = self.brg_left_tangent[area_idx, :] % 360
-        self.crs_right_tangent[area_idx, :] = self.brg_right_tangent[area_idx, :] % 360
+        self.crs_left_tangent[area_idx, :] \
+            = self.brg_left_tangent[area_idx, :] % 360
+        self.crs_right_tangent[area_idx, :] \
+            = self.brg_right_tangent[area_idx, :] % 360
 
     def find_ac_inside_and_inconflict(self, area_idx, area):
         """ Check whether each aircraft is inside the area. """
@@ -590,19 +551,26 @@ class AreaRestrictionManager(TrafficArrays):
 
         for ac_idx in range(self.num_traf):
             if self.is_inside[area_idx, ac_idx]:
-                t_int = 0  # NOTE: If area avoidance works properly, this should never happen!
+                t_int = 0  # If this happens, area avoidance has failed!...
             elif self.is_in_conflict[area_idx, ac_idx]:
-                # Find intersection points of the relative vector with the area and use the
-                # distance to the closest point to calculate time-to-intersection. (We cannot
-                # use shapely distance functions because vertex definitions are in degrees).
-                intr_points = area.ring.intersection(self.relative_track[ac_idx][area_idx])
-                intr_closest = spops.nearest_points(self.current_position[ac_idx], intr_points)[1]
-                intr_closest_lat, intr_closest_lon = intr_closest.y, intr_closest.x
+                # Find intersection points of the relative vector with the area
+                # and use the distance to the closest point to calculate time to
+                # intersection. (We cannot use shapely distance functions because
+                # vertex definitions are in degrees).
+                intr_points = area.ring.intersection(
+                    self.relative_track[ac_idx][area_idx])
+                intr_closest = spops.nearest_points(
+                    self.current_position[ac_idx], intr_points)[1]
+                intr_closest_lat, intr_closest_lon \
+                    = intr_closest.y, intr_closest.x
+
+                # Calculate distance in NM and then convert to meters
                 _, intr_dist_nm = qdrdist(bs.traf.lat[ac_idx],
                                           bs.traf.lon[ac_idx],
                                           intr_closest_lat,
                                           intr_closest_lon)
-                intr_dist_m = intr_dist_nm * NM_TO_M  # qdrdist returns dist in NM, convert to m
+                intr_dist_m = intr_dist_nm * NM_TO_M
+
                 t_int = intr_dist_m / bs.traf.gs[ac_idx]
             else:
                 t_int = -1
@@ -621,8 +589,9 @@ class AreaRestrictionManager(TrafficArrays):
 
         self.closest_conflicting_area_idx = [None] * self.num_traf
 
-        # Loop over all aircraft-area combinations and for each aircraft store the
-        # index of the area where the time to intrusion is the smallest positive number.
+        # Loop over all aircraft-area combinations and for each aircraft
+        # store the index of the area where the time to intrusion is the
+        # smallest positive number.
         for ac_idx, t_int_column in enumerate(self.time_to_intrusion.T):
             curr_lowest_t_int = 1e9
             for area_idx, t_int in enumerate(t_int_column):
@@ -632,11 +601,14 @@ class AreaRestrictionManager(TrafficArrays):
 
         # Find indices of conflicting aircraft-area pairs
         conflict_pairs = [(ac_idx, area_idx) for ac_idx, area_idx
-                          in enumerate(self.closest_conflicting_area_idx) if area_idx is not None]
+                          in enumerate(self.closest_conflicting_area_idx)
+                          if area_idx is not None]
 
-        # Per area, calculate resolution vectors for all aircraft conflicting with that area
+        # Per area, calculate resolution vectors for all aircraft conflicting
+        # with that area
         for area_idx in range(self.num_areas):
-            ac_indices = [ac for ac, area in conflict_pairs if area == area_idx]
+            ac_indices = [ac for ac, area in conflict_pairs
+                          if area == area_idx]
 
             if ac_indices:
                 self.calculate_resolutions_for_single_area(area_idx, ac_indices)
@@ -657,9 +629,9 @@ class AreaRestrictionManager(TrafficArrays):
         u_r_north = np.cos(np.radians(self.brg_right_tangent[area_idx, ac_indices]))
 
         # For heading-change-only resolution maneuvers, the resolution vector lies
-        # on the edge of the Velocity Obstacle (or Collision Cone if area is non-moving).
-        # The vector magnitudes are the same as the current aircraft ground speeds
-        # (assuming zero wind).
+        # on the edge of the Velocity Obstacle (or Collision Cone if area is
+        # non-moving). The vector magnitudes are the same as the current aircraft
+        # ground speeds (assuming zero wind).
         if area.gs:
             # Find angles between -vrel and left- and right edges of VO using dot
             # product of -vrel and the unit vectors along the VO edges
@@ -693,8 +665,9 @@ class AreaRestrictionManager(TrafficArrays):
         vres_r_crs = (np.degrees(np.arctan2(vres_r_east, vres_r_north))
                       + AREA_AVOIDANCE_CRS_MARGIN) % 360
 
-        # Determine which of the two resolution vectors should be used based on the course to
-        # the current active waypoint. We choose the course with the smallest angle difference
+        # Determine which of the two resolution vectors should be used based on
+        # the course to the current active waypoint. We choose the course with the
+        # smallest angle difference
         wp_crs = self.crs_to_active_wp[ac_indices]
         new_crs = crs_closest(wp_crs, vres_l_crs, vres_r_crs)
 
@@ -853,9 +826,11 @@ class RestrictedAirspaceArea():
 
         # Area coordinates will be stored in four formats:
         #  - self.verts  : numpy array containing [lon, lat] pairs per vertex
-        #  - self.ring   : Shapely LinearRing (in lon,lat order) for geometric calculations
-        #  - self.poly   : Shapely Polygon (in lon, lat order) for geometric calculations
-        #  - self.coords : List of sequential lat,lon pairs for BlueSky functions
+        #  For geometrical calculations:
+        #  - self.ring   : Shapely LinearRing (in lon,lat order)
+        #  - self.poly   : Shapely Polygon (in lon, lat order)
+        # For use in BlueSky functions
+        #  - self.coords : List of sequential lat,lon pairs
         self.verts = self._coords2verts(coords)
         self.ring = spgeom.LinearRing(self.verts)
         self.poly = spgeom.Polygon(self.verts)
@@ -874,22 +849,29 @@ class RestrictedAirspaceArea():
         position drawn in the BlueSky RadarWidget.
         """
 
-        if self.gsnorth or self.gseast:
-            # Calculate new vertex positions after timestep dt
-            curr_lon = self.verts[:, 0]
-            curr_lat = self.verts[:, 1]
-            newlon, newlat = calc_future_pos(dt, curr_lon, curr_lat, self.gseast, self.gsnorth)
+        if not (self.gsnorth or self.gseast):
+            return
 
-            # Update vertex representations in all formats
-            self.verts = np.array([newlon, newlat]).T
-            self.ring = spgeom.LinearRing(self.verts)
-            self.poly = spgeom.Polygon(self.verts)
-            self.coords = self._verts2coords(self.verts)
+        # Calculate new vertex positions after timestep dt
+        curr_lon = self.verts[:, 0]
+        curr_lat = self.verts[:, 1]
+        newlon, newlat = calc_future_pos(dt,
+                                         curr_lon,
+                                         curr_lat,
+                                         self.gseast,
+                                         self.gsnorth)
 
-            # Remove current drawing and redraw new position on BlueSky RadarWidget canvas
-            # NOTE: Can probably be improved by a lot!
-            self._undraw()
-            self._draw()
+        # Update vertex representations in all formats
+        self.verts = np.array([newlon, newlat]).T
+        self.ring = spgeom.LinearRing(self.verts)
+        self.poly = spgeom.Polygon(self.verts)
+        self.coords = self._verts2coords(self.verts)
+
+        # Remove current drawing and redraw new position on the BlueSky
+        # RadarWidget canvas
+        # NOTE: Can probably be improved by a lot!
+        self._undraw()
+        self._draw()
 
     def delete(self):
         """
@@ -910,11 +892,11 @@ class RestrictedAirspaceArea():
         If this is not already the case then create a valid polygon.
         """
 
-        # Make sure the border is a closed ring (first and last coordinate pair should be the same)
+        # Ensure the border is a closed ring
         if (coords[0], coords[1]) != (coords[-2], coords[-1]):
             coords = coords + [coords[0], coords[1]]
 
-        # If the coordinates are not ordered in ccw direction, then rearrange the coords
+        # Ensure coordinates are defined in ccw direction
         if not self.is_ccw(coords):
             reordered = []
             for ii in range(0, len(coords) - 1, 2):
@@ -986,12 +968,13 @@ class RestrictedAirspaceArea():
         for ii in range(num_traf):
             ac_pos = [ac_lon[ii], ac_lat[ii]]
 
-            # Start by assuming both tangents touch at polygon vertex with index 0
+            # Start by assuming both tangents touch at vertex with index 0
             idx_left_vert = 0
             idx_right_vert = 0
 
-            # Loop over vertices 1:n-1 and evaluate position of aircraft wrt the edges
-            # to find the indices of the vertices at which the tangents touch the polygon
+            # Loop over vertices 1:n-1 and evaluate position of aircraft wrt
+            # the edges to find the indices of the vertices at which the tangents
+            # touch the polygon
             #
             # Algorithm from: http://geomalgorithms.com/a15-_tangents.html
             for jj in range(1, len(vertex) - 1):
