@@ -180,7 +180,7 @@ def test_arm_reset(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
     assert AreaRestrictionManager_.areas == []
     assert AreaRestrictionManager_.area_ids == []
     assert AreaRestrictionManager_.num_areas == 0
-    assert AreaRestrictionManager_.t_lookahead == 300
+    assert AreaRestrictionManager_.t_lookahead == 120
 
 def test_arm_preupdate(AreaRestrictionManager_, MockTraf_, areafilter_, mocktraf_):
     """ Test the preupdate() method. """
