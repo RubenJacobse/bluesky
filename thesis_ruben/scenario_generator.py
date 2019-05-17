@@ -25,6 +25,7 @@ import bluesky.tools.geo as bsgeo
 import plugins.tempgeo as tg
 
 # Module level constants
+SIM_PAUSE_HOUR = 2
 SEED = 1
 CENTER_LAT = 0.0  # [deg]
 CENTER_LON = 0.0  # [deg]
@@ -102,6 +103,7 @@ def create(random_seed,
         scnfile.write(zero_time + "SWRAD {}\n".format("SAT"))
         scnfile.write(zero_time + "SWRAD {}\n".format("APT"))
         scnfile.write(zero_time + "FF\n")
+        scnfile.write("{}:00:00.00>PAUSE\n".format(SIM_PAUSE_HOUR))
 
         scnfile.write("\n# Setup circular experiment area and activate it"
                       + " as a traffic area in BlueSky\n")
@@ -317,8 +319,8 @@ def create_aircraft(scnfile,
                                     corridor_entry_lat, corridor_entry_lon)
 
         # The first generated aircraft is always accepted. Each aircraft
-        # thereafter has to have at least minimum separation (in space
-        # OR time) with ALL existing aircraft at the time of its creation.
+        # thereafter has to have at least minimum separation in space
+        # OR time with ALL existing aircraft at the time of its creation.
         if num_created_ac > 0:
             time_diff_list = [curr_time - t for t in creation_time]
             dist_diff_list = [bsgeo.kwikdist(lat, lon, curr_lat, curr_lon)
@@ -348,9 +350,9 @@ def create_aircraft(scnfile,
         creation_dest_idx.append(curr_dest_wp_idx)
         num_created_ac += 1
 
+    # Print each aircraft to file
     for ac_idx in range(num_created_ac):
-        # Type and altitude are always the same
-        ac_type = "B744"
+        # Altitude is the same for all aircraft
         ac_alt = "36000"
 
         time_str = time.strftime('%H:%M:%S', time.gmtime(creation_time[ac_idx]))
