@@ -20,7 +20,7 @@ import shapely.ops as spops
 
 # BlueSky imports
 import bluesky as bs
-from bluesky.tools import areafilter
+from bluesky.tools import areafilter, datalog
 from bluesky.tools.aero import Rearth
 from bluesky.tools.geo import qdrdist
 from bluesky.tools.trafficarrays import TrafficArrays, RegisterElementParameters
@@ -40,6 +40,11 @@ AREA_AVOIDANCE_CRS_MARGIN = 2  # [deg]
 COMMANDED_CRS_MARGIN = 0.2  # [deg] Verify if commanded heading has been reached
 NM_TO_M = 1852.  # Conversion factor nautical miles to metres
 
+CONFLOG_HEADER = ("AREA CONFLICT LOGGER\n"
+                  + "simt [s], "
+                  + "ac callsign [-], "
+                  + "area idx[-], "
+                  + "t_int [s]")
 
 def init_plugin():
     """Initialize the RAA plugin"""
@@ -154,6 +159,10 @@ class AreaRestrictionManager(TrafficArrays):
         # Default look-ahead-time in seconds, used to
         # detect aircraft-area conflicts
         self.t_lookahead = DEFAULT_AREA_T_LOOKAHEAD
+
+        # Create and start area conflict logger
+        self.area_conf_logger = datalog.crelog("AREA_CONF_LOG", None, CONFLOG_HEADER)
+        self.area_conf_logger.start()
 
     def make_parameter_lists(self, keys):
         """
@@ -303,6 +312,9 @@ class AreaRestrictionManager(TrafficArrays):
         self.num_traf = 0
         self.t_lookahead = DEFAULT_AREA_T_LOOKAHEAD
 
+        # Reset loggers
+        self.area_conf_logger.reset()
+
     def remove(self):
         """ Called when plugin is removed. """
 
@@ -426,7 +438,7 @@ class AreaRestrictionManager(TrafficArrays):
             return True, "Sucessfully deleted airspace restriction {}".format(area_id)
 
     def set_t_lookahead(self, new_t_lookahead):
-        """ 
+        """
         Change the look-ahead-time used for aircraft-area conflict detection.
         """
 
@@ -576,6 +588,11 @@ class AreaRestrictionManager(TrafficArrays):
                 t_int = -1
 
             self.time_to_intrusion[area_idx, ac_idx] = t_int
+
+            if not t_int == -1:
+                self.area_conf_logger.log(np.array(bs.traf.id)[[ac_idx]],
+                                          self.area_ids[area_idx],
+                                          t_int)
 
     def calculate_area_resolution_vectors(self):
         """
