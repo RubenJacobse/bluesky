@@ -112,9 +112,10 @@ def main():
         if modulename is None:
             raise error
         else:
-            print("BlueSky needs Python package: {}".format(modulename))
+            print("BlueSky needs: {}".format(modulename))
+            print("Run setup-python.bat (Windows) or check requirements.txt (other systems)")
             print("Install using e.g. 'pip install {}'".format(modulename))
-
+        
     print('BlueSky normal end.')
 
 
