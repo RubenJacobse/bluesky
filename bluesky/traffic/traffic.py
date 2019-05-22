@@ -134,10 +134,6 @@ class Traffic(TrafficArrays):
             self.bank     = np.array([])  # nominal bank angle, [radian]
             self.swhdgsel = np.array([], dtype=np.bool)  # determines whether aircraft is turning
 
-            # Crossover altitude
-            self.abco   = np.array([])
-            self.belco  = np.array([])
-
             # limit settings
             self.limspd      = np.array([])  # limit speed
             self.limspd_flag = np.array([], dtype=np.bool)  # flag for limit spd - we have to test for max and min
@@ -287,10 +283,6 @@ class Traffic(TrafficArrays):
         self.ax[-n:]      = kts           # absolute value of longitudinal accelleration
         self.bank[-n:]    = np.radians(25.)
 
-        # Crossover altitude
-        self.abco[-n:]   = 0  # not necessary to overwrite 0 to 0, but leave for clarity
-        self.belco[-n:]  = 1
-
         # Traffic autopilot settings
         self.selspd[-n:] = self.cas[-n:]
         self.aptas[-n:]  = self.tas[-n:]
@@ -427,11 +419,12 @@ class Traffic(TrafficArrays):
 
         # Turning
         turnrate = np.degrees(g0 * np.tan(self.bank) / np.maximum(self.tas, self.eps))
-        delhdg = (self.pilot.hdg - self.hdg + 180) % 360 - 180 # [deg]
-        self.swhdgsel = np.abs(delhdg) > np.abs(2 * simdt * turnrate)
+        delhdg = (self.pilot.hdg - self.hdg + 180) % 360 - 180  # [deg]
+        self.swhdgsel = np.abs(delhdg) > np.abs(1.5 * simdt * turnrate)
 
         # Update heading
-        self.hdg = (self.hdg + simdt * turnrate * self.swhdgsel * np.sign(delhdg)) % 360.
+        self.hdg = (self.hdg + np.where(self.swhdgsel,
+            simdt * turnrate * np.sign(delhdg), delhdg)) % 360.0
 
         # Update vertical speed
         delta_alt = self.pilot.alt - self.alt
