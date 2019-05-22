@@ -450,9 +450,30 @@ def calc_destination_waypoints(num_dest_points,
 
 
 if __name__ == "__main__":
-    # If using arc angle
+    # When running as main, generate a file for each relevant resolution method
     create(1,
-           RESO_METHOD,
+           "OFF",
+           CORRIDOR_LENGTH,
+           CORRIDOR_WIDTH,
+           ARC_ANGLE,
+           is_restriction_angle=False)
+
+    create(1,
+           "MVP",
+           CORRIDOR_LENGTH,
+           CORRIDOR_WIDTH,
+           ARC_ANGLE,
+           is_restriction_angle=False)
+
+    create(1,
+           "LF",
+           CORRIDOR_LENGTH,
+           CORRIDOR_WIDTH,
+           ARC_ANGLE,
+           is_restriction_angle=False)
+
+    create(1,
+           "SWARM",
            CORRIDOR_LENGTH,
            CORRIDOR_WIDTH,
            ARC_ANGLE,
