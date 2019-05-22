@@ -306,7 +306,7 @@ def create_aircraft(scnfile,
         # Select an aircraft type and velocity
         type_idx = random.randint(0, len(AC_TYPES) - 1)
         curr_type = AC_TYPES[type_idx]
-        curr_spd = random.gauss(AC_TYPES_SPD[type_idx], 10)
+        curr_spd = random.gauss(AC_TYPES_SPD[type_idx], 5)
 
         # Select random departure and destination waypoint
         curr_dep_wp_idx = random.randint(0, NUM_DEP_DEST_POINTS - 1)
@@ -457,11 +457,3 @@ if __name__ == "__main__":
            CORRIDOR_WIDTH,
            ARC_ANGLE,
            is_restriction_angle=False)
-
-    # If using restriction angle
-    create(1,
-           RESO_METHOD,
-           CORRIDOR_LENGTH,
-           CORRIDOR_WIDTH,
-           RESTRICTION_ANGLE,
-           is_restriction_angle=True)
