@@ -11,6 +11,7 @@ import sys
 import os
 import time
 import random
+import datetime
 
 # Third-party imports
 import numpy as np
@@ -25,33 +26,37 @@ import bluesky.tools.geo as bsgeo
 import plugins.tempgeo as tg
 
 # Module level constants
-SIM_PAUSE_HOUR = 2
-SEED = 1
 CENTER_LAT = 0.0  # [deg]
 CENTER_LON = 0.0  # [deg]
-RMETHH = "BOTH"
 PLUGIN_NAME = "RAA"
 AREA_LOOKAHEAD_TIME = 120
 SIM_TIME_STEP = 0.05  # [s] Simulation time step
+SIM_PAUSE_HOUR = 3  # [h] Pause simulation after this time
+RMETHH = "BOTH"  # Horizontal resolution method, allow both spd and hdg changes
 SHOW_AC_TRAILS = True
 AREA_RADIUS = 100  # [NM]
 EXPERIMENT_RADIUS = 75  # [NM]
 NUM_DEP_DEST_POINTS = 10  # Number of departure and destination points
 NUM_EXPERIMENT_AIRCRAFT = 100
-# AC_TYPES = ["B744", "A320", "B737", "A343"]
+# AC_TYPES = ["B744", "A320", "B738", "A343"]
 # AC_TYPES_SPD = [286, 258, 260, 273]
 AC_TYPES = ["B744"]
 AC_TYPES_SPD = [280]
+SPD_STDDEV = 5  # [kts]
+AC_CRE_INTERVAL_MIN = 30  # [s] Minimum interval between creation of aircraft
+AC_CRE_INTERVAL_MAX = 90  # [s] Maximum interval between creation of aircraft
 
 # Passing these as arguments to create() when called as __main__
+SEED = 1
 CORRIDOR_LENGTH = 40  # [NM]
-CORRIDOR_WIDTH = 15  # [NM]
+CORRIDOR_WIDTH = 25  # [NM]
 RESTRICTION_ANGLE = 45  # [deg]
 ARC_ANGLE = 90  # [deg]
-RESO_METHOD = "MVP"
+RESO_METHOD = "MVP"  # Conflict resolution method
 
 
-def create(random_seed,
+def create(creation_time,
+           random_seed,
            asas_reso_method,
            corridor_length,
            corridor_width,
@@ -66,8 +71,9 @@ def create(random_seed,
 
     # Use different file name format for restriction angle source
     if is_restriction_angle:
-        file_name = "SEED{}_C{}_{}_L{}_W{}_R{}_ANG{}_NP{}_RESO-{}.scn"\
-            .format(SEED,
+        file_name = "{}_SCEN_{}_C{}_{}_L{}_W{}_R{}_ANG{}_NP{}_RESO-{}.scn"\
+            .format(creation_time,
+                    SEED,
                     CENTER_LAT,
                     CENTER_LON,
                     corridor_length,
@@ -77,8 +83,9 @@ def create(random_seed,
                     NUM_DEP_DEST_POINTS,
                     asas_reso_method)
     else:
-        file_name = "SEED{}_C{}_{}_L{}_W{}_R{}_ARC{}_NP{}_RESO-{}.scn"\
-            .format(SEED,
+        file_name = "{}_SCEN_{}_C{}_{}_L{}_W{}_R{}_ARC{}_NP{}_RESO-{}.scn"\
+            .format(creation_time,
+                    SEED,
                     CENTER_LAT,
                     CENTER_LON,
                     corridor_length,
@@ -97,11 +104,11 @@ def create(random_seed,
         scnfile.write(zero_time + "DT {}\n".format(SIM_TIME_STEP))
         scnfile.write(zero_time + "TRAIL {}\n".format("ON" if SHOW_AC_TRAILS
                                                       else "OFF"))
-        scnfile.write(zero_time + "SWRAD {}\n".format("SYM"))
-        scnfile.write(zero_time + "SWRAD {}\n".format("LABEL 1"))
-        scnfile.write(zero_time + "SWRAD {}\n".format("WPT"))
-        scnfile.write(zero_time + "SWRAD {}\n".format("SAT"))
-        scnfile.write(zero_time + "SWRAD {}\n".format("APT"))
+        scnfile.write(zero_time + "SWRAD SYM\n")
+        scnfile.write(zero_time + "SWRAD LABEL 1\n")
+        scnfile.write(zero_time + "SWRAD WPT\n")
+        scnfile.write(zero_time + "SWRAD SAT\n")
+        scnfile.write(zero_time + "SWRAD APT\n")
         scnfile.write(zero_time + "FF\n")
         scnfile.write("{}:00:00.00>PAUSE\n".format(SIM_PAUSE_HOUR))
 
@@ -123,12 +130,20 @@ def create(random_seed,
         scnfile.write(zero_time + "PLUGINS LOAD {}\n".format(PLUGIN_NAME))
         scnfile.write(zero_time + "RAACONF {}\n".format(AREA_LOOKAHEAD_TIME))
 
-        _ = create_area(scnfile, zero_time, corridor_width,
-                        corridor_length, "LEFT",
-                        angle, is_restriction_angle)
-        angle_to_ring_intersect = create_area(scnfile, zero_time, corridor_width,
-                                              corridor_length, "RIGHT",
-                                              angle, is_restriction_angle)
+        _ = create_area(scnfile,
+                        zero_time,
+                        corridor_width,
+                        corridor_length,
+                        "LEFT",
+                        angle,
+                        is_restriction_angle)
+        angle_to_ring_intersect = create_area(scnfile,
+                                              zero_time,
+                                              corridor_width,
+                                              corridor_length,
+                                              "RIGHT",
+                                              angle,
+                                              is_restriction_angle)
 
         # Angle range for traffic creation
         if is_restriction_angle:
@@ -162,10 +177,14 @@ def create(random_seed,
 
         # Corridor waypoints
         scnfile.write("\n# Corridor waypoints\n")
-        corridor_top_lat, _ = bsgeo.qdrpos(CENTER_LAT, CENTER_LON,
-                                           0, corridor_length/2)
-        corridor_bottom_lat, _ = bsgeo.qdrpos(CENTER_LAT, CENTER_LON,
-                                              180, corridor_length/2)
+        corridor_top_lat, _ = bsgeo.qdrpos(CENTER_LAT,
+                                           CENTER_LON,
+                                           0,
+                                           corridor_length/2)
+        corridor_bottom_lat, _ = bsgeo.qdrpos(CENTER_LAT,
+                                              CENTER_LON,
+                                              180,
+                                              corridor_length/2)
 
         scnfile.write(zero_time + "DEFWPT COR101,{:.6f},{:.6f},FIX\n"
                       .format(corridor_bottom_lat, CENTER_LON))
@@ -174,12 +193,21 @@ def create(random_seed,
 
         # Create aircaft
         scnfile.write("\n# Create {} aircraft".format(NUM_EXPERIMENT_AIRCRAFT))
-        create_aircraft(scnfile, dep_waypoints, dest_waypoints,
-                        corridor_bottom_lat, CENTER_LON)
+        create_aircraft(scnfile,
+                        NUM_EXPERIMENT_AIRCRAFT,
+                        dep_waypoints,
+                        dest_waypoints,
+                        corridor_bottom_lat,
+                        CENTER_LON)
 
 
-def create_area(scnfile, zero_time, corridor_width, corridor_length,
-                corridor_side, angle, is_restriction_angle=False):
+def create_area(scnfile,
+                zero_time,
+                corridor_width,
+                corridor_length,
+                corridor_side,
+                angle,
+                is_restriction_angle=False):
     """
     Create the restricted area on a given coridor side
     """
@@ -189,28 +217,44 @@ def create_area(scnfile, zero_time, corridor_width, corridor_length,
     east_west_angle = 270 if corridor_side == "LEFT" else 90
 
     # Calculate coordinates of area edge bordering the corridor
-    inner_top_lat, _ = bsgeo.qdrpos(CENTER_LAT, CENTER_LON,
-                                    0, corridor_length / 2)
-    _, inner_top_lon = bsgeo.qdrpos(CENTER_LAT, CENTER_LON,
-                                    east_west_angle, corridor_width / 2)
-    inner_bottom_lat, _ = bsgeo.qdrpos(CENTER_LAT, CENTER_LON,
-                                       180, corridor_length / 2)
-    _, inner_bottom_lon = bsgeo.qdrpos(CENTER_LAT, CENTER_LON,
-                                       east_west_angle, corridor_width / 2)
+    inner_top_lat, _ = bsgeo.qdrpos(CENTER_LAT,
+                                    CENTER_LON,
+                                    0,
+                                    corridor_length/2)
+    _, inner_top_lon = bsgeo.qdrpos(CENTER_LAT,
+                                    CENTER_LON,
+                                    east_west_angle,
+                                    corridor_width/2)
+    inner_bottom_lat, _ = bsgeo.qdrpos(CENTER_LAT,
+                                       CENTER_LON,
+                                       180,
+                                       corridor_length/2)
+    _, inner_bottom_lon = bsgeo.qdrpos(CENTER_LAT,
+                                       CENTER_LON,
+                                       east_west_angle,
+                                       corridor_width/2)
 
     # Determine the angle of the area edge
     if is_restriction_angle:
         edge_angle = (angle if corridor_side == "RIGHT" else -angle)
     else:
-        arc_angle = (angle / 2 if corridor_side == "RIGHT" else -angle / 2)
-        arc_ext_lat, arc_ext_lon = bsgeo.qdrpos(CENTER_LAT, CENTER_LON,
-                                                arc_angle, AREA_RADIUS * 1.1)
+        arc_angle = (angle/2 if corridor_side == "RIGHT" else -angle/2)
+        arc_ext_lat, arc_ext_lon = bsgeo.qdrpos(CENTER_LAT,
+                                                CENTER_LON,
+                                                arc_angle,
+                                                AREA_RADIUS*1.1)
         arc_point_lat, arc_point_lon, _ \
-            = calc_line_ring_intersection(CENTER_LAT, CENTER_LON, AREA_RADIUS,
-                                          CENTER_LAT, CENTER_LON,
-                                          arc_ext_lat, arc_ext_lon)
-        edge_angle, _ = bsgeo.qdrdist(inner_top_lat, inner_top_lon,
-                                      arc_point_lat, arc_point_lon)
+            = calc_line_ring_intersection(CENTER_LAT,
+                                          CENTER_LON,
+                                          AREA_RADIUS,
+                                          CENTER_LAT,
+                                          CENTER_LON,
+                                          arc_ext_lat,
+                                          arc_ext_lon)
+        edge_angle, _ = bsgeo.qdrdist(inner_top_lat,
+                                      inner_top_lon,
+                                      arc_point_lat,
+                                      arc_point_lon)
 
     # Calculate coordinates of points on the extended angled edges
     ext_dist = abs(2 * AREA_RADIUS / math.sin(math.radians(edge_angle)))
@@ -228,32 +272,51 @@ def create_area(scnfile, zero_time, corridor_width, corridor_length,
     # Calculate coordinates of points on north and south lines extending the
     # edge furthest from the corridor
     vert_dist = ext_dist * 2
-    _, outer_lon = bsgeo.qdrpos(CENTER_LAT, CENTER_LON, east_west_angle, AREA_RADIUS)
-    vert_top_lat, vert_top_lon = bsgeo.qdrpos(CENTER_LAT, outer_lon,
-                                              360, vert_dist)
-    vert_bottom_lat, vert_bottom_lon = bsgeo.qdrpos(CENTER_LAT, outer_lon,
-                                                    180, vert_dist)
+    _, outer_lon = bsgeo.qdrpos(CENTER_LAT,
+                                CENTER_LON,
+                                east_west_angle,
+                                AREA_RADIUS)
+    vert_top_lat, vert_top_lon = bsgeo.qdrpos(CENTER_LAT,
+                                              outer_lon,
+                                              360,
+                                              vert_dist)
+    vert_bottom_lat, vert_bottom_lon = bsgeo.qdrpos(CENTER_LAT,
+                                                    outer_lon,
+                                                    180,
+                                                    vert_dist)
 
     # Calculate the coordinates of the edge furthest from the corridor by
     # intersecting the extended lines with the vertical lines
     outer_top_lat, outer_top_lon = \
-        tg.sphere_greatcircle_intersect(inner_top_lat, inner_top_lon,
-                                        ext_top_lat, ext_top_lon,
-                                        CENTER_LAT, outer_lon,
-                                        vert_top_lat, vert_top_lon)
+        tg.sphere_greatcircle_intersect(inner_top_lat,
+                                        inner_top_lon,
+                                        ext_top_lat,
+                                        ext_top_lon,
+                                        CENTER_LAT,
+                                        outer_lon,
+                                        vert_top_lat,
+                                        vert_top_lon)
     outer_bottom_lat, outer_bottom_lon = \
-        tg.sphere_greatcircle_intersect(inner_bottom_lat, inner_bottom_lon,
-                                        ext_bottom_lat, ext_bottom_lon,
-                                        CENTER_LAT, outer_lon,
-                                        vert_bottom_lat, vert_bottom_lon)
+        tg.sphere_greatcircle_intersect(inner_bottom_lat,
+                                        inner_bottom_lon,
+                                        ext_bottom_lat,
+                                        ext_bottom_lon,
+                                        CENTER_LAT,
+                                        outer_lon,
+                                        vert_bottom_lat,
+                                        vert_bottom_lon)
 
     # Write the area and waypoint with area name to the scenario file
     area_idx = 1 if corridor_side == "LEFT" else 2
     area_coords = "{:.6f},{:.6f},{:.6f},{:.6f},{:.6f},{:.6f},{:.6f},{:.6f}"\
-        .format(inner_top_lat, inner_top_lon,
-                outer_top_lat, outer_top_lon,
-                outer_bottom_lat, outer_bottom_lon,
-                inner_bottom_lat, inner_bottom_lon)
+        .format(inner_top_lat,
+                inner_top_lon,
+                outer_top_lat,
+                outer_top_lon,
+                outer_bottom_lat,
+                outer_bottom_lon,
+                inner_bottom_lat,
+                inner_bottom_lon)
     scnfile.write(zero_time + "RAA RAA{},ON,{},{},{}\n"
                   .format(area_idx, 0, 0, area_coords))
     scnfile.write(zero_time + "COLOR RAA{},164,0,0\n".format(area_idx))
@@ -262,14 +325,18 @@ def create_area(scnfile, zero_time, corridor_width, corridor_length,
 
     # Calculate angle from the center point to intersection between ring and
     # area edge
-    _, _, top_angle_from_center \
-        = calc_line_ring_intersection(CENTER_LAT, CENTER_LON, AREA_RADIUS,
-                                      inner_top_lat, inner_top_lon,
-                                      outer_top_lat, outer_top_lon)
+    _, _, top_angle_from_center = calc_line_ring_intersection(CENTER_LAT,
+                                                              CENTER_LON,
+                                                              AREA_RADIUS,
+                                                              inner_top_lat,
+                                                              inner_top_lon,
+                                                              outer_top_lat,
+                                                              outer_top_lon)
     return top_angle_from_center
 
 
 def create_aircraft(scnfile,
+                    num_total_ac,
                     dep_waypoints,
                     dest_waypoints,
                     corridor_entry_lat,
@@ -295,18 +362,19 @@ def create_aircraft(scnfile,
     creation_dest_idx = []
 
     num_created_ac = 0
-    while num_created_ac < NUM_EXPERIMENT_AIRCRAFT:
+    while num_created_ac < num_total_ac:
         # Will be set True if creation results in a conflict
         in_conflict_at_creation = False
 
         # Create an aircraft at random time and position
         prev_time = creation_time[-1] if num_created_ac else 0
-        curr_time = prev_time + random.randint(30, 60)
+        curr_time = prev_time + random.randint(AC_CRE_INTERVAL_MIN,
+                                               AC_CRE_INTERVAL_MAX)
 
         # Select an aircraft type and velocity
         type_idx = random.randint(0, len(AC_TYPES) - 1)
         curr_type = AC_TYPES[type_idx]
-        curr_spd = random.gauss(AC_TYPES_SPD[type_idx], 5)
+        curr_spd = random.gauss(AC_TYPES_SPD[type_idx], SPD_STDDEV)
 
         # Select random departure and destination waypoint
         curr_dep_wp_idx = random.randint(0, NUM_DEP_DEST_POINTS - 1)
@@ -315,13 +383,15 @@ def create_aircraft(scnfile,
         (dest_lat, dest_lon) = dest_waypoints[curr_dest_wp_idx]
 
         # Heading to waypoint at start of corridor
-        curr_hdg, _ = bsgeo.qdrdist(curr_lat, curr_lon,
-                                    corridor_entry_lat, corridor_entry_lon)
+        curr_hdg, _ = bsgeo.qdrdist(curr_lat,
+                                    curr_lon,
+                                    corridor_entry_lat,
+                                    corridor_entry_lon)
 
         # The first generated aircraft is always accepted. Each aircraft
         # thereafter has to have at least minimum separation in space
         # OR time with ALL existing aircraft at the time of its creation.
-        if num_created_ac > 0:
+        if num_created_ac:
             time_diff_list = [curr_time - t for t in creation_time]
             dist_diff_list = [bsgeo.kwikdist(lat, lon, curr_lat, curr_lon)
                               for (lat, lon) in zip(creation_lat, creation_lon)]
@@ -350,7 +420,7 @@ def create_aircraft(scnfile,
         creation_dest_idx.append(curr_dest_wp_idx)
         num_created_ac += 1
 
-    # Print each aircraft to file
+    # Write each aircraft to file
     for ac_idx in range(num_created_ac):
         # Altitude is the same for all aircraft
         ac_alt = "36000"
@@ -391,13 +461,18 @@ def calc_line_ring_intersection(ring_center_lat,
         lat [deg], lon [deg], angle [deg]
     """
 
-    # First guess is midpoint of line
-    intersect_lat, intersect_lon = tg.calc_midpoint(line_start_lat, line_start_lon,
-                                                    line_end_lat, line_end_lon)
-    qdr_from_center, dist_from_center = bsgeo.qdrdist(ring_center_lat, ring_center_lon,
-                                                      intersect_lat, intersect_lon)
+    # First guess for intersection is midpoint of line
+    intersect_lat, intersect_lon = tg.calc_midpoint(line_start_lat,
+                                                    line_start_lon,
+                                                    line_end_lat,
+                                                    line_end_lon)
+    qdr_from_center, dist_from_center = bsgeo.qdrdist(ring_center_lat,
+                                                      ring_center_lon,
+                                                      intersect_lat,
+                                                      intersect_lon)
 
-    # Iterate until the intersection point is within distance margin from the ring
+    # Use recursive bisection until the intersection point is within
+    # distance margin from the ring edge
     while True:
         if abs(dist_from_center - ring_radius) < 0.1:
             break
@@ -407,10 +482,14 @@ def calc_line_ring_intersection(ring_center_lat,
         elif dist_from_center < ring_radius:
             line_start_lat, line_start_lon = intersect_lat, intersect_lon
 
-        intersect_lat, intersect_lon = tg.calc_midpoint(line_start_lat, line_start_lon,
-                                                        line_end_lat, line_end_lon)
-        qdr_from_center, dist_from_center = bsgeo.qdrdist(ring_center_lat, ring_center_lon,
-                                                          intersect_lat, intersect_lon)
+        intersect_lat, intersect_lon = tg.calc_midpoint(line_start_lat,
+                                                        line_start_lon,
+                                                        line_end_lat,
+                                                        line_end_lon)
+        qdr_from_center, dist_from_center = bsgeo.qdrdist(ring_center_lat,
+                                                          ring_center_lon,
+                                                          intersect_lat,
+                                                          intersect_lon)
 
     angle_from_center = ar.ned2crs(qdr_from_center)
 
@@ -451,29 +530,34 @@ def calc_destination_waypoints(num_dest_points,
 
 if __name__ == "__main__":
     # When running as main, generate a file for each relevant resolution method
-    create(1,
+    curr_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    create(curr_time,
+           1,
            "OFF",
            CORRIDOR_LENGTH,
            CORRIDOR_WIDTH,
            ARC_ANGLE,
            is_restriction_angle=False)
 
-    create(1,
+    create(curr_time,
+           1,
            "MVP",
            CORRIDOR_LENGTH,
            CORRIDOR_WIDTH,
            ARC_ANGLE,
            is_restriction_angle=False)
 
-    create(1,
+    create(curr_time,
+           1,
            "LF",
            CORRIDOR_LENGTH,
            CORRIDOR_WIDTH,
            ARC_ANGLE,
            is_restriction_angle=False)
 
-    create(1,
-           "SWARM",
+    create(curr_time,
+           1,
+           "SWARM_V2",
            CORRIDOR_LENGTH,
            CORRIDOR_WIDTH,
            ARC_ANGLE,
