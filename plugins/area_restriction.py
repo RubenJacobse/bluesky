@@ -46,6 +46,7 @@ CONFLOG_HEADER = ("AREA CONFLICT LOGGER\n"
                   + "area idx[-], "
                   + "t_int [s]")
 
+
 def init_plugin():
     """Initialize the RAA plugin"""
 
@@ -728,6 +729,10 @@ class AreaRestrictionManager(TrafficArrays):
                 if not self.is_in_area_reso[ac_idx]:
                     # Aircraft is not in a resolution manoeuver, must initiate a new one
                     self.perform_manoeuver(ac_idx)
+
+                    # Ignore traffic conflicts and route following
+                    bs.stack.stack("RESOOFF {}".format(bs.traf.id[ac_idx]))
+                    bs.stack.stack("LNAV {},OFF".format(bs.traf.id[ac_idx]))
                 else:
                     # Check if resolution manoeuver has been completed
                     if abs(current_crs[ac_idx] - self.commanded_crs[ac_idx])\
@@ -793,10 +798,6 @@ class AreaRestrictionManager(TrafficArrays):
         Perform a resolution manoeuver to solve a conflict with a
         restricted airspace.
         """
-
-        # Ignore traffic conflicts and route following
-        bs.stack.stack("RESOOFF {}".format(bs.traf.id[ac_idx]))
-        bs.stack.stack("LNAV {},OFF".format(bs.traf.id[ac_idx]))
 
         new_v_east = bs.traf.gseast[ac_idx] + self.reso_dv_east[ac_idx]
         new_v_north = bs.traf.gsnorth[ac_idx] + self.reso_dv_north[ac_idx]
