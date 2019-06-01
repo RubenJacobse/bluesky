@@ -32,6 +32,7 @@ from . import MVP
 from . import Swarm
 from . import SSD
 from . import LF
+from . import Swarm_alt
 
 # Register default settings
 settings.set_variable_defaults(asas_dt=1.0,
@@ -58,6 +59,7 @@ class ASAS(TrafficArrays):
                   "MVP": MVP,
                   "EBY": Eby,
                   "SWARM": Swarm,
+                  "SWARM_V2": Swarm_alt,
                   "LF": LF}
 
     # The SSD method requires the pyclipper module for its visualizations
@@ -577,7 +579,7 @@ class ASAS(TrafficArrays):
             self.cd.detect(bs.traf, bs.traf, self.R, self.dh, self.dtlookahead)
 
         # Conflict resolution if there are conflicts
-        if self.confpairs:
+        if self.confpairs or self.cr_name == "SWARM_V2":
             self.cr.resolve(self, bs.traf)
 
         # Add new conflicts to resopairs and confpairs_all and new losses to lospairs_all
