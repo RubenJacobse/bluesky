@@ -148,8 +148,8 @@ class AreaRestrictionManager(TrafficArrays):
             self.relative_track = []  # LineString [(lon, lat), (lon, lat)]
 
             # Aircraft control mode during current and previous time step
-            self.current_control_mode = []
-            self.previous_control_mode = []
+            self.control_mode_curr = []
+            self.control_mode_prev = []
 
         # Keep track of all restricted areas in list and by ID (same order)
         self.areas = []
@@ -706,14 +706,14 @@ class AreaRestrictionManager(TrafficArrays):
             - "lnav" :  in route following mode
         """
 
-        self.current_control_mode = [None] * self.num_traf
+        self.control_mode_curr = [None] * self.num_traf
         for ac_idx in range(self.num_traf):
             if self.is_in_conflict[:, ac_idx].any() or self.is_in_area_reso[ac_idx]:
-                self.current_control_mode[ac_idx] = "area"
+                self.control_mode_curr[ac_idx] = "area"
             elif bs.traf.asas.active[ac_idx]:
-                self.current_control_mode[ac_idx] = "asas"
+                self.control_mode_curr[ac_idx] = "asas"
             else:
-                self.current_control_mode[ac_idx] = "lnav"
+                self.control_mode_curr[ac_idx] = "lnav"
 
     def apply_mode_based_action(self):
         """
@@ -725,7 +725,7 @@ class AreaRestrictionManager(TrafficArrays):
         # NOTE: Some of the branches of the if-statements inside this loop are
         # redundant, but are still explicitly included to improve readability.
         for ac_idx in range(self.num_traf):
-            if self.current_control_mode[ac_idx] == "area":
+            if self.control_mode_curr[ac_idx] == "area":
                 if not self.is_in_area_reso[ac_idx]:
                     # Aircraft is not in a resolution manoeuver, must initiate a new one
                     self.perform_manoeuver(ac_idx)
@@ -735,27 +735,29 @@ class AreaRestrictionManager(TrafficArrays):
                     bs.stack.stack("LNAV {},OFF".format(bs.traf.id[ac_idx]))
                 else:
                     # Check if resolution manoeuver has been completed
-                    if abs(current_crs[ac_idx] - self.commanded_crs[ac_idx])\
-                            < COMMANDED_CRS_MARGIN:
+                    if (abs(current_crs[ac_idx] - self.commanded_crs[ac_idx])
+                            < COMMANDED_CRS_MARGIN):
                         if self.is_in_conflict[:, ac_idx].any():
-                            # Current course within margin of commanded course, but still in
-                            # conflict, perform new manoeuver.
+                            # Current course within margin of commanded course,
+                            # but still in conflict, perform new manoeuver.
                             self.perform_manoeuver(ac_idx)
                         else:
-                            # Course is within margin of commanded course, reset resolution variables
+                            # Course is within margin of commanded course,
+                            # reset resolution variables
                             self.is_in_area_reso[ac_idx] = False
                             self.commanded_crs[ac_idx] = 1e9
                             self.commanded_spd[ac_idx] = 1e9
                             # print("t={}s : {} resolution manoeuver completed!".format(int(bs.sim.simt), bs.traf.id[ac_idx]))
 
-                            # When no longer in area resolution, stop ignoring traffic conflicts
+                            # When no longer in area resolution, stop ignoring traffic
+                            # conflicts and continue following LNAV
                             bs.stack.stack("RESOOFF {}".format(bs.traf.id[ac_idx]))
-
-                            # Start following LNAV again
                             bs.stack.stack("LNAV {},ON".format(bs.traf.id[ac_idx]))
+                            self.control_mode_curr[ac_idx] = "lnav"
                     else:
                         # Course not yet within margin of commanded course, continue manoeuver.
                         pass
+                        
                         # print("t={}s : {} is manoeuvring, hdg: {:.2f}, target: {:.2f}, autopilot: {:.2f}".format(int(bs.sim.simt),
                         #                                                                                          bs.traf.id[ac_idx],
                         #                                                                                          bs.traf.hdg[ac_idx],
@@ -765,16 +767,16 @@ class AreaRestrictionManager(TrafficArrays):
                         #     print("{} current control mode: {}".format(bs.traf.id[ac_idx], self.current_control_mode[ac_idx]))
                         #     print("{} swlnav: {}".format(bs.traf.id[ac_idx], bs.traf.swlnav[ac_idx]))
 
-            if self.current_control_mode[ac_idx] == "asas":
+            if self.control_mode_curr[ac_idx] == "asas":
                 pass
 
-            if self.current_control_mode[ac_idx] == "lnav":
+            if self.control_mode_curr[ac_idx] == "lnav":
                 # # NOTE: current implementation is naive, could result in all sorts of turning
                 # # behaviour if the active waypoint is behind the aircraft.
                 # #
                 # Waypoint recovery after conflict: Find the next active waypoint
                 # and send the aircraft to that waypoint.
-                if self.previous_control_mode[ac_idx] != "lnav":
+                if self.control_mode_prev[ac_idx] != "lnav":
                     iwpid = bs.traf.ap.route[ac_idx].findact(ac_idx)
                     if iwpid != -1:  # To avoid problems if there are no waypoints
                         bs.traf.ap.route[ac_idx].direct(ac_idx,
@@ -791,7 +793,7 @@ class AreaRestrictionManager(TrafficArrays):
         #                                                         self.current_control_mode[ac_idx]))
 
         # Remember current control mode for use in next time step
-        self.previous_control_mode = [x for x in self.current_control_mode]
+        self.control_mode_prev = [x for x in self.control_mode_curr]
 
     def perform_manoeuver(self, ac_idx):
         """
