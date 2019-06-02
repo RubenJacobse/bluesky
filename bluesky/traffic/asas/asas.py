@@ -546,7 +546,6 @@ class ASAS(TrafficArrays):
             ac_idx = bs.traf.id2idx(ac_id)
             if ac_id in self.resoofflst:
                 self.resoofflst.remove(ac_id)
-                self.active[ac_idx] = True
             else:
                 self.resoofflst.append(ac_id)
                 self.active[ac_idx] = False
