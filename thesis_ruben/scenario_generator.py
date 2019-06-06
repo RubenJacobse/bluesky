@@ -74,7 +74,7 @@ def create(creation_time,
                     corridor_length,
                     corridor_width,
                     asas_reso_method,
-                    SEED,
+                    random_seed,
                     angle)
     else:
         file_name = ("arc_scenarios/{}_L{}_W{}_RESO-{}_SCEN_{}_ARC{}.scn")\
@@ -82,7 +82,7 @@ def create(creation_time,
                     corridor_length,
                     corridor_width,
                     asas_reso_method,
-                    SEED,
+                    random_seed,
                     angle)
 
     # Create a header to simplify traceability of variable values
