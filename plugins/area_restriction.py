@@ -36,7 +36,7 @@ VAR_DEFAULTS = {"float": 0.0,
                 "str": "",
                 "object": None}
 DEFAULT_AREA_T_LOOKAHEAD = 120  # [s]
-AREA_AVOIDANCE_CRS_MARGIN = 2  # [deg]
+AREA_AVOIDANCE_CRS_MARGIN = 1  # [deg]
 COMMANDED_CRS_MARGIN = 0.2  # [deg] Verify if commanded heading has been reached
 NM_TO_M = 1852.  # Conversion factor nautical miles to metres
 
@@ -44,7 +44,10 @@ CONFLOG_HEADER = ("AREA CONFLICT LOGGER\n"
                   + "simt [s], "
                   + "ac callsign [-], "
                   + "area idx[-], "
-                  + "t_int [s]")
+                  + "t_int [s], "
+                  #   + "ac lat [deg], "
+                  #   + "ac lon [deg]"
+                  )
 
 
 def init_plugin():
@@ -337,6 +340,8 @@ class AreaRestrictionManager(TrafficArrays):
         if not self.num_traf or not self.num_areas:
             return
 
+        self.ac_id = bs.traf.id[:]  # Purely for debugging purposes only
+
         # Find courses to active and next waypoint
         self.calculate_courses_to_waypoints()
 
@@ -593,7 +598,10 @@ class AreaRestrictionManager(TrafficArrays):
             if not t_int == -1:
                 self.area_conf_logger.log(np.array(bs.traf.id)[[ac_idx]],
                                           self.area_ids[area_idx],
-                                          t_int)
+                                          t_int,
+                                          #   bs.traf.lat[ac_idx],
+                                          #   bs.traf.lon[ac_idx]
+                                          )
 
     def calculate_area_resolution_vectors(self):
         """
@@ -721,18 +729,40 @@ class AreaRestrictionManager(TrafficArrays):
         a resolution manoeuver.
         """
 
+        # For debugging purposes
+        debugprintlist = ("AC056")
+        debugprinttime = 4100
+
+        if bs.sim.simt > debugprinttime:
+            print("\nt={}s".format(bs.sim.simt))
+
         current_crs = ned2crs(bs.traf.trk)
         # NOTE: Some of the branches of the if-statements inside this loop are
         # redundant, but are still explicitly included to improve readability.
         for ac_idx in range(self.num_traf):
+            do_printdebug = ((bs.traf.id[ac_idx] in debugprintlist)
+                             and bs.sim.simt >= debugprinttime)
+
+            if do_printdebug:
+                print("{} current control mode: {}".format(
+                    bs.traf.id[ac_idx], self.control_mode_curr[ac_idx]))
+                print("{} swlnav: {}".format(
+                    bs.traf.id[ac_idx], bs.traf.swlnav[ac_idx]))
+                print("{} asas active: {}".format(
+                    bs.traf.id[ac_idx], bs.traf.asas.active[ac_idx]))
+
             if self.control_mode_curr[ac_idx] == "area":
                 if not self.is_in_area_reso[ac_idx]:
-                    # Aircraft is not in a resolution manoeuver, must initiate a new one
+                    # Initiate new manoeuvre
                     self.perform_manoeuver(ac_idx)
 
                     # Ignore traffic conflicts and route following
                     bs.stack.stack("RESOOFF {}".format(bs.traf.id[ac_idx]))
                     bs.stack.stack("LNAV {},OFF".format(bs.traf.id[ac_idx]))
+
+                    if do_printdebug:
+                        print("{} starting resolution manoeuver!"
+                              .format(bs.traf.id[ac_idx]))
                 else:
                     # Check if resolution manoeuver has been completed
                     if (abs(current_crs[ac_idx] - self.commanded_crs[ac_idx])
@@ -741,31 +771,35 @@ class AreaRestrictionManager(TrafficArrays):
                             # Current course within margin of commanded course,
                             # but still in conflict, perform new manoeuver.
                             self.perform_manoeuver(ac_idx)
+
+                            if do_printdebug:
+                                print("{} additional resolution manoeuver!"
+                                      .format(bs.traf.id[ac_idx]))
                         else:
                             # Course is within margin of commanded course,
                             # reset resolution variables
                             self.is_in_area_reso[ac_idx] = False
-                            self.commanded_crs[ac_idx] = 1e9
-                            self.commanded_spd[ac_idx] = 1e9
-                            # print("t={}s : {} resolution manoeuver completed!".format(int(bs.sim.simt), bs.traf.id[ac_idx]))
+                            self.commanded_crs[ac_idx] = 0.0
+                            self.commanded_spd[ac_idx] = 0.0
 
                             # When no longer in area resolution, stop ignoring traffic
                             # conflicts and continue following LNAV
                             bs.stack.stack("RESOOFF {}".format(bs.traf.id[ac_idx]))
                             bs.stack.stack("LNAV {},ON".format(bs.traf.id[ac_idx]))
-                            self.control_mode_curr[ac_idx] = "lnav"
+
+                            if do_printdebug:
+                                print("{} resolution manoeuver completed!"
+                                      .format(bs.traf.id[ac_idx]))
                     else:
                         # Course not yet within margin of commanded course, continue manoeuver.
                         pass
-                        
-                        # print("t={}s : {} is manoeuvring, hdg: {:.2f}, target: {:.2f}, autopilot: {:.2f}".format(int(bs.sim.simt),
-                        #                                                                                          bs.traf.id[ac_idx],
-                        #                                                                                          bs.traf.hdg[ac_idx],
-                        #                                                                                          self.commanded_crs[ac_idx],
-                        #                                                                                          bs.traf.ap.trk[ac_idx]))
-                        # if bs.sim.simt > 852 and bs.traf.id[ac_idx] == "AC006":
-                        #     print("{} current control mode: {}".format(bs.traf.id[ac_idx], self.current_control_mode[ac_idx]))
-                        #     print("{} swlnav: {}".format(bs.traf.id[ac_idx], bs.traf.swlnav[ac_idx]))
+
+                        if do_printdebug:
+                            print("{} is manoeuvring, hdg: {:.2f}, target: {:.2f}, autopilot: {:.2f}"
+                                  .format(bs.traf.id[ac_idx],
+                                          bs.traf.hdg[ac_idx],
+                                          self.commanded_crs[ac_idx],
+                                          bs.traf.ap.trk[ac_idx]))
 
             if self.control_mode_curr[ac_idx] == "asas":
                 pass
@@ -782,15 +816,20 @@ class AreaRestrictionManager(TrafficArrays):
                         bs.traf.ap.route[ac_idx].direct(ac_idx,
                                                         bs.traf.ap.route[ac_idx].wpname[iwpid])
 
-        # For debugging purposes only
-        # for ac_idx in range(self.num_traf):
-        #     if self.previous_control_mode[ac_idx] \
-        #             and self.current_control_mode[ac_idx] != self.previous_control_mode[ac_idx]:
+                        if do_printdebug:
+                            print("{} heading direct to {}"
+                                  .format(bs.traf.id[ac_idx],
+                                          bs.traf.ap.route[ac_idx].wpname[iwpid]))
 
-        #         print("t={}s : {} mode change: {} -> {}".format(int(bs.sim.simt),
-        #                                                         bs.traf.id[ac_idx],
-        #                                                         self.previous_control_mode[ac_idx],
-        #                                                         self.current_control_mode[ac_idx]))
+        # For debugging purposes only
+        for ac_idx in range(self.num_traf):
+            if (self.control_mode_prev[ac_idx]
+                    and self.control_mode_curr[ac_idx] != self.control_mode_prev[ac_idx]):
+
+                # if do_printdebug:
+                print("{} mode change: {} -> {}".format(bs.traf.id[ac_idx],
+                                                        self.control_mode_prev[ac_idx],
+                                                        self.control_mode_curr[ac_idx]))
 
         # Remember current control mode for use in next time step
         self.control_mode_prev = [x for x in self.control_mode_curr]
@@ -806,16 +845,16 @@ class AreaRestrictionManager(TrafficArrays):
         new_v = np.sqrt(new_v_east ** 2 + new_v_north ** 2)
         new_crs = np.degrees(np.arctan2(new_v_east, new_v_north)) % 360
 
-        # print("t={}s : {} in conflict with {}, turning to course {:.2f} degrees" \
-        #     .format(int(bs.sim.simt),
-        #             bs.traf.id[ac_idx],
-        #             self.area_ids[self.closest_conflicting_area_idx[ac_idx]],
-        #             new_crs))
-
         self.stack_reso_apply(ac_idx, new_crs, new_v)
         self.is_in_area_reso[ac_idx] = True
         self.commanded_crs[ac_idx] = new_crs
         self.commanded_spd[ac_idx] = new_v
+
+        if bs.traf.id[ac_idx] == "AC056":
+            print("{} in conflict with {}, turning to course {:.2f} degrees"
+                  .format(bs.traf.id[ac_idx],
+                          self.area_ids[self.closest_conflicting_area_idx[ac_idx]],
+                          new_crs))
 
     def stack_reso_apply(self, ac_idx, crs, tas):
         """ Apply all resolution vectors via the BlueSky stack. """
@@ -1080,7 +1119,7 @@ class RestrictedAirspaceArea():
         dir_sum = 0
         for ii in range(0, len(coords) - 2, 2):  # ii = 0,2,4,...
             edge = (coords[ii + 3] - coords[ii + 1]) * \
-                   (coords[ii] + coords[ii + 2])
+                (coords[ii] + coords[ii + 2])
             dir_sum += edge
 
         return False if dir_sum > 0 else True
@@ -1126,7 +1165,7 @@ def crs_is_between(crs, crs_left, crs_right):
     """
 
     is_between = ((crs_left > crs_right) and (crs > crs_left or crs < crs_right)) or \
-                 ((crs_left < crs_right) and (crs > crs_left and crs < crs_right))
+        ((crs_left < crs_right) and (crs > crs_left and crs < crs_right))
 
     return is_between
 
