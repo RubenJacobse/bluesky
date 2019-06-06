@@ -668,7 +668,7 @@ class ASAS(TrafficArrays):
             # multiple conflicts, where the first, but not all conflicts are
             # resolved.
             self.active[idx] = active
-            if not active:
+            if not active and not bs.traf.id[idx] in self.resoofflst:
                 # Waypoint recovery after conflict: Find the next active waypoint
                 # and send the aircraft to that waypoint.
                 iwpid = bs.traf.ap.route[idx].findact(idx)
