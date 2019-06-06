@@ -35,7 +35,6 @@ SIM_PAUSE_HOUR = 3  # [h] Pause simulation after this number of hours
 RMETHH = "BOTH"  # Horizontal resolution method, allow both spd and hdg changes
 SHOW_AC_TRAILS = True  # Plot trails in the radar window
 AREA_RADIUS = 100  # [NM]
-NUM_DEP_DEST_POINTS = 10  # Number of departure and destination points
 NUM_AIRCRAFT = 100
 # AC_TYPES = ["B744", "A320", "B738", "A343"]
 # AC_TYPES_SPD = [286, 258, 260, 273]
@@ -162,30 +161,6 @@ def create(creation_time,
         else:
             angle_from_centerpoint = angle / 2
 
-        # Departure waypoints
-        scnfile.write("\n# Departure waypoints\n")
-        dep_waypoints = calc_departure_waypoints(NUM_DEP_DEST_POINTS,
-                                                 CENTER_LAT,
-                                                 CENTER_LON,
-                                                 AREA_RADIUS,
-                                                 angle_from_centerpoint)
-
-        for fix_idx, (fix_lat, fix_lon) in enumerate(dep_waypoints):
-            scnfile.write(zero_time + "DEFWPT DEP{:03d},{:.6f},{:.6f},FIX\n"
-                          .format(fix_idx, fix_lat, fix_lon))
-
-        # Destination waypoints
-        scnfile.write("\n# Destination waypoints\n")
-        dest_waypoints = calc_destination_waypoints(NUM_DEP_DEST_POINTS,
-                                                    CENTER_LAT,
-                                                    CENTER_LON,
-                                                    AREA_RADIUS,
-                                                    angle_from_centerpoint)
-
-        for fix_idx, (fix_lat, fix_lon) in enumerate(dest_waypoints):
-            scnfile.write(zero_time + "DEFWPT DST{:03d},{:.6f},{:.6f},FIX\n"
-                          .format(fix_idx, fix_lat, fix_lon))
-
         # Corridor waypoints
         scnfile.write("\n# Corridor waypoints\n")
         corridor_top_lat, _ = bsgeo.qdrpos(CENTER_LAT,
@@ -206,8 +181,7 @@ def create(creation_time,
         scnfile.write("\n# Create {} aircraft".format(NUM_AIRCRAFT))
         create_aircraft(scnfile,
                         NUM_AIRCRAFT,
-                        dep_waypoints,
-                        dest_waypoints,
+                        angle_from_centerpoint,
                         corridor_bottom_lat,
                         CENTER_LON)
 
@@ -348,8 +322,7 @@ def create_area(scnfile,
 
 def create_aircraft(scnfile,
                     num_total_ac,
-                    dep_waypoints,
-                    dest_waypoints,
+                    angle,
                     corridor_entry_lat,
                     corridor_entry_lon):
     """
@@ -366,11 +339,11 @@ def create_aircraft(scnfile,
     creation_time = []
     creation_type = []
     creation_spd = []
-    creation_lat = []
-    creation_lon = []
+    creation_dep_lat = []
+    creation_dep_lon = []
+    creation_dest_lat = []
+    creation_dest_lon = []
     creation_hdg = []
-    creation_dest = []
-    creation_dest_idx = []
 
     num_created_ac = 0
     while num_created_ac < num_total_ac:
@@ -388,10 +361,16 @@ def create_aircraft(scnfile,
         curr_spd = random.gauss(AC_TYPES_SPD[type_idx], SPD_STDDEV)
 
         # Select random departure and destination waypoint
-        curr_dep_wp_idx = random.randint(0, NUM_DEP_DEST_POINTS - 1)
-        (curr_lat, curr_lon) = dep_waypoints[curr_dep_wp_idx]
-        curr_dest_wp_idx = random.randint(0, NUM_DEP_DEST_POINTS - 1)
-        (dest_lat, dest_lon) = dest_waypoints[curr_dest_wp_idx]
+        curr_dep_angle = random.uniform(180 - angle + 3, 180 + angle - 3)
+        (curr_lat, curr_lon) = bsgeo.qdrpos(CENTER_LAT,
+                                            CENTER_LON,
+                                            curr_dep_angle,
+                                            AREA_RADIUS)
+        curr_dest_angle = random.uniform(-angle + 3, angle - 3)
+        (dest_lat, dest_lon) = bsgeo.qdrpos(CENTER_LAT,
+                                            CENTER_LON,
+                                            curr_dest_angle,
+                                            AREA_RADIUS + 0.5)
 
         # Heading to waypoint at start of corridor
         curr_hdg, _ = bsgeo.qdrdist(curr_lat,
@@ -405,7 +384,7 @@ def create_aircraft(scnfile,
         if num_created_ac:
             time_diff_list = [curr_time - t for t in creation_time]
             dist_diff_list = [bsgeo.kwikdist(lat, lon, curr_lat, curr_lon)
-                              for (lat, lon) in zip(creation_lat, creation_lon)]
+                              for (lat, lon) in zip(creation_dep_lat, creation_dep_lon)]
 
             for time_diff, dist_diff in zip(time_diff_list, dist_diff_list):
                 # Either time OR distance difference must be smaller than minimum
@@ -424,11 +403,11 @@ def create_aircraft(scnfile,
         creation_time.append(curr_time)
         creation_type.append(curr_type)
         creation_spd.append(curr_spd)
-        creation_lat.append(curr_lat)
-        creation_lon.append(curr_lon)
+        creation_dep_lat.append(curr_lat)
+        creation_dep_lon.append(curr_lon)
         creation_hdg.append(curr_hdg % 360)
-        creation_dest.append((dest_lat, dest_lon))
-        creation_dest_idx.append(curr_dest_wp_idx)
+        creation_dest_lat.append(dest_lat)
+        creation_dest_lon.append(dest_lon)
         num_created_ac += 1
 
     # Write each aircraft to file
@@ -441,16 +420,22 @@ def create_aircraft(scnfile,
         aircraft_str = time_str + "CRE AC{:03d} {},{:.6f},{:.6f},{:.2f},{},{:.0f}\n"\
             .format(ac_idx,
                     creation_type[ac_idx],
-                    creation_lat[ac_idx],
-                    creation_lon[ac_idx],
+                    creation_dep_lat[ac_idx],
+                    creation_dep_lon[ac_idx],
                     creation_hdg[ac_idx],
                     ac_alt,
                     creation_spd[ac_idx])
 
+        aircraft_str += time_str + ("DEFWPT DEP{:03d},{:06f},{:06f},FIX\n"
+                                    .format(ac_idx, creation_dep_lat[ac_idx], creation_dep_lon[ac_idx]))
+        aircraft_str += time_str + ("DEFWPT DST{:03d},{:06f},{:06f},FIX\n"
+                                    .format(ac_idx, creation_dest_lat[ac_idx], creation_dest_lon[ac_idx]))
+        aircraft_str += time_str + ("AC{:03d} ADDWPT DEP{:03d}\n"
+                                    .format(ac_idx, ac_idx))
         aircraft_str += time_str + "AC{:03d} ADDWPT COR101\n".format(ac_idx)
         aircraft_str += time_str + "AC{:03d} ADDWPT COR201\n".format(ac_idx)
-        aircraft_str += time_str + "AC{:03d} ADDWPT DST{:03d}\n" \
-            .format(ac_idx, creation_dest_idx[ac_idx])
+        aircraft_str += time_str + ("AC{:03d} ADDWPT DST{:03d}\n"
+                                    .format(ac_idx, ac_idx))
 
         scnfile.write("\n" + aircraft_str)
 
@@ -505,38 +490,6 @@ def calc_line_ring_intersection(ring_center_lat,
     angle_from_center = ar.ned2crs(qdr_from_center)
 
     return intersect_lat, intersect_lon, angle_from_center
-
-
-def calc_departure_waypoints(num_dep_points,
-                             area_center_lat,
-                             area_center_lon,
-                             area_radius,
-                             angle):
-    """
-    Calculate the locations of all departure waypoints on the area edge.
-    """
-
-    angles = list(np.linspace(180 - angle + 3, 180 + angle - 3, num_dep_points))
-    waypoints = [bsgeo.qdrpos(area_center_lat, area_center_lon, angle, area_radius)
-                 for angle in angles]
-
-    return waypoints
-
-
-def calc_destination_waypoints(num_dest_points,
-                               area_center_lat,
-                               area_center_lon,
-                               area_radius,
-                               angle):
-    """
-    Calculate the locations of all destination waypoints on the area edge.
-    """
-
-    angles = list(np.linspace(-angle + 3, angle - 3, num_dest_points))
-    waypoints = [bsgeo.qdrpos(area_center_lat, area_center_lon, angle, area_radius)
-                 for angle in angles]
-
-    return waypoints
 
 
 if __name__ == "__main__":
