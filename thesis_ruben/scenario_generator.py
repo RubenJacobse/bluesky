@@ -29,22 +29,21 @@ import plugins.tempgeo as tg
 CENTER_LAT = 0.0  # [deg]
 CENTER_LON = 0.0  # [deg]
 PLUGIN_NAME = "RAA"
-AREA_LOOKAHEAD_TIME = 120
+AREA_LOOKAHEAD_TIME = 120  # [s] Look-ahead time used to detect area conflicts
 SIM_TIME_STEP = 0.05  # [s] Simulation time step
-SIM_PAUSE_HOUR = 3  # [h] Pause simulation after this time
+SIM_PAUSE_HOUR = 3  # [h] Pause simulation after this number of hours
 RMETHH = "BOTH"  # Horizontal resolution method, allow both spd and hdg changes
-SHOW_AC_TRAILS = True
+SHOW_AC_TRAILS = True  # Plot trails in the radar window
 AREA_RADIUS = 100  # [NM]
-EXPERIMENT_RADIUS = 75  # [NM]
 NUM_DEP_DEST_POINTS = 10  # Number of departure and destination points
-NUM_EXPERIMENT_AIRCRAFT = 100
+NUM_AIRCRAFT = 100
 # AC_TYPES = ["B744", "A320", "B738", "A343"]
 # AC_TYPES_SPD = [286, 258, 260, 273]
 AC_TYPES = ["B744"]
 AC_TYPES_SPD = [280]
-SPD_STDDEV = 5  # [kts]
-AC_CRE_INTERVAL_MIN = 30  # [s] Minimum interval between creation of aircraft
-AC_CRE_INTERVAL_MAX = 90  # [s] Maximum interval between creation of aircraft
+SPD_STDDEV = 5  # [kts] Standard deviation of cruise speed distributions
+CRE_INTERVAL_MIN = 30  # [s] Minimum interval between creation of aircraft
+CRE_INTERVAL_MAX = 90  # [s] Maximum interval between creation of aircraft
 
 # Passing these as arguments to create() when called as __main__
 SEED = 1
@@ -71,32 +70,44 @@ def create(creation_time,
 
     # Use different file name format for restriction angle source
     if is_restriction_angle:
-        file_name = "{}_SCEN_{}_C{}_{}_L{}_W{}_R{}_ANG{}_NP{}_RESO-{}.scn"\
+        file_name = ("angle_scenarios/{}_L{}_W{}_RESO-{}_SCEN_{}_ANG{}.scn")\
             .format(creation_time,
-                    SEED,
-                    CENTER_LAT,
-                    CENTER_LON,
                     corridor_length,
                     corridor_width,
-                    AREA_RADIUS,
-                    angle,
-                    NUM_DEP_DEST_POINTS,
-                    asas_reso_method)
+                    asas_reso_method,
+                    SEED,
+                    angle)
     else:
-        file_name = "{}_SCEN_{}_C{}_{}_L{}_W{}_R{}_ARC{}_NP{}_RESO-{}.scn"\
+        file_name = ("arc_scenarios/{}_L{}_W{}_RESO-{}_SCEN_{}_ARC{}.scn")\
             .format(creation_time,
-                    SEED,
-                    CENTER_LAT,
-                    CENTER_LON,
                     corridor_length,
                     corridor_width,
-                    AREA_RADIUS,
-                    angle,
-                    NUM_DEP_DEST_POINTS,
-                    asas_reso_method)
+                    asas_reso_method,
+                    SEED,
+                    angle)
+
+    # Create a header to simplify traceability of variable values
+    scen_header = ("##################################################\n"
+                   + "# File created at: {}\n".format(creation_time)
+                   + "# Center latitude: {}\n".format(CENTER_LAT)
+                   + "# Center longitude: {}\n".format(CENTER_LON)
+                   + "# Corridor length: {} NM\n".format(CORRIDOR_LENGTH)
+                   + "# Corridor width: {} NM\n".format(CORRIDOR_WIDTH)
+                   + "# Angle: {} deg ".format(angle)
+                   + (" (Area edge)\n" if is_restriction_angle else "(Arc)\n")
+                   + "# Experiment area radius: {} NM\n".format(AREA_RADIUS)
+                   + "# Aircraft types: {}\n".format(AC_TYPES)
+                   + "# Aircraft average speed: {} kts\n".format(AC_TYPES_SPD)
+                   + "# Aircraft speed std dev: {} kts\n".format(SPD_STDDEV)
+                   + "# Number of aircraft created: {}\n".format(NUM_AIRCRAFT)
+                   + "# Min creation interval: {} s\n".format(CRE_INTERVAL_MIN)
+                   + "# Max creation interval: {} s\n".format(CRE_INTERVAL_MAX)
+                   + "# Random number generator seed: {}\n".format(SEED)
+                   + "##################################################\n\n")
 
     # Open file, overwrite if existing
     with open(file_name, "w+") as scnfile:
+        scnfile.write(scen_header)
         zero_time = "0:00:00.00>"
 
         scnfile.write("# Sim commands\n")
@@ -192,9 +203,9 @@ def create(creation_time,
                       .format(corridor_top_lat, CENTER_LON))
 
         # Create aircaft
-        scnfile.write("\n# Create {} aircraft".format(NUM_EXPERIMENT_AIRCRAFT))
+        scnfile.write("\n# Create {} aircraft".format(NUM_AIRCRAFT))
         create_aircraft(scnfile,
-                        NUM_EXPERIMENT_AIRCRAFT,
+                        NUM_AIRCRAFT,
                         dep_waypoints,
                         dest_waypoints,
                         corridor_bottom_lat,
@@ -368,8 +379,8 @@ def create_aircraft(scnfile,
 
         # Create an aircraft at random time and position
         prev_time = creation_time[-1] if num_created_ac else 0
-        curr_time = prev_time + random.randint(AC_CRE_INTERVAL_MIN,
-                                               AC_CRE_INTERVAL_MAX)
+        curr_time = prev_time + random.randint(CRE_INTERVAL_MIN,
+                                               CRE_INTERVAL_MAX)
 
         # Select an aircraft type and velocity
         type_idx = random.randint(0, len(AC_TYPES) - 1)
@@ -530,35 +541,13 @@ def calc_destination_waypoints(num_dest_points,
 
 if __name__ == "__main__":
     # When running as main, generate a file for each relevant resolution method
-    curr_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    create(curr_time,
-           1,
-           "OFF",
-           CORRIDOR_LENGTH,
-           CORRIDOR_WIDTH,
-           ARC_ANGLE,
-           is_restriction_angle=False)
+    creation_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    create(curr_time,
-           1,
-           "MVP",
-           CORRIDOR_LENGTH,
-           CORRIDOR_WIDTH,
-           ARC_ANGLE,
-           is_restriction_angle=False)
-
-    create(curr_time,
-           1,
-           "LF",
-           CORRIDOR_LENGTH,
-           CORRIDOR_WIDTH,
-           ARC_ANGLE,
-           is_restriction_angle=False)
-
-    create(curr_time,
-           1,
-           "SWARM_V2",
-           CORRIDOR_LENGTH,
-           CORRIDOR_WIDTH,
-           ARC_ANGLE,
-           is_restriction_angle=False)
+    for reso_method in ["OFF", "MVP", "LF", "SWARM_V2"]:
+        create(creation_time,
+               1,
+               reso_method,
+               CORRIDOR_LENGTH,
+               CORRIDOR_WIDTH,
+               ARC_ANGLE,
+               is_restriction_angle=False)
