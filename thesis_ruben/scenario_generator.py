@@ -67,23 +67,19 @@ def create(creation_time,
 
     random.seed(random_seed)
 
-    # Use different file name format for restriction angle source
-    if is_restriction_angle:
-        file_name = ("angle_scenarios/{}_L{}_W{}_RESO-{}_SCEN_{}_ANG{}.scn")\
-            .format(creation_time,
-                    corridor_length,
-                    corridor_width,
-                    asas_reso_method,
-                    random_seed,
-                    angle)
-    else:
-        file_name = ("arc_scenarios/{}_L{}_W{}_RESO-{}_SCEN_{}_ARC{}.scn")\
-            .format(creation_time,
-                    corridor_length,
-                    corridor_width,
-                    asas_reso_method,
-                    random_seed,
-                    angle)
+    # Write scenario files to different folders based on angle types
+    folder_name = "angle_scenarios" if is_restriction_angle else "arc_scenarios"
+    folder_rel_path = "{}/{}".format(folder_name, creation_time)
+
+    if not os.path.exists(folder_rel_path):
+        os.makedirs(folder_rel_path)
+
+    file_rel_path = ("{}/L{}_W{}_RESO-{}_SCEN_{:03d}.scn")\
+        .format(folder_rel_path,
+                corridor_length,
+                corridor_width,
+                asas_reso_method,
+                random_seed)
 
     # Create a header to simplify traceability of variable values
     scen_header = ("##################################################\n"
@@ -105,7 +101,7 @@ def create(creation_time,
                    + "##################################################\n\n")
 
     # Open file, overwrite if existing
-    with open(file_name, "w+") as scnfile:
+    with open(file_rel_path, "w+") as scnfile:
         scnfile.write(scen_header)
         zero_time = "0:00:00.00>"
 
