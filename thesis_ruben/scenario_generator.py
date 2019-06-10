@@ -31,13 +31,13 @@ CENTER_LON = 0.0  # [deg]
 PLUGIN_NAME = "RAA"
 AREA_LOOKAHEAD_TIME = 120  # [s] Look-ahead time used to detect area conflicts
 SIM_TIME_STEP = 0.05  # [s] Simulation time step
-SIM_PAUSE_HOUR = 3  # [h] Pause simulation after this number of hours
+SIM_PAUSE_HOUR = 4  # [h] Pause simulation after this number of hours
 RMETHH = "BOTH"  # Horizontal resolution method, allow both spd and hdg changes
 SHOW_AC_TRAILS = True  # Plot trails in the radar window
 AREA_RADIUS = 100  # [NM]
-NUM_AIRCRAFT = 100
-# AC_TYPES = ["B744", "A320", "B738", "A343"]
-# AC_TYPES_SPD = [286, 258, 260, 273]
+NUM_AIRCRAFT = 200
+# AC_TYPES = ["A320", "B738", "A333", "B744"]
+# AC_TYPES_SPD = [258, 260, 273, 286]
 AC_TYPES = ["B744"]
 AC_TYPES_SPD = [280]
 SPD_STDDEV = 5  # [kts] Standard deviation of cruise speed distributions
@@ -59,7 +59,7 @@ def create(creation_time,
            corridor_length,
            corridor_width,
            angle,
-           is_restriction_angle=False):
+           is_edge_angle=False):
     """
     Create a scenario file which name reflects the properties of the
     experiment geometry.
@@ -68,7 +68,7 @@ def create(creation_time,
     random.seed(random_seed)
 
     # Write scenario files to different folders based on angle types
-    folder_name = "angle_scenarios" if is_restriction_angle else "arc_scenarios"
+    folder_name = "angle_scenarios" if is_edge_angle else "arc_scenarios"
     folder_rel_path = "{}/{}".format(folder_name, creation_time)
 
     if not os.path.exists(folder_rel_path):
@@ -89,7 +89,8 @@ def create(creation_time,
                    + "# Corridor length: {} NM\n".format(CORRIDOR_LENGTH)
                    + "# Corridor width: {} NM\n".format(CORRIDOR_WIDTH)
                    + "# Angle: {} deg ".format(angle)
-                   + (" (Area edge)\n" if is_restriction_angle else "(Arc)\n")
+                   + (" (Defined by area edge angle)\n" if is_edge_angle
+                      else "(Defined by arc angle)\n")
                    + "# Experiment area radius: {} NM\n".format(AREA_RADIUS)
                    + "# Aircraft types: {}\n".format(AC_TYPES)
                    + "# Aircraft average speed: {} kts\n".format(AC_TYPES_SPD)
@@ -142,17 +143,17 @@ def create(creation_time,
                         corridor_length,
                         "LEFT",
                         angle,
-                        is_restriction_angle)
+                        is_edge_angle)
         angle_to_ring_intersect = create_area(scnfile,
                                               zero_time,
                                               corridor_width,
                                               corridor_length,
                                               "RIGHT",
                                               angle,
-                                              is_restriction_angle)
+                                              is_edge_angle)
 
         # Angle range for traffic creation
-        if is_restriction_angle:
+        if is_edge_angle:
             angle_from_centerpoint = angle_to_ring_intersect
         else:
             angle_from_centerpoint = angle / 2
@@ -188,7 +189,7 @@ def create_area(scnfile,
                 corridor_length,
                 corridor_side,
                 angle,
-                is_restriction_angle=False):
+                is_edge_angle=False):
     """
     Create the restricted area on a given coridor side
     """
@@ -215,8 +216,10 @@ def create_area(scnfile,
                                        east_west_angle,
                                        corridor_width/2)
 
-    # Determine the angle of the area edge
-    if is_restriction_angle:
+    # Determine the angle of the area edge, either by using the
+    # input edge angle or by calculating the intersection of the
+    # area edge with the ring
+    if is_edge_angle:
         edge_angle = (angle if corridor_side == "RIGHT" else -angle)
     else:
         arc_angle = (angle/2 if corridor_side == "RIGHT" else -angle/2)
@@ -379,8 +382,9 @@ def create_aircraft(scnfile,
         # OR time with ALL existing aircraft at the time of its creation.
         if num_created_ac:
             time_diff_list = [curr_time - t for t in creation_time]
-            dist_diff_list = [bsgeo.kwikdist(lat, lon, curr_lat, curr_lon)
-                              for (lat, lon) in zip(creation_dep_lat, creation_dep_lon)]
+            dist_diff_list = \
+                [bsgeo.kwikdist(lat, lon, curr_lat, curr_lon)
+                 for (lat, lon) in zip(creation_dep_lat, creation_dep_lon)]
 
             for time_diff, dist_diff in zip(time_diff_list, dist_diff_list):
                 # Either time OR distance difference must be smaller than minimum
@@ -411,21 +415,27 @@ def create_aircraft(scnfile,
         # Altitude is the same for all aircraft
         ac_alt = "36000"
 
-        time_str = time.strftime('%H:%M:%S', time.gmtime(creation_time[ac_idx]))
+        time_str = time.strftime('%H:%M:%S',
+                                 time.gmtime(creation_time[ac_idx]))
         time_str = "{}.00>".format(time_str)
-        aircraft_str = time_str + "CRE AC{:03d} {},{:.6f},{:.6f},{:.2f},{},{:.0f}\n"\
-            .format(ac_idx,
-                    creation_type[ac_idx],
-                    creation_dep_lat[ac_idx],
-                    creation_dep_lon[ac_idx],
-                    creation_hdg[ac_idx],
-                    ac_alt,
-                    creation_spd[ac_idx])
+        aircraft_str = (time_str
+                        + "CRE AC{:03d} {},{:.6f},{:.6f},{:.2f},{},{:.0f}\n"
+                        .format(ac_idx,
+                                creation_type[ac_idx],
+                                creation_dep_lat[ac_idx],
+                                creation_dep_lon[ac_idx],
+                                creation_hdg[ac_idx],
+                                ac_alt,
+                                creation_spd[ac_idx]))
 
         aircraft_str += time_str + ("DEFWPT DEP{:03d},{:06f},{:06f},FIX\n"
-                                    .format(ac_idx, creation_dep_lat[ac_idx], creation_dep_lon[ac_idx]))
+                                    .format(ac_idx,
+                                            creation_dep_lat[ac_idx],
+                                            creation_dep_lon[ac_idx]))
         aircraft_str += time_str + ("DEFWPT DST{:03d},{:06f},{:06f},FIX\n"
-                                    .format(ac_idx, creation_dest_lat[ac_idx], creation_dest_lon[ac_idx]))
+                                    .format(ac_idx,
+                                            creation_dest_lat[ac_idx],
+                                            creation_dest_lon[ac_idx]))
         aircraft_str += time_str + ("AC{:03d} ADDWPT DEP{:03d}\n"
                                     .format(ac_idx, ac_idx))
         aircraft_str += time_str + "AC{:03d} ADDWPT COR101\n".format(ac_idx)
@@ -494,9 +504,9 @@ if __name__ == "__main__":
 
     for reso_method in ["OFF", "MVP", "LF", "SWARM_V2"]:
         create(creation_time,
-               1,
+               SEED,
                reso_method,
                CORRIDOR_LENGTH,
                CORRIDOR_WIDTH,
                ARC_ANGLE,
-               is_restriction_angle=False)
+               is_edge_angle=False)
