@@ -40,14 +40,27 @@ AREA_AVOIDANCE_CRS_MARGIN = 1  # [deg]
 COMMANDED_CRS_MARGIN = 0.2  # [deg] Verify if commanded heading has been reached
 NM_TO_M = 1852.  # Conversion factor nautical miles to metres
 
-CONFLOG_HEADER = ("AREA CONFLICT LOGGER\n"
+AREALOG_HEADER = ("AREA CONFLICT LOGGER\n"
                   + "simt [s], "
                   + "ac callsign [-], "
                   + "area idx[-], "
                   + "t_int [s], "
-                  #   + "ac lat [deg], "
-                  #   + "ac lon [deg]"
-                  )
+                  + "ac lat [deg], "
+                  + "ac lon [deg]"
+                 )
+
+ASASLOG_HEADER = ("ASAS CONFLICT LOGGER\n"
+                  + "simt [s], "
+                  + "ac1 [-], "
+                  + "ac2 [-], "
+                  + "dist [NM], "
+                  + "t_cpa [s], "
+                  + "t_los [s], "
+                  + "ac1 lat [deg], "
+                  + "ac1 lon [deg], "
+                  + "ac2 lat [deg], "
+                  + "ac2 lon [deg], "
+                 )
 
 
 def init_plugin():
@@ -165,8 +178,12 @@ class AreaRestrictionManager(TrafficArrays):
         self.t_lookahead = DEFAULT_AREA_T_LOOKAHEAD
 
         # Create and start area conflict logger
-        self.area_conf_logger = datalog.crelog("AREA_CONF_LOG", None, CONFLOG_HEADER)
+        self.area_conf_logger = datalog.crelog("AREA_CONF_LOG", None, AREALOG_HEADER)
         self.area_conf_logger.start()
+
+        # Create and start aircraft conflict logger
+        self.asas_conf_logger = datalog.crelog("ASAS_CONF_LOG", None, ASASLOG_HEADER)
+        self.asas_conf_logger.start()
 
     def make_parameter_lists(self, keys):
         """
@@ -318,6 +335,7 @@ class AreaRestrictionManager(TrafficArrays):
 
         # Reset loggers
         self.area_conf_logger.reset()
+        self.asas_conf_logger.reset()
 
     def remove(self):
         """ Called when plugin is removed. """
@@ -341,6 +359,26 @@ class AreaRestrictionManager(TrafficArrays):
             return
 
         self.ac_id = bs.traf.id[:]  # Purely for debugging purposes only
+
+        # Log each conflict pair only once
+        for (ac1, ac2), dist, tcpa, tlos in zip(bs.traf.asas.confpairs,
+                                                bs.traf.asas.dist,
+                                                bs.traf.asas.tcpa,
+                                                bs.traf.asas.tLOS):
+            idx1 = bs.traf.id2idx(ac1)
+            idx2 = bs.traf.id2idx(ac2)
+            if idx1 > idx2:
+                continue
+
+            self.asas_conf_logger.log(np.array(bs.traf.id)[[idx1]],
+                                      bs.traf.id[idx2],
+                                      dist,
+                                      tcpa,
+                                      tlos,
+                                      bs.traf.lat[idx1],
+                                      bs.traf.lon[idx1],
+                                      bs.traf.lat[idx2],
+                                      bs.traf.lon[idx2])
 
         # Find courses to active and next waypoint
         self.calculate_courses_to_waypoints()
@@ -599,9 +637,8 @@ class AreaRestrictionManager(TrafficArrays):
                 self.area_conf_logger.log(np.array(bs.traf.id)[[ac_idx]],
                                           self.area_ids[area_idx],
                                           t_int,
-                                          #   bs.traf.lat[ac_idx],
-                                          #   bs.traf.lon[ac_idx]
-                                          )
+                                          bs.traf.lat[ac_idx],
+                                          bs.traf.lon[ac_idx])
 
     def calculate_area_resolution_vectors(self):
         """
