@@ -40,8 +40,7 @@ AREA_AVOIDANCE_CRS_MARGIN = 1  # [deg]
 COMMANDED_CRS_MARGIN = 0.2  # [deg] Verify if commanded heading has been reached
 NM_TO_M = 1852.  # Conversion factor nautical miles to metres
 
-AREALOG_HEADER = ("AREA CONFLICT LOGGER\n"
-                  + "simt [s], "
+AREALOG_HEADER = ("simt [s], "
                   + "ac callsign [-], "
                   + "area idx[-], "
                   + "t_int [s], "
@@ -49,11 +48,10 @@ AREALOG_HEADER = ("AREA CONFLICT LOGGER\n"
                   + "ac lon [deg]"
                  )
 
-ASASLOG_HEADER = ("ASAS CONFLICT LOGGER\n"
-                  + "simt [s], "
+ASASLOG_HEADER = ("simt [s], "
                   + "ac1 [-], "
                   + "ac2 [-], "
-                  + "dist [NM], "
+                  + "dist [m], "
                   + "t_cpa [s], "
                   + "t_los [s], "
                   + "ac1 lat [deg], "

@@ -11,33 +11,29 @@ from bluesky import settings
 
 # Log parameters for the flight statistics log
 header = \
-    "#######################################################\n" + \
-    "FLST LOG\n" + \
-    "Flight Statistics\n" + \
-    "#######################################################\n\n" + \
-    "Parameters [Units]:\n" + \
-    "Deletion Time [s], " + \
-    "Call sign [-], " + \
-    "Spawn Time [s], " + \
-    "Flight time [s], " + \
-    "Actual Distance 2D [m], " + \
-    "Actual Distance 3D [m], " + \
-    "Work Done [J], " + \
-    "Latitude [deg], " + \
-    "Longitude [deg], " + \
-    "Altitude [m], " + \
-    "TAS [m/s], " + \
-    "Vertical Speed [m/s], " + \
-    "Heading [deg], " + \
-    "Origin Lat [deg], " + \
-    "Origin Lon [deg], " + \
-    "Destination Lat [deg], " + \
-    "Destination Lon [deg], " + \
-    "ASAS Active [bool], " + \
-    "Pilot ALT [m], " + \
-    "Pilot SPD (TAS) [m/s], " + \
-    "Pilot HDG [deg], " + \
-    "Pilot VS [m/s]"  + "\n"
+    ("Deletion time [s], "
+     + "Callsign [-], "
+     + "Spawn time [s], "
+     + "Flight time [s], "
+     + "Actual Distance 2D [m], "
+     + "Actual Distance 3D [m], "
+     + "Work Done [J], "
+     + "Latitude [deg], "
+     + "Longitude [deg], "
+     + "Altitude [m], "
+     + "TAS [m/s], "
+     + "Vertical Speed [m/s], "
+     + "Heading [deg], "
+    # + "Origin Lat [deg], "
+    # + "Origin Lon [deg], "
+    # + "Destination Lat [deg], "
+    # + "Destination Lon [deg], "
+    # + "ASAS Active [bool], "
+    # + "Pilot ALT [m], "
+    # + "Pilot SPD (TAS) [m/s], "
+    # + "Pilot HDG [deg], "
+    # + "Pilot VS [m/s]"
+     + "\n")
 
 # Global data
 area = None
@@ -160,11 +156,11 @@ class Area(TrafficArrays):
                 # traf.ap.origlon[delidx],
                 # traf.ap.destlat[delidx],
                 # traf.ap.destlon[delidx],
-                traf.asas.active[delidx],
-                traf.pilot.alt[delidx],
-                traf.pilot.tas[delidx],
-                traf.pilot.vs[delidx],
-                traf.pilot.hdg[delidx]
+                # traf.asas.active[delidx],
+                # traf.pilot.alt[delidx],
+                # traf.pilot.tas[delidx],
+                # traf.pilot.vs[delidx],
+                # traf.pilot.hdg[delidx]
             )
             # delete all aicraft in self.delidx
             traf.delete(delidx)
