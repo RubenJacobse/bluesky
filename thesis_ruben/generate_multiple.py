@@ -4,23 +4,33 @@ combinations of input variables.
 """
 
 # Python imports
+import os
+import sys
+import shutil
 import itertools
 import datetime
 
 # Local imports
-from scenario_generator import create
+from scenario_generator import create_scenfile
 
 
 def main():
-    current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    """
+    Use the scenario generator to create a number of scenario files
+    using all possible combinations of the relevant input parameter
+    lists. Also create a scenario file that allows the BlueSky
+    BATCH command to be used to execute the generated scenarios in
+    parallel on all cpu cores.
+    """
 
-    # Input variables and
-    random_seed = [x for x in range(1, 11)]
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    # Input variables and the list of all combinations
+    random_seed = [x for x in range(1, 3)]
     corridor_length = [40]
     corridor_width = [25]
     ac_creation_arc_angle = [90]
     asas_reso_method = ["OFF", "LF", "MVP", "SWARM_V2"]
-
     combination_lst = list(itertools.product(random_seed,
                                              asas_reso_method,
                                              corridor_length,
@@ -29,13 +39,39 @@ def main():
 
     # Create a scenario file for each combination of variables
     for (seed, reso_method, length, width, angle) in combination_lst:
-        create(current_time,
-               seed,
-               reso_method,
-               length,
-               width,
-               angle,
-               is_edge_angle=False)
+        create_scenfile(timestamp,
+                        seed,
+                        reso_method,
+                        length,
+                        width,
+                        angle,
+                        is_edge_angle=False)
+
+    # Create a batch file that allows the BlueSky "BATCH" command to
+    # process all scenario files using all CPU cores in parallel.
+    current_dir = os.path.dirname(__file__)
+    scen_rel_dir = "thesis_ruben/{}/".format(timestamp)
+    output_abs_dir = os.path.join(current_dir, "../scenario", scen_rel_dir)
+    if not os.path.exists(os.path.dirname(output_abs_dir)):
+        os.makedirs(os.path.dirname(output_abs_dir))
+
+    with open(output_abs_dir + "batch.scn", "w") as batch_file:
+        for scen_number, (seed, reso_method, length, width, angle) \
+                in enumerate(combination_lst):
+            scenfile_name = ("L{}_W{}_RESO-{}_SCEN_{:03d}.scn"
+                             .format(length,
+                                     width,
+                                     reso_method,
+                                     seed))
+            scenfile_path = scen_rel_dir + scenfile_name
+            batch_file.write("0:00:00.00>SCEN {:03d}\n".format(scen_number+1))
+            batch_file.write("0:00:00.00>PCALL {}\n".format(scenfile_path))
+            batch_file.write("0:00:00.00>SCHEDULE 4:00:00 HOLD\n")
+
+    # Make a copy of the batch file to simplify calling from the
+    # BlueSky command line using "BATCH thesis_latest"
+    shutil.copy(output_abs_dir + "batch.scn",
+                os.path.join(current_dir, "../scenario/thesis_latest.scn"))
 
 
 if __name__ == "__main__":

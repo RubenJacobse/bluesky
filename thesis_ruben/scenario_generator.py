@@ -13,9 +13,6 @@ import time
 import random
 import datetime
 
-# Third-party imports
-import numpy as np
-
 # Enable BlueSky imports by adding the project folder to the path
 sys.path.append(os.path.abspath(os.path.join('..')))
 sys.path.append(os.path.abspath(os.path.join('../plugins')))
@@ -30,7 +27,7 @@ CENTER_LAT = 0.0  # [deg]
 CENTER_LON = 0.0  # [deg]
 PLUGIN_NAME = "RAA"
 AREA_LOOKAHEAD_TIME = 120  # [s] Look-ahead time used to detect area conflicts
-SIM_TIME_STEP = 0.05  # [s] Simulation time step
+SIM_TIME_STEP = 0.1  # [s] Simulation time step
 SIM_PAUSE_HOUR = 4  # [h] Pause simulation after this number of hours
 RMETHH = "BOTH"  # Horizontal resolution method, allow both spd and hdg changes
 SHOW_AC_TRAILS = True  # Plot trails in the radar window
@@ -53,13 +50,13 @@ ARC_ANGLE = 90  # [deg]
 RESO_METHOD = "MVP"  # Conflict resolution method
 
 
-def create(creation_time,
-           random_seed,
-           asas_reso_method,
-           corridor_length,
-           corridor_width,
-           angle,
-           is_edge_angle=False):
+def create_scenfile(timestamp,
+                    random_seed,
+                    asas_reso_method,
+                    corridor_length,
+                    corridor_width,
+                    angle,
+                    is_edge_angle=False):
     """
     Create a scenario file which name reflects the properties of the
     experiment geometry.
@@ -68,14 +65,14 @@ def create(creation_time,
     random.seed(random_seed)
 
     # Write scenario files to different folders based on angle types
-    folder_name = "angle_scenarios" if is_edge_angle else "arc_scenarios"
-    folder_rel_path = "{}/{}".format(folder_name, creation_time)
+    curr_dir = os.path.dirname(__file__)
+    folder_rel_path = "../scenario/thesis_ruben/{}".format(timestamp)
+    folder_abs_path = os.path.join(curr_dir, folder_rel_path)
+    if not os.path.exists(folder_abs_path):
+        os.makedirs(folder_abs_path)
 
-    if not os.path.exists(folder_rel_path):
-        os.makedirs(folder_rel_path)
-
-    file_rel_path = ("{}/L{}_W{}_RESO-{}_SCEN_{:03d}.scn")\
-        .format(folder_rel_path,
+    file_path = ("{}/L{}_W{}_RESO-{}_SCEN_{:03d}.scn")\
+        .format(folder_abs_path,
                 corridor_length,
                 corridor_width,
                 asas_reso_method,
@@ -83,7 +80,7 @@ def create(creation_time,
 
     # Create a header to simplify traceability of variable values
     scen_header = ("##################################################\n"
-                   + "# File created at: {}\n".format(creation_time)
+                   + "# File created at: {}\n".format(timestamp)
                    + "# Center latitude: {}\n".format(CENTER_LAT)
                    + "# Center longitude: {}\n".format(CENTER_LON)
                    + "# Corridor length: {} NM\n".format(CORRIDOR_LENGTH)
@@ -102,7 +99,7 @@ def create(creation_time,
                    + "##################################################\n\n")
 
     # Open file, overwrite if existing
-    with open(file_rel_path, "w+") as scnfile:
+    with open(file_path, "w+") as scnfile:
         scnfile.write(scen_header)
         zero_time = "0:00:00.00>"
 
@@ -112,12 +109,12 @@ def create(creation_time,
         scnfile.write(zero_time + "TRAIL {}\n".format("ON" if SHOW_AC_TRAILS
                                                       else "OFF"))
         scnfile.write(zero_time + "SWRAD SYM\n")
-        scnfile.write(zero_time + "SWRAD LABEL 1\n")
+        scnfile.write(zero_time + "SWRAD LABEL 0\n")
         scnfile.write(zero_time + "SWRAD WPT\n")
         scnfile.write(zero_time + "SWRAD SAT\n")
         scnfile.write(zero_time + "SWRAD APT\n")
         scnfile.write(zero_time + "FF\n")
-        scnfile.write("{}:00:00.00>PAUSE\n".format(SIM_PAUSE_HOUR))
+        scnfile.write("{}:00:00.00>HOLD\n".format(SIM_PAUSE_HOUR))
 
         scnfile.write("\n# Setup circular experiment area and activate it"
                       + " as a traffic area in BlueSky\n")
@@ -499,14 +496,15 @@ def calc_line_ring_intersection(ring_center_lat,
 
 
 if __name__ == "__main__":
-    # When running as main, generate a file for each relevant resolution method
+    # When running as main, generate a file for each relevant resolution
+    # method using the default values of the other parameters.
     creation_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
     for reso_method in ["OFF", "MVP", "LF", "SWARM_V2"]:
-        create(creation_time,
-               SEED,
-               reso_method,
-               CORRIDOR_LENGTH,
-               CORRIDOR_WIDTH,
-               ARC_ANGLE,
-               is_edge_angle=False)
+        create_scenfile(creation_time,
+                        SEED,
+                        reso_method,
+                        CORRIDOR_LENGTH,
+                        CORRIDOR_WIDTH,
+                        ARC_ANGLE,
+                        is_edge_angle=False)
