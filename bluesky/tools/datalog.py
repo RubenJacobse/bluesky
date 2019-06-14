@@ -136,12 +136,12 @@ class CSVLogger:
         # Write the header
         for line in self.header:
             self.file.write(bytearray('# ' + line + '\n', 'ascii'))
-        # Write the column contents
-        columns = ['simt']
-        for v in self.selvars:
-            columns.append(v.varname)
-        self.file.write(
-            bytearray('# ' + str.join(', ', columns) + '\n', 'ascii'))
+        # # Write the column contents
+        # columns = ['simt']
+        # for v in self.selvars:
+        #     columns.append(v.varname)
+        # self.file.write(
+        #     bytearray('# ' + str.join(', ', columns) + '\n', 'ascii'))
 
     def isopen(self):
         return self.file is not None

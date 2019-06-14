@@ -24,16 +24,16 @@ header = \
      + "TAS [m/s], "
      + "Vertical Speed [m/s], "
      + "Heading [deg], "
-    # + "Origin Lat [deg], "
-    # + "Origin Lon [deg], "
-    # + "Destination Lat [deg], "
-    # + "Destination Lon [deg], "
-    # + "ASAS Active [bool], "
-    # + "Pilot ALT [m], "
-    # + "Pilot SPD (TAS) [m/s], "
-    # + "Pilot HDG [deg], "
-    # + "Pilot VS [m/s]"
-     + "\n")
+     # + "Origin Lat [deg], "
+     # + "Origin Lon [deg], "
+     # + "Destination Lat [deg], "
+     # + "Destination Lon [deg], "
+     # + "ASAS Active [bool], "
+     # + "Pilot ALT [m], "
+     # + "Pilot SPD (TAS) [m/s], "
+     # + "Pilot HDG [deg], "
+     # + "Pilot VS [m/s]"
+     )
 
 # Global data
 area = None
