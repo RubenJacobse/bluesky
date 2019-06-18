@@ -56,15 +56,15 @@ def main():
         os.makedirs(os.path.dirname(output_dir))
 
     with open(output_dir + "/batch.scn", "w") as batch_file:
-        for scen_number, (seed, reso_method, length, width, angle) \
-                in enumerate(combination_lst):
-            scenfile_name = ("L{}_W{}_RESO-{}_SCEN_{:03d}.scn"
+        for (seed, reso_method, length, width, angle) in combination_lst:
+            scenfile_name = ("L{}_W{}_A{}_RESO-{}_SCEN{:03d}.scn"
                              .format(length,
                                      width,
+                                     angle,
                                      reso_method,
                                      seed))
             scenfile_path = os.path.join(scen_dir, scenfile_name)
-            batch_file.write("0:00:00.00>SCEN {:03d}\n".format(scen_number+1))
+            batch_file.write("0:00:00.00>SCEN {}\n".format(scenfile_name[:-4]))
             batch_file.write("0:00:00.00>PCALL {}\n".format(scenfile_path))
             batch_file.write("0:00:00.00>SCHEDULE 5:00:00 HOLD\n")
 

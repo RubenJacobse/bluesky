@@ -71,10 +71,11 @@ def create_scenfile(timestamp,
     if not os.path.exists(folder_abs_path):
         os.makedirs(folder_abs_path)
 
-    file_path = ("{}/L{}_W{}_RESO-{}_SCEN_{:03d}.scn")\
+    file_path = ("{}/L{}_W{}_A{}_RESO-{}_SCEN{:03d}.scn")\
         .format(folder_abs_path,
                 corridor_length,
                 corridor_width,
+                angle,
                 asas_reso_method,
                 random_seed)
 
