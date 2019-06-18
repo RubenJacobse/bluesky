@@ -66,7 +66,7 @@ def create_scenfile(timestamp,
 
     # Write scenario files to different folders based on angle types
     curr_dir = os.path.dirname(__file__)
-    folder_rel_path = "../scenario/thesis_ruben/{}".format(timestamp)
+    folder_rel_path = "scenario/{}".format(timestamp)
     folder_abs_path = os.path.join(curr_dir, folder_rel_path)
     if not os.path.exists(folder_abs_path):
         os.makedirs(folder_abs_path)

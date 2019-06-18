@@ -57,9 +57,11 @@ ASASLOG_HEADER = ("simt [s], "
                   + "ac1 lat [deg], "
                   + "ac1 lon [deg], "
                   + "ac2 lat [deg], "
-                  + "ac2 lon [deg], "
+                  + "ac2 lon [deg]"
                  )
 
+# Ensure log files are saved in separate directory
+bs.settings.set_variable_defaults(log_path="thesis_ruben/output")
 
 def init_plugin():
     """Initialize the RAA plugin"""

@@ -50,12 +50,12 @@ def main():
     # Create a batch file that allows the BlueSky "BATCH" command to
     # process all scenario files using all CPU cores in parallel.
     current_dir = os.path.dirname(__file__)
-    scen_rel_dir = "thesis_ruben/{}/".format(timestamp)
-    output_abs_dir = os.path.join(current_dir, "../scenario", scen_rel_dir)
-    if not os.path.exists(os.path.dirname(output_abs_dir)):
-        os.makedirs(os.path.dirname(output_abs_dir))
+    scen_dir = "{}".format(timestamp)
+    output_dir = os.path.join(current_dir, "scenario", scen_dir)
+    if not os.path.exists(os.path.dirname(output_dir)):
+        os.makedirs(os.path.dirname(output_dir))
 
-    with open(output_abs_dir + "batch.scn", "w") as batch_file:
+    with open(output_dir + "/batch.scn", "w") as batch_file:
         for scen_number, (seed, reso_method, length, width, angle) \
                 in enumerate(combination_lst):
             scenfile_name = ("L{}_W{}_RESO-{}_SCEN_{:03d}.scn"
@@ -63,15 +63,15 @@ def main():
                                      width,
                                      reso_method,
                                      seed))
-            scenfile_path = scen_rel_dir + scenfile_name
+            scenfile_path = os.path.join(scen_dir, scenfile_name)
             batch_file.write("0:00:00.00>SCEN {:03d}\n".format(scen_number+1))
             batch_file.write("0:00:00.00>PCALL {}\n".format(scenfile_path))
-            batch_file.write("0:00:00.00>SCHEDULE 4:00:00 HOLD\n")
+            batch_file.write("0:00:00.00>SCHEDULE 5:00:00 HOLD\n")
 
     # Make a copy of the batch file to simplify calling from the
     # BlueSky command line using "BATCH thesis_latest"
-    shutil.copy(output_abs_dir + "batch.scn",
-                os.path.join(current_dir, "../scenario/thesis_latest.scn"))
+    shutil.copy(output_dir + "/batch.scn",
+                os.path.join(current_dir, "scenario/thesis_latest.scn"))
 
 
 if __name__ == "__main__":
