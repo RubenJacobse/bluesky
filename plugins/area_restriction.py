@@ -333,9 +333,11 @@ class AreaRestrictionManager(TrafficArrays):
         self.num_traf = 0
         self.t_lookahead = DEFAULT_AREA_T_LOOKAHEAD
 
-        # Reset loggers
+        # Reset and restart loggers
         self.area_conf_logger.reset()
         self.asas_conf_logger.reset()
+        self.area_conf_logger.start()
+        self.asas_conf_logger.start()
 
     def remove(self):
         """ Called when plugin is removed. """
