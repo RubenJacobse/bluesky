@@ -6,6 +6,7 @@ import numpy as np
 from bluesky import traf, sim  #, settings, navdb, traf, sim, scr, tools
 from bluesky.tools import datalog, areafilter, \
     TrafficArrays, RegisterElementParameters
+from bluesky.tools import geo
 from bluesky.tools.aero import ft
 from bluesky import settings
 
@@ -15,9 +16,11 @@ header = \
      + "Callsign [-], "
      + "Spawn time [s], "
      + "Flight time [s], "
+     + "Nominal Distance 2D [m],"
      + "Actual Distance 2D [m], "
      + "Actual Distance 3D [m], "
      + "Work Done [J], "
+     + "Dist to last waypoint [m], "
      + "Latitude [deg], "
      + "Longitude [deg], "
      + "Altitude [m], "
@@ -139,13 +142,26 @@ class Area(TrafficArrays):
 
         # Log flight statistics when for deleted aircraft
         if len(delidx) > 0:
+            # Calculate nominal route distance and distance to last
+            # waypoint at deletion time
+            routedist = np.zeros(len(delidx))
+            lastwpdist = np.zeros(len(delidx))
+            for idx, ac_idx in enumerate(delidx):
+                routedist[idx] = sum(traf.ap.route[ac_idx].wpdistto) * 1852
+                lastwpdist[idx] = geo.latlondist(traf.lat[ac_idx],
+                                                 traf.lon[ac_idx],
+                                                 traf.ap.route[ac_idx].wplat[-1],
+                                                 traf.ap.route[ac_idx].wplon[-1])
+
             self.logger.log(
                 np.array(traf.id)[delidx],
                 self.create_time[delidx],
                 sim.simt - self.create_time[delidx],
+                routedist,
                 self.distance2D[delidx],
                 self.distance3D[delidx],
                 self.work[delidx],
+                lastwpdist,
                 traf.lat[delidx],
                 traf.lon[delidx],
                 traf.alt[delidx],
