@@ -57,8 +57,9 @@ def main():
 
     with open(output_dir + "/batch.scn", "w") as batch_file:
         for (seed, reso_method, length, width, angle) in combination_lst:
-            scenfile_name = ("L{}_W{}_A{}_RESO-{}_SCEN{:03d}.scn"
-                             .format(length,
+            scenfile_name = ("{}_L{}_W{}_A{}_RESO-{}_SCEN{:03d}.scn"
+                             .format(timestamp,
+                                     length,
                                      width,
                                      angle,
                                      reso_method,

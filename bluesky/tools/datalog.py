@@ -55,8 +55,7 @@ def reset():
 
 
 def makeLogfileName(logname):
-    timestamp = datetime.now().strftime('%Y%m%d_%H-%M-%S')
-    fname = "%s_%s_%s.log" % (logname, stack.get_scenname(), timestamp)
+    fname = "%s_%s.log" % (logname, stack.get_scenname())
     return settings.log_path + '/' + fname
 
 
