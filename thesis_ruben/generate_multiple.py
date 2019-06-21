@@ -68,6 +68,8 @@ def main():
             batch_file.write("0:00:00.00>SCEN {}\n".format(scenfile_name[:-4]))
             batch_file.write("0:00:00.00>PCALL {}\n".format(scenfile_path))
             batch_file.write("0:00:00.00>SCHEDULE 5:00:00 HOLD\n")
+        # Exit BlueSky after last scenario is finished
+        batch_file.write("0:00:00.00>SCHEDULE 5:00:00 EXIT")
 
     # Make a copy of the batch file to simplify calling from the
     # BlueSky command line using "BATCH thesis_latest"

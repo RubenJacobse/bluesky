@@ -22,17 +22,21 @@ import plugins.area_restriction as ar
 import bluesky.tools.geo as bsgeo
 import plugins.tempgeo as tg
 
-# Module level constants
+# BlueSky simulator settings
+SIM_TIME_STEP = 0.1  # [s] Simulation time step
+SIM_PAUSE_HOUR = 5  # [h] Pause simulation after this number of hours
+SHOW_AC_TRAILS = True  # Plot trails in the radar window
+
+# Area restriction settings
 CENTER_LAT = 0.0  # [deg]
 CENTER_LON = 0.0  # [deg]
 PLUGIN_NAME = "RAA"
 AREA_LOOKAHEAD_TIME = 120  # [s] Look-ahead time used to detect area conflicts
-SIM_TIME_STEP = 0.1  # [s] Simulation time step
-SIM_PAUSE_HOUR = 4  # [h] Pause simulation after this number of hours
 RMETHH = "BOTH"  # Horizontal resolution method, allow both spd and hdg changes
-SHOW_AC_TRAILS = True  # Plot trails in the radar window
 AREA_RADIUS = 100  # [NM]
-NUM_AIRCRAFT = 200
+
+# Aircraft creation settings
+NUM_AIRCRAFT = 2
 # AC_TYPES = ["A320", "B738", "A333", "B744"]
 # AC_TYPES_SPD = [258, 260, 273, 286]
 AC_TYPES = ["B744"]
@@ -52,7 +56,7 @@ RESO_METHOD = "MVP"  # Conflict resolution method
 
 def create_scenfile(timestamp,
                     random_seed,
-                    asas_reso_method,
+                    resolution_method,
                     corridor_length,
                     corridor_width,
                     angle,
@@ -77,28 +81,29 @@ def create_scenfile(timestamp,
                 corridor_length,
                 corridor_width,
                 angle,
-                asas_reso_method,
+                resolution_method,
                 random_seed)
 
     # Create a header to simplify traceability of variable values
-    scen_header = ("##################################################\n"
-                   + "# File created at: {}\n".format(timestamp)
-                   + "# Center latitude: {}\n".format(CENTER_LAT)
-                   + "# Center longitude: {}\n".format(CENTER_LON)
-                   + "# Corridor length: {} NM\n".format(CORRIDOR_LENGTH)
-                   + "# Corridor width: {} NM\n".format(CORRIDOR_WIDTH)
-                   + "# Angle: {} deg ".format(angle)
-                   + (" (Defined by area edge angle)\n" if is_edge_angle
-                      else "(Defined by arc angle)\n")
-                   + "# Experiment area radius: {} NM\n".format(AREA_RADIUS)
-                   + "# Aircraft types: {}\n".format(AC_TYPES)
-                   + "# Aircraft average speed: {} kts\n".format(AC_TYPES_SPD)
-                   + "# Aircraft speed std dev: {} kts\n".format(SPD_STDDEV)
-                   + "# Number of aircraft created: {}\n".format(NUM_AIRCRAFT)
-                   + "# Min creation interval: {} s\n".format(CRE_INTERVAL_MIN)
-                   + "# Max creation interval: {} s\n".format(CRE_INTERVAL_MAX)
-                   + "# Random number generator seed: {}\n".format(SEED)
-                   + "##################################################\n\n")
+    scen_header = \
+        ("##################################################\n"
+         + "# File created at: {}\n".format(timestamp)
+         + "# Center latitude: {}\n".format(CENTER_LAT)
+         + "# Center longitude: {}\n".format(CENTER_LON)
+         + "# Corridor length: {} NM\n".format(CORRIDOR_LENGTH)
+         + "# Corridor width: {} NM\n".format(CORRIDOR_WIDTH)
+         + "# Angle: {} deg ".format(angle)
+         + (" (Defined by area edge angle)\n" if is_edge_angle
+            else "(Defined by arc angle)\n")
+         + "# Experiment area radius: {} NM\n".format(AREA_RADIUS)
+         + "# Aircraft types: {}\n".format(AC_TYPES)
+         + "# Aircraft average speed: {} kts\n".format(AC_TYPES_SPD)
+         + "# Aircraft speed std dev: {} kts\n".format(SPD_STDDEV)
+         + "# Number of aircraft created: {}\n".format(NUM_AIRCRAFT)
+         + "# Min creation interval: {} s\n".format(CRE_INTERVAL_MIN)
+         + "# Max creation interval: {} s\n".format(CRE_INTERVAL_MAX)
+         + "# Random number generator seed: {}\n".format(SEED)
+         + "##################################################\n\n")
 
     # Open file, overwrite if existing
     with open(file_path, "w+") as scnfile:
@@ -116,7 +121,6 @@ def create_scenfile(timestamp,
         scnfile.write(zero_time + "SWRAD SAT\n")
         scnfile.write(zero_time + "SWRAD APT\n")
         scnfile.write(zero_time + "FF\n")
-        scnfile.write("{}:00:00.00>HOLD\n".format(SIM_PAUSE_HOUR))
 
         scnfile.write("\n# Setup circular experiment area and activate it"
                       + " as a traffic area in BlueSky\n")
@@ -128,7 +132,7 @@ def create_scenfile(timestamp,
 
         scnfile.write("\n# Setup BlueSky ASAS module options\n")
         scnfile.write(zero_time + "ASAS ON\n")
-        scnfile.write(zero_time + "RESO {}\n".format(asas_reso_method))
+        scnfile.write(zero_time + "RESO {}\n".format(resolution_method))
         scnfile.write(zero_time + "RMETHH {}\n".format(RMETHH))
 
         # Create restricted areas
