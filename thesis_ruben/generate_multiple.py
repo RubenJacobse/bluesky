@@ -76,6 +76,15 @@ def main():
     shutil.copy(output_dir + "/batch.scn",
                 os.path.join(current_dir, "scenario/thesis_latest.scn"))
 
+    # Store all combinations in csv format for easier post-processing
+    with open(output_dir + "/combinations.csv", "w") as combi_file:
+        combi_header = "# scen name, corridor length, corridor width, angle, reso method\n"
+        combi_file.write(combi_header)
+        for combination in combination_lst:
+            (seed, reso_method, length, width, angle) = combination
+            scen_name = "SCEN{:03d}".format(seed)
+            combi_file.write(f"{scen_name},{length},{width},{angle},{reso_method}\n")
+
 
 if __name__ == "__main__":
     main()
