@@ -67,6 +67,8 @@ def create_scenfile(target_dir,
     experiment geometry.
     """
 
+    # Initialize random number generator before we do anything where
+    # random numbers are used.
     random.seed(random_seed)
 
     # Set the path of the resulting scenario file
@@ -189,7 +191,7 @@ def create_area(scnfile,
                 angle,
                 is_edge_angle=False):
     """
-    Create the restricted area on a given coridor side
+    Create the restricted area on a given corridor side.
     """
 
     # Area on left side is located at 270 and right side at 90
@@ -492,7 +494,7 @@ if __name__ == "__main__":
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     test_folder = "scengen_test"
 
-    for reso_method in ["OFF", "MVP", "LF", "SWARM_V2"]:
+    for reso_method in ["OFF", "MVP", "LF", "SWARM-V2"]:
         create_scenfile(test_folder,
                         current_time,
                         SEED,

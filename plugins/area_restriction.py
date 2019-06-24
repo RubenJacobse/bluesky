@@ -45,8 +45,7 @@ AREALOG_HEADER = ("simt [s], "
                   + "area idx[-], "
                   + "t_int [s], "
                   + "ac lat [deg], "
-                  + "ac lon [deg]"
-                 )
+                  + "ac lon [deg]")
 
 ASASLOG_HEADER = ("simt [s], "
                   + "ac1 [-], "
@@ -57,11 +56,11 @@ ASASLOG_HEADER = ("simt [s], "
                   + "ac1 lat [deg], "
                   + "ac1 lon [deg], "
                   + "ac2 lat [deg], "
-                  + "ac2 lon [deg]"
-                 )
+                  + "ac2 lon [deg]")
 
 # Ensure log files are saved in separate directory
 bs.settings.set_variable_defaults(log_path="thesis_ruben/output")
+
 
 def init_plugin():
     """Initialize the RAA plugin"""
@@ -178,11 +177,11 @@ class AreaRestrictionManager(TrafficArrays):
         self.t_lookahead = DEFAULT_AREA_T_LOOKAHEAD
 
         # Create and start area conflict logger
-        self.area_conf_logger = datalog.crelog("AREA_CONF_LOG", None, AREALOG_HEADER)
+        self.area_conf_logger = datalog.crelog("AREALOG", None, AREALOG_HEADER)
         self.area_conf_logger.start()
 
         # Create and start aircraft conflict logger
-        self.asas_conf_logger = datalog.crelog("ASAS_CONF_LOG", None, ASASLOG_HEADER)
+        self.asas_conf_logger = datalog.crelog("ASASLOG", None, ASASLOG_HEADER)
         self.asas_conf_logger.start()
 
     def make_parameter_lists(self, keys):

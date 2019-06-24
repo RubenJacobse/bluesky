@@ -36,8 +36,7 @@ def main():
     random_seed = [x for x in range(1, 3)]
     corridor_length = [40]
     corridor_width = [25]
-    ac_creation_arc_angle = [90]
-    asas_reso_method = ["OFF", "LF", "MVP", "SWARM_V2"]
+    asas_reso_method = ["OFF", "LF", "MVP", "SWARM-V2"]
     combination_lst = list(itertools.product(random_seed,
                                              asas_reso_method,
                                              corridor_length,

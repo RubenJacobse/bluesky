@@ -14,7 +14,7 @@ from . import MVP_alt
 
 
 def start(asas):
-    asas.Rswarm = 20 * nm  # [m]
+    asas.Rswarm = 7.5 * nm  # [m]
     asas.dhswarm = 1500 * ft  # [m]
     asas.Swarmweights = np.array([10, 3, 1])
 
