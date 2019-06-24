@@ -23,7 +23,7 @@ def main():
     parallel on all cpu cores.
     """
 
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
     # Input variables and the list of all combinations
     random_seed = [x for x in range(1, 3)]

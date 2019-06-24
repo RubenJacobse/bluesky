@@ -504,10 +504,10 @@ def calc_line_ring_intersection(ring_center_lat,
 if __name__ == "__main__":
     # When running as main, generate a file for each relevant resolution
     # method using the default values of the other parameters.
-    creation_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
     for reso_method in ["OFF", "MVP", "LF", "SWARM_V2"]:
-        create_scenfile(creation_time,
+        create_scenfile(timestamp,
                         SEED,
                         reso_method,
                         CORRIDOR_LENGTH,
