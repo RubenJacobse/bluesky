@@ -461,27 +461,9 @@ def calc_line_ring_intersection(ring_center_lat,
         lat [deg], lon [deg], angle [deg]
     """
 
-    # First guess for intersection is midpoint of line
-    intersect_lat, intersect_lon = tg.calc_midpoint(line_start_lat,
-                                                    line_start_lon,
-                                                    line_end_lat,
-                                                    line_end_lon)
-    qdr_from_center, dist_from_center = bsgeo.qdrdist(ring_center_lat,
-                                                      ring_center_lon,
-                                                      intersect_lat,
-                                                      intersect_lon)
-
     # Use recursive bisection until the intersection point is within
     # distance margin from the ring edge
     while True:
-        if abs(dist_from_center - ring_radius) < 0.1:
-            break
-
-        if dist_from_center > ring_radius:
-            line_end_lat, line_end_lon = intersect_lat, intersect_lon
-        elif dist_from_center < ring_radius:
-            line_start_lat, line_start_lon = intersect_lat, intersect_lon
-
         intersect_lat, intersect_lon = tg.calc_midpoint(line_start_lat,
                                                         line_start_lon,
                                                         line_end_lat,
@@ -490,6 +472,14 @@ def calc_line_ring_intersection(ring_center_lat,
                                                           ring_center_lon,
                                                           intersect_lat,
                                                           intersect_lon)
+
+        if abs(dist_from_center - ring_radius) < 0.1:
+            break
+
+        if dist_from_center > ring_radius:
+            line_end_lat, line_end_lon = intersect_lat, intersect_lon
+        elif dist_from_center < ring_radius:
+            line_start_lat, line_start_lon = intersect_lat, intersect_lon
 
     angle_from_center = ar.ned2crs(qdr_from_center)
 
