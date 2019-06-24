@@ -54,7 +54,8 @@ ARC_ANGLE = 90  # [deg]
 RESO_METHOD = "MVP"  # Conflict resolution method
 
 
-def create_scenfile(timestamp,
+def create_scenfile(target_dir,
+                    timestamp,
                     random_seed,
                     resolution_method,
                     corridor_length,
@@ -68,21 +69,15 @@ def create_scenfile(timestamp,
 
     random.seed(random_seed)
 
-    # Write scenario files to different folders based on angle types
-    curr_dir = os.path.dirname(__file__)
-    folder_rel_path = "scenario/{}".format(timestamp)
-    folder_abs_path = os.path.join(curr_dir, folder_rel_path)
-    if not os.path.exists(folder_abs_path):
-        os.makedirs(folder_abs_path)
-
-    file_path = ("{}/{}_L{}_W{}_A{}_RESO-{}_SCEN{:03d}.scn")\
-        .format(folder_abs_path,
-                timestamp,
+    # Set the path of the resulting scenario file
+    file_name = ("{}_L{}_W{}_A{}_RESO-{}_SCEN{:03d}.scn")\
+        .format(timestamp,
                 corridor_length,
                 corridor_width,
                 angle,
                 resolution_method,
                 random_seed)
+    file_path = os.path.join(target_dir, file_name)
 
     # Create a header to simplify traceability of variable values
     scen_header = \
@@ -105,7 +100,7 @@ def create_scenfile(timestamp,
          + "# Random number generator seed: {}\n".format(SEED)
          + "##################################################\n\n")
 
-    # Open file, overwrite if existing
+    # Create scenario file, overwrite if existing
     with open(file_path, "w+") as scnfile:
         scnfile.write(scen_header)
         zero_time = "0:00:00.00>"
@@ -504,10 +499,12 @@ def calc_line_ring_intersection(ring_center_lat,
 if __name__ == "__main__":
     # When running as main, generate a file for each relevant resolution
     # method using the default values of the other parameters.
-    timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    test_folder = "scengen_test"
 
     for reso_method in ["OFF", "MVP", "LF", "SWARM_V2"]:
-        create_scenfile(timestamp,
+        create_scenfile(test_folder,
+                        current_time,
                         SEED,
                         reso_method,
                         CORRIDOR_LENGTH,

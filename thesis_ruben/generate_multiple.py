@@ -23,7 +23,14 @@ def main():
     parallel on all cpu cores.
     """
 
+    # Set directory where scenarios and other files are stored (create
+    # new folder if not already existing)
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    current_dir = os.path.dirname(__file__)
+    scen_dir = f"{timestamp}" + os.sep
+    output_dir = os.path.join(current_dir, "scenario", scen_dir)
+    if not os.path.exists(os.path.dirname(output_dir)):
+        os.mkdir(os.path.dirname(output_dir))
 
     # Input variables and the list of all combinations
     random_seed = [x for x in range(1, 3)]
@@ -39,7 +46,8 @@ def main():
 
     # Create a scenario file for each combination of variables
     for (seed, reso_method, length, width, angle) in combination_lst:
-        create_scenfile(timestamp,
+        create_scenfile(output_dir,
+                        timestamp,
                         seed,
                         reso_method,
                         length,
@@ -49,13 +57,7 @@ def main():
 
     # Create a batch file that allows the BlueSky "BATCH" command to
     # process all scenario files using all CPU cores in parallel.
-    current_dir = os.path.dirname(__file__)
-    scen_dir = "{}".format(timestamp)
-    output_dir = os.path.join(current_dir, "scenario", scen_dir)
-    if not os.path.exists(os.path.dirname(output_dir)):
-        os.makedirs(os.path.dirname(output_dir))
-
-    with open(output_dir + "/batch.scn", "w") as batch_file:
+    with open(os.path.join(output_dir, "batch.scn"), "w") as batch_file:
         for (seed, reso_method, length, width, angle) in combination_lst:
             scenfile_name = ("{}_L{}_W{}_A{}_RESO-{}_SCEN{:03d}.scn"
                              .format(timestamp,
@@ -72,12 +74,12 @@ def main():
         batch_file.write("0:00:00.00>SCHEDULE 5:00:00 EXIT")
 
     # Make a copy of the batch file to simplify calling from the
-    # BlueSky command line using "BATCH thesis_latest"
-    shutil.copy(output_dir + "/batch.scn",
+    # BlueSky command line by allowing the use of "BATCH thesis_latest"
+    shutil.copy(os.path.join(output_dir, "batch.scn"),
                 os.path.join(current_dir, "scenario/thesis_latest.scn"))
 
     # Store all combinations in csv format for easier post-processing
-    with open(output_dir + "/combinations.csv", "w") as combi_file:
+    with open(os.path.join(output_dir, "combinations.csv"), "w") as combi_file:
         combi_header = "# scen name, corridor length, corridor width, angle, reso method\n"
         combi_file.write(combi_header)
         for combination in combination_lst:
