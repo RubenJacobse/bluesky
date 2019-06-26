@@ -6,9 +6,9 @@ involving the area_restriction.py module.
 """
 
 # Python imports
-import math
-import sys
 import os
+import sys
+import math
 import time
 import random
 import datetime
@@ -18,8 +18,8 @@ sys.path.append(os.path.abspath(os.path.join('..')))
 sys.path.append(os.path.abspath(os.path.join('../plugins')))
 
 # BlueSky imports
-import plugins.area_restriction as ar
 import bluesky.tools.geo as bsgeo
+import plugins.area_restriction as ar
 import plugins.tempgeo as tg
 
 # BlueSky simulator settings
@@ -71,45 +71,52 @@ def create_scenfile(target_dir,
     # random numbers are used.
     random.seed(random_seed)
 
-    # Set the path of the resulting scenario file
-    file_name = ("{}_L{}_W{}_A{}_RESO-{}_SCEN{:03d}.scn")\
-        .format(timestamp,
-                corridor_length,
-                corridor_width,
-                angle,
-                resolution_method,
-                random_seed)
-    file_path = os.path.join(target_dir, file_name)
+    # Set the path of the resulting scenario file and geo file
+    scnfile_name = (("{}_L{}_W{}_A{}_RESO-{}_SCEN{:03d}.scn")
+                    .format(timestamp,
+                            corridor_length,
+                            corridor_width,
+                            angle,
+                            resolution_method,
+                            random_seed))
+    scnfile_path = os.path.join(target_dir, scnfile_name)
+
+    geofile_name = (("{}_L{}_W{}_A{}_geo.csv")
+                    .format(timestamp,
+                            corridor_length,
+                            corridor_width,
+                            angle))
+    geofile_path = os.path.join(target_dir, geofile_name)
 
     # Create a header to simplify traceability of variable values
     scen_header = \
         ("##################################################\n"
-         + "# File created at: {}\n".format(timestamp)
-         + "# Center latitude: {}\n".format(CENTER_LAT)
-         + "# Center longitude: {}\n".format(CENTER_LON)
-         + "# Corridor length: {} NM\n".format(CORRIDOR_LENGTH)
-         + "# Corridor width: {} NM\n".format(CORRIDOR_WIDTH)
-         + "# Angle: {} deg ".format(angle)
+         + f"# File created at: {timestamp}\n"
+         + f"# Center latitude: {CENTER_LAT} deg\n"
+         + f"# Center longitude: {CENTER_LON} deg\n"
+         + f"# Corridor length: {corridor_length} NM\n"
+         + f"# Corridor width: {corridor_width} NM\n"
+         + f"# Angle: {angle} deg "
          + (" (Defined by area edge angle)\n" if is_edge_angle
             else "(Defined by arc angle)\n")
-         + "# Experiment area radius: {} NM\n".format(AREA_RADIUS)
-         + "# Aircraft types: {}\n".format(AC_TYPES)
-         + "# Aircraft average speed: {} kts\n".format(AC_TYPES_SPD)
-         + "# Aircraft speed std dev: {} kts\n".format(SPD_STDDEV)
-         + "# Number of aircraft created: {}\n".format(NUM_AIRCRAFT)
-         + "# Min creation interval: {} s\n".format(CRE_INTERVAL_MIN)
-         + "# Max creation interval: {} s\n".format(CRE_INTERVAL_MAX)
-         + "# Random number generator seed: {}\n".format(SEED)
+         + f"# Experiment area radius: {AREA_RADIUS} NM\n"
+         + f"# Aircraft types: {AC_TYPES}\n"
+         + f"# Aircraft average speed: {AC_TYPES_SPD} kts\n"
+         + f"# Aircraft speed std dev: {SPD_STDDEV} kts\n"
+         + f"# Number of aircraft created: {NUM_AIRCRAFT}\n"
+         + f"# Min creation interval: {CRE_INTERVAL_MIN} s\n"
+         + f"# Max creation interval: {CRE_INTERVAL_MAX} s\n"
+         + f"# Random number generator seed: {random_seed}\n"
          + "##################################################\n\n")
 
-    # Create scenario file, overwrite if existing
-    with open(file_path, "w+") as scnfile:
+    # Create scenario file and geo file, overwrite if existing
+    with open(scnfile_path, "w+") as scnfile, open(geofile_path, "w+") as geofile:
         scnfile.write(scen_header)
         zero_time = "0:00:00.00>"
 
         scnfile.write("# Sim commands\n")
-        scnfile.write(zero_time + "PAN {},{}\n".format(CENTER_LAT, CENTER_LON))
-        scnfile.write(zero_time + "DT {}\n".format(SIM_TIME_STEP))
+        scnfile.write(zero_time + f"PAN {CENTER_LAT},{CENTER_LON}\n")
+        scnfile.write(zero_time + f"DT {SIM_TIME_STEP}\n")
         scnfile.write(zero_time + "TRAIL {}\n".format("ON" if SHOW_AC_TRAILS
                                                       else "OFF"))
         scnfile.write(zero_time + "SWRAD SYM\n")
@@ -129,15 +136,21 @@ def create_scenfile(target_dir,
 
         scnfile.write("\n# Setup BlueSky ASAS module options\n")
         scnfile.write(zero_time + "ASAS ON\n")
-        scnfile.write(zero_time + "RESO {}\n".format(resolution_method))
-        scnfile.write(zero_time + "RMETHH {}\n".format(RMETHH))
+        scnfile.write(zero_time + f"RESO {resolution_method}\n")
+        scnfile.write(zero_time + f"RMETHH {RMETHH}\n")
+
+        # Create csv file to allow generation of area restriction graphs
+        geofile.write("{},{},{},{}\n".format(
+            "ring", CENTER_LAT, CENTER_LON, AREA_RADIUS))
 
         # Create restricted areas
         scnfile.write("\n# LOAD RAA plugin and create area restrictions\n")
-        scnfile.write(zero_time + "PLUGINS LOAD {}\n".format(PLUGIN_NAME))
-        scnfile.write(zero_time + "RAACONF {}\n".format(AREA_LOOKAHEAD_TIME))
+        scnfile.write(zero_time + f"PLUGINS LOAD {PLUGIN_NAME}\n")
+        scnfile.write(zero_time + f"RAALOG {timestamp}\n")
+        scnfile.write(zero_time + f"RAACONF {AREA_LOOKAHEAD_TIME}\n")
 
         _ = create_area(scnfile,
+                        geofile,
                         zero_time,
                         corridor_width,
                         corridor_length,
@@ -145,6 +158,7 @@ def create_scenfile(target_dir,
                         angle,
                         is_edge_angle)
         angle_to_ring_intersect = create_area(scnfile,
+                                              geofile,
                                               zero_time,
                                               corridor_width,
                                               corridor_length,
@@ -184,6 +198,7 @@ def create_scenfile(target_dir,
 
 
 def create_area(scnfile,
+                geofile,
                 zero_time,
                 corridor_width,
                 corridor_length,
@@ -301,11 +316,13 @@ def create_area(scnfile,
                 outer_bottom_lon,
                 inner_bottom_lat,
                 inner_bottom_lon)
-    scnfile.write(zero_time + "RAA RAA{},ON,{},{},{}\n"
-                  .format(area_idx, 0, 0, area_coords))
-    scnfile.write(zero_time + "COLOR RAA{},164,0,0\n".format(area_idx))
+    scnfile.write(zero_time + f"RAA RAA{area_idx},ON,{0},{0},{area_coords}\n")
+    scnfile.write(zero_time + f"COLOR RAA{area_idx},164,0,0\n")
     scnfile.write(zero_time + "DEFWPT RAA_{},{:.6f},{:.6f},FIX\n".format(
         area_idx, CENTER_LAT, (inner_bottom_lon + outer_lon) / 2))
+
+    # Write coordinates to geo file
+    geofile.write(f"RAA{area_idx},{area_coords}\n")
 
     # Calculate angle from the center point to intersection between ring and
     # area edge
