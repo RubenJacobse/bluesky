@@ -7,7 +7,7 @@ and
 import csv
 
 # Module level constants
-PZ_RADIUS = 5.0 * 1852
+PZ_RADIUS = 5.0 * 1852  # Protected zone radius in meters
 
 
 class LogParser:

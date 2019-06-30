@@ -771,18 +771,19 @@ class AreaRestrictionManager(TrafficArrays):
         """
 
         # For debugging purposes
-        debugprintlist = ("AC056")
-        debugprinttime = 4100
+        debugprintlist = ("AC002", "AC003")
+        debugprinttime = 0
 
-        if bs.sim.simt > debugprinttime:
-            print("\nt={}s".format(bs.sim.simt))
+        # if bs.sim.simt > debugprinttime:
+        #     print("\nt={}s".format(bs.sim.simt))
 
         current_crs = ned2crs(bs.traf.trk)
         # NOTE: Some of the branches of the if-statements inside this loop are
         # redundant, but are still explicitly included to improve readability.
         for ac_idx in range(self.num_traf):
-            do_printdebug = ((bs.traf.id[ac_idx] in debugprintlist)
-                             and bs.sim.simt >= debugprinttime)
+            # do_printdebug = ((bs.traf.id[ac_idx] in debugprintlist)
+            #                  and bs.sim.simt >= debugprinttime)
+            do_printdebug = False
 
             if do_printdebug:
                 print("{} current control mode: {}".format(
@@ -848,29 +849,34 @@ class AreaRestrictionManager(TrafficArrays):
             if self.control_mode_curr[ac_idx] == "lnav":
                 # # NOTE: current implementation is naive, could result in all sorts of turning
                 # # behaviour if the active waypoint is behind the aircraft.
-                # #
+                #
                 # Waypoint recovery after conflict: Find the next active waypoint
                 # and send the aircraft to that waypoint.
-                if self.control_mode_prev[ac_idx] != "lnav":
+                if self.control_mode_prev[ac_idx] == "area":
                     iwpid = bs.traf.ap.route[ac_idx].findact(ac_idx)
-                    if iwpid != -1:  # To avoid problems if there are no waypoints
-                        bs.traf.ap.route[ac_idx].direct(ac_idx,
-                                                        bs.traf.ap.route[ac_idx].wpname[iwpid])
+                    if iwpid == -1:  # To avoid problems if there are no waypoints
+                        continue
+                    bs.traf.ap.route[ac_idx].direct(ac_idx,
+                                                    bs.traf.ap.route[ac_idx].wpname[iwpid])
+                    if bs.traf.ap.route[ac_idx].wpname[iwpid] != "COR101":
+                        print("t={}s: {} area restriction direct to {}".format(bs.sim.simt,
+                                                                               bs.traf.id[ac_idx],
+                                                                               bs.traf.ap.route[ac_idx].wpname[iwpid]))
 
-                        if do_printdebug:
-                            print("{} heading direct to {}"
-                                  .format(bs.traf.id[ac_idx],
-                                          bs.traf.ap.route[ac_idx].wpname[iwpid]))
+                    if do_printdebug:
+                        print("{} heading direct to {}"
+                              .format(bs.traf.id[ac_idx],
+                                      bs.traf.ap.route[ac_idx].wpname[iwpid]))
 
         # For debugging purposes only
         for ac_idx in range(self.num_traf):
             if (self.control_mode_prev[ac_idx]
                     and self.control_mode_curr[ac_idx] != self.control_mode_prev[ac_idx]):
 
-                # if do_printdebug:
-                print("{} mode change: {} -> {}".format(bs.traf.id[ac_idx],
-                                                        self.control_mode_prev[ac_idx],
-                                                        self.control_mode_curr[ac_idx]))
+                if do_printdebug:
+                    print("{} mode change: {} -> {}".format(bs.traf.id[ac_idx],
+                                                            self.control_mode_prev[ac_idx],
+                                                            self.control_mode_curr[ac_idx]))
 
         # Remember current control mode for use in next time step
         self.control_mode_prev = [x for x in self.control_mode_curr]
