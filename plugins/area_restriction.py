@@ -332,12 +332,6 @@ class AreaRestrictionManager(TrafficArrays):
         self.num_traf = 0
         self.t_lookahead = DEFAULT_AREA_T_LOOKAHEAD
 
-        # Reset and restart loggers
-        self.area_conf_logger.reset()
-        self.asas_conf_logger.reset()
-        self.area_conf_logger.start()
-        self.asas_conf_logger.start()
-
     def remove(self):
         """ Called when plugin is removed. """
 
@@ -354,6 +348,15 @@ class AreaRestrictionManager(TrafficArrays):
 
     def update(self):
         """ Do area avoidance calculations after traf has been updated. """
+
+        # If the current scenario name is not the same as the scenario
+        # name setting in the loggers they need to be reset.
+        if self.area_conf_logger.scenname != bs.stack.get_scenname():
+            self.area_conf_logger.reset()
+            self.area_conf_logger.start()
+        if self.asas_conf_logger.scenname != bs.stack.get_scenname():
+            self.asas_conf_logger.reset()
+            self.asas_conf_logger.start()
 
         # Cannot do any calculations if no aircraft or areas exist
         if not self.num_traf or not self.num_areas:

@@ -55,8 +55,9 @@ def reset():
 
 
 def makeLogfileName(logname):
-    fname = "%s_%s.log" % (logname, stack.get_scenname())
-    return settings.log_path + '/' + fname
+    scenname = stack.get_scenname()
+    fname = f"{logname}_{scenname}.log"
+    return settings.log_path + '/' + fname, scenname
 
 
 def col2txt(col, nrows):
@@ -85,6 +86,7 @@ class CSVLogger:
     def __init__(self, name, dt, header):
         self.name = name
         self.file = None
+        self.scenname = ""
         self.dataparents = []
         self.header = header.split('\n')
         self.tlog = 0.0
@@ -174,7 +176,9 @@ class CSVLogger:
     def start(self):
         ''' Start this logger. '''
         self.tlog = bs.sim.simt
-        self.open(makeLogfileName(self.name))
+        filepath, scenname = makeLogfileName(self.name)
+        self.scenname = scenname
+        self.open(filepath)
 
     def reset(self):
         self.dt = self.default_dt
