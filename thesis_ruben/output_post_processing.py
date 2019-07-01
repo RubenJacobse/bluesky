@@ -4,6 +4,7 @@ import shutil
 
 # Local imports
 import output_parser
+from conflict_plot_generator import make_batch_figures
 
 
 def summarize_logfiles(timestamp):
@@ -70,3 +71,4 @@ def summarize_logfiles(timestamp):
 if __name__ == "__main__":
     timestamp = "20190701-034019"
     summarize_logfiles(timestamp)
+    make_batch_figures(timestamp)

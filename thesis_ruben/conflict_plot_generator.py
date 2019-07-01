@@ -18,7 +18,7 @@ sys.path.append(os.path.abspath(os.path.join('..')))
 import bluesky.tools.geo as bsgeo
 
 
-def main(timestamp):
+def make_batch_figures(timestamp):
     """
     Generates the figures for the batch with given timestamp.
     """
@@ -29,12 +29,12 @@ def main(timestamp):
     with open(combi_file_name, "r") as combi_file:
         combi_dict = {}
         for combination in csv.reader(combi_file, delimiter=","):
-            # Unpack the current row, except if it commented out
+            # Unpack the current row, except if it is commented out
             if combination[0].startswith("#"):
                 continue
             [scenname, length, width, angle, method] = combination
 
-            # Add combination to dictionary
+            # Add geometry-method-scenario combination to dictionary
             geometry = f"L{length}_W{width}_A{angle}"
             if not geometry in combi_dict.keys():
                 combi_dict[geometry] = {}
@@ -110,7 +110,7 @@ def main(timestamp):
             conf_locations = [[], []]
             los_locations = [[], []]
             for row in asaslog_data:
-                if (geometry in row[0] and method in row[0]):
+                if geometry in row[0] and method in row[0]:
                     if row[3] == "True":
                         los_locations[0].append(float(row[2]))
                         los_locations[1].append(float(row[1]))
@@ -226,6 +226,4 @@ def make_ac_los_location_plot():
 
 
 if __name__ == "__main__":
-    timestamp = "20190701-034019"
-
-    main(timestamp)
+    make_batch_figures(timestamp)

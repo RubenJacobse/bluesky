@@ -1,11 +1,10 @@
 """
-Generate BlueSky scenario files using scenario_generator.py for specified
+Generate BlueSky scenario files using scenario_file_generator.py for specified
 combinations of input variables.
 """
 
 # Python imports
 import os
-import sys
 import shutil
 import itertools
 import datetime
