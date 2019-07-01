@@ -11,7 +11,7 @@ import itertools
 import datetime
 
 # Local imports
-from scenario_generator import create_scenfile
+from scenario_file_generator import create_scenfile
 
 
 def main():
