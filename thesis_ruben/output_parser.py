@@ -10,19 +10,24 @@ import csv
 PZ_RADIUS = 5.0 * 1852  # Protected zone radius in meters
 
 
-class LogParser:
+class LogListParser:
     """
     Parse and process the contents of all log files that are
     in 'input_list'.
     """
 
-    def __init__(self, input_list, output_file, output_header):
+    def __init__(self, input_list, output_file):
         self.input_list = input_list
         self.output_file = output_file
 
+        # Set the default output header which may be overriden in
+        # subclasses by using the set_header() method.
+        self.header = ""
+        self.set_header()
+
         # Create a new output file and write its header
         with open(self.output_file, "w") as output:
-            output.write(output_header + "\n")
+            output.write("#" + self.header + "\n")
 
         # Parse the contents of each file in the input list
         for filename in self.input_list:
@@ -59,8 +64,11 @@ class LogParser:
     def summarize_stats(self, logfile, log_data):
         pass
 
+    def set_header(self):
+        pass
 
-class AREALogSummaryParser(LogParser):
+
+class AREALogSummaryParser(LogListParser):
     """
     Parse and process the contents of all AREA_LOG_... files that are
     in 'input_list'.
@@ -102,8 +110,11 @@ class AREALogSummaryParser(LogParser):
         outputline = f"{logfile},{num_intrusions}"
         self.write_to_output_file(outputline)
 
+    def set_header(self):
+        self.header = "logfile, num intrusions [-]"
 
-class ASASLogSummaryParser(LogParser):
+
+class ASASLogSummaryParser(LogListParser):
     """
     Parse and process the contents of all ASAS_LOG_... files that are
     in 'input_list' and summarize the stats for each scenario.
@@ -164,8 +175,11 @@ class ASASLogSummaryParser(LogParser):
         outputline = f"{logfile},{num_conf},{num_los},{int_prev_rate}"
         self.write_to_output_file(outputline)
 
+    def set_header(self):
+        self.header = "logfile, num conflicts [-], num LoS [-], IPR [-]"
 
-class ASASLogOccurrenceParser(LogParser):
+
+class ASASLogOccurrenceParser(LogListParser):
     """
     Parse and process the contents of all ASAS_LOG_... files that are
     in 'input_list' and summarize the stats for each individual conflict.
@@ -237,8 +251,12 @@ class ASASLogOccurrenceParser(LogParser):
                               + f",{los_severity},{start},{end}")
                 self.write_to_output_file(outputline)
 
+    def set_header(self):
+        self.header = ("logfile, confpair, conflict duration [s], is LoS [-],"
+                       + " LoS severity [-], t start [s], t end[s]")
 
-class ASASLogLocationParser(LogParser):
+
+class ASASLogLocationParser(LogListParser):
     """
     Parse and process the contents of all ASAS_LOG_... files that are
     in 'input_list' and write all coordinates at which aircraft are in
@@ -267,16 +285,24 @@ class ASASLogLocationParser(LogParser):
 
             is_los = dist <= PZ_RADIUS
 
-            outputline = (f"{logfile},{ac1_lat},{ac1_lon},{is_los}\n"
-                          + f"{logfile},{ac2_lat},{ac2_lon},{is_los}")
-            self.write_to_output_file(outputline)
+            # Write lines for ac1 and ac2 at once
+            outputlines = (f"{logfile},{ac1_lat},{ac1_lon},{is_los}\n"
+                           + f"{logfile},{ac2_lat},{ac2_lon},{is_los}")
+            self.write_to_output_file(outputlines)
+
+    def set_header(self):
+        self.header = "logfile, ac lat [deg], ac lon[deg], is LoS [-]"
 
 
-class FLSTLogOccurrenceParser(LogParser):
+class FLSTLogOccurrenceParser(LogListParser):
     """
     Parse and process the contents of all FLST_LOG_... files that are
     in 'input_list' and summarize the stats for each individual flight.
     """
+
+    def set_header(self):
+        self.header = ("logfile, ac id, work [J], route efficiency [-],"
+                       + "dist to last wp [m]")
 
     def summarize_stats(self, logfile, log_data):
         """
@@ -303,24 +329,19 @@ if __name__ == "__main__":
         "test_output/AREA_CONF_LOG_20190619_224422_L40_W25_A90_RESO-SWARM_V2_SCEN002.log",
         "test_output/AREA_CONF_LOG_test.log"]
     AREALogSummaryParser(arealog_list,
-                         "arealog_summary.csv",
-                         "logfile, num intrusions [-]")
+                         "arealog_summary.csv")
 
     asaslog_list = [
         "test_output/ASAS_CONF_LOG_20190619_224422_L40_W25_A90_RESO-SWARM_V2_SCEN002.log",
         "test_output/ASAS_CONF_LOG_test.log"]
     ASASLogSummaryParser(asaslog_list,
-                         "asaslog_summary.csv",
-                         "logfile, num conflicts [-], num LoS [-], IPR [-]")
+                         "asaslog_summary.csv")
     ASASLogOccurrenceParser(asaslog_list,
-                            "asaslog_occurence.csv",
-                            "logfile, confpair, conflict duration [s], LoS severity [-]")
+                            "asaslog_occurence.csv")
     ASASLogLocationParser(asaslog_list,
-                          "asaslog_locations.csv",
-                          "logfile, ac lat [deg], ac lon[deg], is LoS [-]")
+                          "asaslog_locations.csv")
 
     flstlog_list = [
         "test_output/FLSTLOG_20190619_224422_L40_W25_A90_RESO-SWARM_V2_SCEN002.log"]
     FLSTLogOccurrenceParser(flstlog_list,
-                            "flstlog_occurence.csv",
-                            "logfile, ac id, work [J], route efficiency [-], dist to last wp [m]")
+                            "flstlog_occurence.csv")

@@ -6,7 +6,6 @@ Generate figures showing conflict locations.
 import os
 import sys
 import csv
-from copy import copy
 
 # Third-party imports
 import matplotlib.pyplot as plt
@@ -19,16 +18,14 @@ sys.path.append(os.path.abspath(os.path.join('..')))
 import bluesky.tools.geo as bsgeo
 
 
-def main():
+def main(timestamp):
     """
-    Bla
+    Generates the figures for the batch with given timestamp.
     """
 
-    timestamp = "20190701-034019"
     combi_file_name = os.path.join("scenario",
                                    timestamp,
                                    "combinations.csv")
-
     with open(combi_file_name, "r") as combi_file:
         combi_dict = {}
         for combination in csv.reader(combi_file, delimiter=","):
@@ -45,17 +42,23 @@ def main():
                 combi_dict[geometry][method] = []
             combi_dict[geometry][method].append(scenname)
 
-    with open(f"post_processing\{timestamp}\\asaslog_locations.csv") as asaslog_file:
-        asaslog_reader = csv.reader(asaslog_file, delimiter=",")
-        asaslog_data = [row for row in list(asaslog_reader)
-                        if not row[0].startswith("#")]
+    # Load conflict location data
+    summary_dir = f"post_processing/{timestamp}/logfiles_summary/"
+    asaslog_file = os.path.join(summary_dir, "asaslog_locations.csv")
+    asaslog_data = load_csv_data(asaslog_file)
+
+    # Generate figures in separate subfolder
+    figure_dir = f"post_processing/{timestamp}/figures/"
+    if not os.path.isdir(figure_dir):
+        os.makedirs(figure_dir)
 
     for geometry in combi_dict:
         # Create and save the bare plot with geometry only
         geo_file = f"scenario/{timestamp}/{timestamp}_{geometry}_geo.csv"
-        geo_data = load_geo_data(geo_file)
-        geo_plot = plot_geo_data(geo_data)
-        geo_plot.savefig(f"L{length}_W{width}_A{angle}.png", dpi=300)
+        geo_plot_filename = figure_dir + f"{geometry}.png"
+        geo_data = load_csv_data(geo_file)
+        geo_plot = make_geo_plot(geo_data)
+        geo_plot.savefig(geo_plot_filename, dpi=300)
         geo_plot.close()
 
         # Create plots showing conflict locations for each resolution method
@@ -66,30 +69,91 @@ def main():
                     conflict_locations[0].append(float(row[2]))
                     conflict_locations[1].append(float(row[1]))
 
-            conf_plot = plot_geo_data(geo_data)
+            conf_plot = make_geo_plot(geo_data)
             conf_plot.scatter(conflict_locations[0],
                               conflict_locations[1],
-                              alpha=0.1,
-                              linewidths=None)
+                              alpha=0.05,
+                              linewidths=None,
+                              marker=".",
+                              edgecolors=None,
+                              c="blue")
             conf_plot.title(f"Separation method: {method}")
-            conf_plot.savefig(f"L{length}_W{width}_A{angle}_{method}.png", dpi=300)
+            conf_plot_filename = figure_dir + f"{geometry}_{method}_CONF.png"
+            conf_plot.savefig(conf_plot_filename, dpi=300)
+            conf_plot.close()
+
+        # Create plots showing LoS locations for each resolution method
+        for method in combi_dict[geometry]:
+            los_locations = [[], []]
+            for row in asaslog_data:
+                if (geometry in row[0] and method in row[0]
+                        and row[3] == "True"):
+                    los_locations[0].append(float(row[2]))
+                    los_locations[1].append(float(row[1]))
+
+            los_plot = make_geo_plot(geo_data)
+            los_plot.scatter(los_locations[0],
+                             los_locations[1],
+                             alpha=0.05,
+                             linewidths=None,
+                             marker=".",
+                             edgecolors=None,
+                             c="red")
+            los_plot.title(f"Separation method: {method}")
+            los_plot_filename = figure_dir + f"{geometry}_{method}_LoS.png"
+            los_plot.savefig(los_plot_filename, dpi=300)
+            los_plot.close()
+
+        # Create plots showing both conflict and LoS locations for each
+        # resolution method
+        for method in combi_dict[geometry]:
+            conf_locations = [[], []]
+            los_locations = [[], []]
+            for row in asaslog_data:
+                if (geometry in row[0] and method in row[0]):
+                    if row[3] == "True":
+                        los_locations[0].append(float(row[2]))
+                        los_locations[1].append(float(row[1]))
+                    else:
+                        conf_locations[0].append(float(row[2]))
+                        conf_locations[1].append(float(row[1]))
+
+            comb_plot = make_geo_plot(geo_data)
+            comb_plot.scatter(conf_locations[0],
+                              conf_locations[1],
+                              alpha=0.05,
+                              linewidths=None,
+                              marker=".",
+                              edgecolors=None,
+                              c="blue")
+            comb_plot.scatter(los_locations[0],
+                              los_locations[1],
+                              alpha=0.05,
+                              linewidths=None,
+                              marker=".",
+                              edgecolors=None,
+                              c="red")
+            comb_plot.title(f"Separation method: {method}")
+            comb_plot_filename = figure_dir + f"{geometry}_{method}_COMB.png"
+            comb_plot.savefig(comb_plot_filename, dpi=300)
+            comb_plot.close()
 
 
-def load_geo_data(geo_file):
+def load_csv_data(filename):
     """
-    Load the geometry data from the csv format in 'geo_file' to a list
-    that contains lists of row elements in string format.
+    Loads the csv data from filename and returns a list that contains lists
+    of row elements in string format.
     """
 
-    with open(geo_file) as geo_file:
-        geo_reader = csv.reader(geo_file, delimiter=",")
-        data = [row for row in list(geo_reader)
+    with open(filename) as csv_file:
+        reader = csv.reader(csv_file, delimiter=",")
+        data = [row for row in list(reader)
                 if not row[0].startswith("#")]
 
     return data
 
 
-def plot_geo_data(geo_data):
+def make_geo_plot(geo_data):
     """
     Plot the experiment area and airspace restrictions defined in 'geo_data'.
 
@@ -162,4 +226,6 @@ def make_ac_los_location_plot():
 
 
 if __name__ == "__main__":
-    main()
+    timestamp = "20190701-034019"
+
+    main(timestamp)
