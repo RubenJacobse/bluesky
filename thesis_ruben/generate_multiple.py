@@ -34,9 +34,10 @@ def main():
 
     # Input variables and the list of all combinations
     random_seed = [x for x in range(1, 3)]
+    asas_reso_method = ["OFF", "LF", "MVP", "SWARM-V2"]
     corridor_length = [40]
     corridor_width = [25]
-    asas_reso_method = ["OFF", "LF", "MVP", "SWARM-V2"]
+    ac_creation_arc_angle = [100]
     combination_lst = list(itertools.product(random_seed,
                                              asas_reso_method,
                                              corridor_length,
