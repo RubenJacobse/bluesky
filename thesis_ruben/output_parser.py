@@ -118,6 +118,7 @@ class ASASLogSummaryParser(LogParser):
         num_los = 0
         num_conf = 0
         conf_dict = {}
+        los_dict = {}
 
         for row in log_data:
             [simt, ac1_id, ac2_id, dist, t_cpa, t_los,
@@ -142,12 +143,21 @@ class ASASLogSummaryParser(LogParser):
                     num_conf += 1
             else:
                 num_conf += 1
-
             conf_dict[confpair].append(simt)
 
-            # Loss of separation only if
-            if dist > PZ_RADIUS:
+            # Continue to next occurence if no loss of separation
+            if not dist < PZ_RADIUS:
                 continue
+
+            # Check if los count needs to be incremented
+            if confpair not in los_dict.keys():
+                los_dict[confpair] = []
+            if los_dict[confpair]:
+                if not los_dict[confpair][-1] == simt-1:
+                    num_los += 1
+            else:
+                num_los += 1
+            los_dict[confpair].append(simt)
 
         int_prev_rate = (num_conf - num_los) / num_conf
 
