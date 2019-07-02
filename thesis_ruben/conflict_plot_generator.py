@@ -23,24 +23,21 @@ def make_batch_figures(timestamp):
     Generates the figures for the batch with given timestamp.
     """
 
+    # Creat a nested dictionary that contains a list of all scenarios runs
+    # for each geometry-method combination that is present in this batch.
     combi_file_name = os.path.join("scenario",
                                    timestamp,
                                    "combinations.csv")
-    with open(combi_file_name, "r") as combi_file:
-        combi_dict = {}
-        for combination in csv.reader(combi_file, delimiter=","):
-            # Unpack the current row, except if it is commented out
-            if combination[0].startswith("#"):
-                continue
-            [scenname, length, width, angle, method] = combination
-
-            # Add geometry-method-scenario combination to dictionary
-            geometry = f"L{length}_W{width}_A{angle}"
-            if not geometry in combi_dict.keys():
-                combi_dict[geometry] = {}
-            if not method in combi_dict[geometry].keys():
-                combi_dict[geometry][method] = []
-            combi_dict[geometry][method].append(scenname)
+    combi_data = load_csv_data(combi_file_name)
+    combi_dict = {}
+    for combination in combi_data:
+        [scenname, length, width, angle, method] = combination
+        geometry = f"L{length}_W{width}_A{angle}"
+        if not geometry in combi_dict.keys():
+            combi_dict[geometry] = {}
+        if not method in combi_dict[geometry].keys():
+            combi_dict[geometry][method] = []
+        combi_dict[geometry][method].append(scenname)
 
     # Load conflict location data
     summary_dir = f"post_processing/{timestamp}/logfiles_summary/"
@@ -53,15 +50,18 @@ def make_batch_figures(timestamp):
         os.makedirs(figure_dir)
 
     for geometry in combi_dict:
-        # Create and save the bare plot with geometry only
-        geo_file = f"scenario/{timestamp}/{timestamp}_{geometry}_geo.csv"
+        # Load the data for the current geometry
+        geo_source_file = f"scenario/{timestamp}/{timestamp}_{geometry}_geo.csv"
+        geo_data = load_csv_data(geo_source_file)
+
+        # Create and save the base plot with geometry only
+        geo_plot = make_geo_base_plot(geo_data)
         geo_plot_filename = figure_dir + f"{geometry}.png"
-        geo_data = load_csv_data(geo_file)
-        geo_plot = make_geo_plot(geo_data)
         geo_plot.savefig(geo_plot_filename, dpi=300)
         geo_plot.close()
 
         # Create plots showing conflict locations for each resolution method
+        # on top of the base plot in separate figures
         for method in combi_dict[geometry]:
             conflict_locations = [[], []]
             for row in asaslog_data:
@@ -69,16 +69,17 @@ def make_batch_figures(timestamp):
                     conflict_locations[0].append(float(row[2]))
                     conflict_locations[1].append(float(row[1]))
 
-            conf_plot = make_geo_plot(geo_data)
+            conf_plot = make_geo_base_plot(geo_data)
             conf_plot.scatter(conflict_locations[0],
                               conflict_locations[1],
                               alpha=0.05,
-                              linewidths=None,
                               marker=".",
-                              edgecolors=None,
-                              c="blue")
+                              edgecolors="none",
+                              c="blue",
+                              label="Conflict")
             conf_plot.title(f"Separation method: {method}")
             conf_plot_filename = figure_dir + f"{geometry}_{method}_CONF.png"
+            # conf_plot.legend()
             conf_plot.savefig(conf_plot_filename, dpi=300)
             conf_plot.close()
 
@@ -91,15 +92,16 @@ def make_batch_figures(timestamp):
                     los_locations[0].append(float(row[2]))
                     los_locations[1].append(float(row[1]))
 
-            los_plot = make_geo_plot(geo_data)
+            los_plot = make_geo_base_plot(geo_data)
             los_plot.scatter(los_locations[0],
                              los_locations[1],
+                             c="red",
                              alpha=0.05,
-                             linewidths=None,
                              marker=".",
-                             edgecolors=None,
-                             c="red")
+                             edgecolors="none",
+                             label="Loss of separation")
             los_plot.title(f"Separation method: {method}")
+            # los_plot.legend()
             los_plot_filename = figure_dir + f"{geometry}_{method}_LoS.png"
             los_plot.savefig(los_plot_filename, dpi=300)
             los_plot.close()
@@ -118,22 +120,23 @@ def make_batch_figures(timestamp):
                         conf_locations[0].append(float(row[2]))
                         conf_locations[1].append(float(row[1]))
 
-            comb_plot = make_geo_plot(geo_data)
+            comb_plot = make_geo_base_plot(geo_data)
             comb_plot.scatter(conf_locations[0],
                               conf_locations[1],
+                              c="blue",
                               alpha=0.05,
-                              linewidths=None,
                               marker=".",
-                              edgecolors=None,
-                              c="blue")
+                              edgecolors="none",
+                              label="Conflict")
             comb_plot.scatter(los_locations[0],
                               los_locations[1],
+                              c="red",
                               alpha=0.05,
-                              linewidths=None,
                               marker=".",
-                              edgecolors=None,
-                              c="red")
+                              edgecolors="none",
+                              label="Loss of separation")
             comb_plot.title(f"Separation method: {method}")
+            # comb_plot.legend()
             comb_plot_filename = figure_dir + f"{geometry}_{method}_COMB.png"
             comb_plot.savefig(comb_plot_filename, dpi=300)
             comb_plot.close()
@@ -153,7 +156,7 @@ def load_csv_data(filename):
     return data
 
 
-def make_geo_plot(geo_data):
+def make_geo_base_plot(geo_data):
     """
     Plot the experiment area and airspace restrictions defined in 'geo_data'.
 
@@ -183,20 +186,27 @@ def make_geo_plot(geo_data):
     rarea_polygon = Polygon(rarea_coords)
 
     # Calculate the intersections of the area polygons and the ring polygon
-    larea_inring = ring_polygon.intersection(larea_polygon)
-    rarea_inring = ring_polygon.intersection(rarea_polygon)
+    larea_in_ring = ring_polygon.intersection(larea_polygon)
+    rarea_in_ring = ring_polygon.intersection(rarea_polygon)
 
     # Create the actual plot
     plt.figure()
-    plt.fill(*larea_inring.exterior.xy,
-             facecolor="xkcd:pale pink",
-             edgecolor="xkcd:brick red",
-             linewidth=1)
-    plt.fill(*rarea_inring.exterior.xy,
-             facecolor="xkcd:pale pink",
-             edgecolor="xkcd:brick red",
-             linewidth=1)
-    plt.plot(*ring_polygon.exterior.xy, "k", linewidth=1)
+    area_facecolor = "xkcd:pale pink"
+    area_edgecolor = "xkcd:brick red"
+    plt.fill(*larea_in_ring.exterior.xy,
+             facecolor=area_facecolor,
+             edgecolor=area_edgecolor,
+             linewidth=1,
+             label="_nolegend_")
+    plt.fill(*rarea_in_ring.exterior.xy,
+             facecolor=area_facecolor,
+             edgecolor=area_edgecolor,
+             linewidth=1,
+             label="_nolegend_")
+    plt.plot(*ring_polygon.exterior.xy,
+             "k",
+             linewidth=1,
+             label="_nolegend_")
     plt.axis("scaled")
     plt.xlabel("longitude [deg]")
     plt.ylabel("latitude [deg]")
