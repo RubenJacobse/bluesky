@@ -142,16 +142,16 @@ def make_batch_figures(timestamp):
             comb_plot.close()
 
 
-def load_csv_data(filename):
+def load_csv_data(filename, delimiter=",", comment_token="#"):
     """
     Loads the csv data from filename and returns a list that contains lists
     of row elements in string format.
     """
 
     with open(filename) as csv_file:
-        reader = csv.reader(csv_file, delimiter=",")
+        reader = csv.reader(csv_file, delimiter=delimiter)
         data = [row for row in list(reader)
-                if not row[0].startswith("#")]
+                if not row[0].startswith(comment_token)]
 
     return data
 
