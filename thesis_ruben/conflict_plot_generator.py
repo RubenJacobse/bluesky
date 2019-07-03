@@ -20,126 +20,165 @@ import bluesky.tools.geo as bsgeo
 
 def make_batch_figures(timestamp):
     """
+    Generate the figures for the batch with given timestamp.
+    """
+
+    BatchPlotGenerator(timestamp)
+
+
+class BatchPlotGenerator:
+    """
     Generates the figures for the batch with given timestamp.
     """
 
-    # Creat a nested dictionary that contains a list of all scenarios runs
-    # for each geometry-method combination that is present in this batch.
-    combi_file_name = os.path.join("scenario",
-                                   timestamp,
-                                   "combinations.csv")
-    combi_data = load_csv_data(combi_file_name)
-    combi_dict = {}
-    for combination in combi_data:
-        [scenname, length, width, angle, method] = combination
-        geometry = f"L{length}_W{width}_A{angle}"
-        if not geometry in combi_dict.keys():
-            combi_dict[geometry] = {}
-        if not method in combi_dict[geometry].keys():
-            combi_dict[geometry][method] = []
-        combi_dict[geometry][method].append(scenname)
+    def __init__(self, timestamp):
+        self.timestamp = timestamp
+        self.combination_dict = {}
+        self.asas_location_list = []
+        self.batch_dir = os.path.join("post_processing", self.timestamp)
+        self.figure_dir = os.path.join(self.batch_dir, "figures")
 
-    # Load conflict location data
-    summary_dir = f"post_processing/{timestamp}/logfiles_summary/"
-    asaslog_file = os.path.join(summary_dir, "asaslog_locations.csv")
-    asaslog_data = load_csv_data(asaslog_file)
+        self.make_combination_dict()
+        self.load_conflict_location_data()
+        self.create_figure_dir_if_not_exists()
+        self.generate_geo_figures()
 
-    # Generate figures in separate subfolder
-    figure_dir = f"post_processing/{timestamp}/figures/"
-    if not os.path.isdir(figure_dir):
-        os.makedirs(figure_dir)
+    def make_combination_dict(self):
+        """
+        Create a nested dictionary that contains a list of all scenarios runs
+        for each geometry-method combination that is present in this batch.
+        """
 
-    for geometry in combi_dict:
-        # Load the data for the current geometry
-        geo_source_file = f"scenario/{timestamp}/{timestamp}_{geometry}_geo.csv"
-        geo_data = load_csv_data(geo_source_file)
+        combi_file_name = os.path.join("scenario",
+                                       self.timestamp,
+                                       "combinations.csv")
+        combination_list = load_csv_data(combi_file_name)
+        combi_dict = {}
 
-        # Create and save the base plot with geometry only
-        geo_plot = make_geo_base_plot(geo_data)
-        geo_plot_filename = figure_dir + f"{geometry}.png"
-        geo_plot.savefig(geo_plot_filename, dpi=300)
-        geo_plot.close()
+        for combination in combination_list:
+            # Get the values of the parameters in the current combination
+            [scenname, length, width, angle, method] = combination
+            geometry = f"L{length}_W{width}_A{angle}"
 
-        # Create plots showing conflict locations for each resolution method
-        # on top of the base plot in separate figures
-        for method in combi_dict[geometry]:
-            conflict_locations = [[], []]
-            for row in asaslog_data:
-                if geometry in row[0] and method in row[0]:
-                    conflict_locations[0].append(float(row[2]))
-                    conflict_locations[1].append(float(row[1]))
+            # Make sure that dictionary elements exist before
+            # appending the scenario name
+            if not geometry in combi_dict.keys():
+                combi_dict[geometry] = {}
+            if not method in combi_dict[geometry].keys():
+                combi_dict[geometry][method] = []
+            combi_dict[geometry][method].append(scenname)
 
-            conf_plot = make_geo_base_plot(geo_data)
-            conf_plot.scatter(conflict_locations[0],
-                              conflict_locations[1],
-                              alpha=0.05,
-                              marker=".",
-                              edgecolors="none",
-                              c="blue",
-                              label="Conflict")
-            conf_plot.title(f"Separation method: {method}")
-            conf_plot_filename = figure_dir + f"{geometry}_{method}_CONF.png"
-            # conf_plot.legend()
-            conf_plot.savefig(conf_plot_filename, dpi=300)
-            conf_plot.close()
+        self.combination_dict = combi_dict
 
-        # Create plots showing LoS locations for each resolution method
-        for method in combi_dict[geometry]:
-            los_locations = [[], []]
-            for row in asaslog_data:
-                if (geometry in row[0] and method in row[0]
-                        and row[3] == "True"):
-                    los_locations[0].append(float(row[2]))
-                    los_locations[1].append(float(row[1]))
+    def load_conflict_location_data(self):
+        """
+        Load the locations of all conflicts from file.
+        """
 
-            los_plot = make_geo_base_plot(geo_data)
-            los_plot.scatter(los_locations[0],
-                             los_locations[1],
-                             c="red",
-                             alpha=0.05,
-                             marker=".",
-                             edgecolors="none",
-                             label="Loss of separation")
-            los_plot.title(f"Separation method: {method}")
-            # los_plot.legend()
-            los_plot_filename = figure_dir + f"{geometry}_{method}_LoS.png"
-            los_plot.savefig(los_plot_filename, dpi=300)
-            los_plot.close()
+        summary_dir = os.path.join(self.batch_dir, "logfiles_summary")
+        asaslog_file = os.path.join(summary_dir, "asaslog_locations.csv")
+        self.asas_location_list = load_csv_data(asaslog_file)
 
-        # Create plots showing both conflict and LoS locations for each
-        # resolution method
-        for method in combi_dict[geometry]:
-            conf_locations = [[], []]
-            los_locations = [[], []]
-            for row in asaslog_data:
-                if geometry in row[0] and method in row[0]:
-                    if row[3] == "True":
-                        los_locations[0].append(float(row[2]))
-                        los_locations[1].append(float(row[1]))
-                    else:
-                        conf_locations[0].append(float(row[2]))
-                        conf_locations[1].append(float(row[1]))
+    def create_figure_dir_if_not_exists(self):
+        """
+        Ensures that the directory in which all figures will be saved is
+        created if it does not exist yet.
+        """
 
-            comb_plot = make_geo_base_plot(geo_data)
-            comb_plot.scatter(conf_locations[0],
-                              conf_locations[1],
-                              c="blue",
-                              alpha=0.05,
-                              marker=".",
-                              edgecolors="none",
-                              label="Conflict")
-            comb_plot.scatter(los_locations[0],
-                              los_locations[1],
-                              c="red",
-                              alpha=0.05,
-                              marker=".",
-                              edgecolors="none",
-                              label="Loss of separation")
-            comb_plot.title(f"Separation method: {method}")
-            # comb_plot.legend()
-            comb_plot_filename = figure_dir + f"{geometry}_{method}_COMB.png"
-            comb_plot.savefig(comb_plot_filename, dpi=300)
-            comb_plot.close()
+        if not os.path.isdir(self.figure_dir):
+            os.makedirs(self.figure_dir)
+
+    def generate_geo_figures(self):
+        """
+        Creates the figures showing the geographic features of the scenario
+        as well as the locations of the conflicts and losses of separation
+        per separation method.
+        """
+
+        for geometry in self.combination_dict.keys():
+            # Load the data for the current geometry
+            geo_source_file_name = f"{self.timestamp}_{geometry}_geo.csv"
+            geo_source_file = os.path.join("scenario",
+                                           self.timestamp,
+                                           geo_source_file_name)
+            geo_data = load_csv_data(geo_source_file)
+
+            # Create and save the base plot with geometry only
+            geo_plot = make_geo_base_figure(geo_data)
+            geo_plot_filename = os.path.join(self.figure_dir,
+                                             f"{geometry}.png")
+            geo_plot.savefig(geo_plot_filename, dpi=300)
+            geo_plot.close()
+
+            # Create the plots showing the conflict and intrusion locations
+            for separation_method in self.combination_dict[geometry]:
+                self.make_geo_location_figure(geo_data,
+                                              geometry,
+                                              separation_method,
+                                              location_type="conflict")
+                self.make_geo_location_figure(geo_data,
+                                              geometry,
+                                              separation_method,
+                                              location_type="intrusion")
+                self.make_geo_location_figure(geo_data,
+                                              geometry,
+                                              separation_method,
+                                              location_type="both")
+
+    def make_geo_location_figure(self,
+                                 geo_data,
+                                 geometry,
+                                 separation_method,
+                                 location_type):
+        """
+        Generate a figure that overlays a set of location markers onto
+        the base figure for that geometry.
+
+        The types of locations that can be shown is determined by
+        'location_type' and can take the values: "conflict",
+        "intrusion", or "both".
+        """
+
+        # Store conflict and intrusion locations as list of lists
+        # using the format [[lon0, lon1, ...], [lat0, lat1, ...]]
+        conflict_locations = [[], []]
+        intrusion_locations = [[], []]
+        for [filename, ac_lat, ac_lon, is_los] in self.asas_location_list:
+            # if geometry in row[0] and separation_method in row[0]:
+            if all(x in filename for x in [geometry, separation_method]):
+                if is_los == "True":
+                    intrusion_locations[0].append(float(ac_lon))
+                    intrusion_locations[1].append(float(ac_lat))
+                else:
+                    conflict_locations[0].append(float(ac_lon))
+                    conflict_locations[1].append(float(ac_lat))
+
+        # Plot the locations on top of the geometry and save the figure
+        plt = make_geo_base_figure(geo_data)
+        alpha_plt = 0.02
+        marker_plt = "."
+        if location_type in ["conflict", "both"]:
+            plt.scatter(conflict_locations[0],
+                        conflict_locations[1],
+                        alpha=alpha_plt,
+                        marker=marker_plt,
+                        edgecolors="none",
+                        c="blue",
+                        label="Conflict")
+        if location_type in ["intrusion", "both"]:
+            plt.scatter(intrusion_locations[0],
+                        intrusion_locations[1],
+                        alpha=alpha_plt,
+                        marker=marker_plt,
+                        edgecolors="none",
+                        c="red",
+                        label="Loss of separation")
+        plt.title(f"Separation method: {separation_method}")
+        # plt.legend()
+        plt_filename = f"{geometry}_{separation_method}_{location_type}.png"
+        plt_filepath = os.path.join(self.figure_dir, plt_filename)
+        plt.savefig(plt_filepath, dpi=300)
+        plt.close()
 
 
 def load_csv_data(filename, delimiter=",", comment_token="#"):
@@ -156,7 +195,7 @@ def load_csv_data(filename, delimiter=",", comment_token="#"):
     return data
 
 
-def make_geo_base_plot(geo_data):
+def make_geo_base_figure(geo_data):
     """
     Plot the experiment area and airspace restrictions defined in 'geo_data'.
 
@@ -173,36 +212,31 @@ def make_geo_base_plot(geo_data):
                    for angle in range(0, 361)]
     ring_polygon = Polygon(ring_coords)
 
-    # Generate polygon for area on left side of corridor
-    larea_name = geo_data[1][0]
-    larea_coords = [(float(lon), float(lat)) for (lat, lon)
-                    in zip(geo_data[1][1:8:2], geo_data[1][2:9:2])]
-    larea_polygon = Polygon(larea_coords)
+    # Generate polygon for restriction on left side of corridor
+    left_res_name = geo_data[1][0]
+    left_res_coords = [(float(lon), float(lat)) for (lat, lon)
+                       in zip(geo_data[1][1:8:2], geo_data[1][2:9:2])]
+    left_res_polygon = Polygon(left_res_coords)
 
-    # Generate polygon for area on right side of corridor
-    rarea_name = geo_data[1][0]
-    rarea_coords = [(float(lon), float(lat)) for (lat, lon)
-                    in zip(geo_data[2][1:8:2], geo_data[2][2:9:2])]
-    rarea_polygon = Polygon(rarea_coords)
+    # Generate polygon for restriction on right side of corridor
+    right_res_name = geo_data[1][0]
+    right_res_coords = [(float(lon), float(lat)) for (lat, lon)
+                        in zip(geo_data[2][1:8:2], geo_data[2][2:9:2])]
+    right_res_polygon = Polygon(right_res_coords)
 
-    # Calculate the intersections of the area polygons and the ring polygon
-    larea_in_ring = ring_polygon.intersection(larea_polygon)
-    rarea_in_ring = ring_polygon.intersection(rarea_polygon)
+    # Calculate the intersections of the restriction polygons
+    # and the experiment area ring polygon
+    left_res_in_ring = ring_polygon.intersection(left_res_polygon)
+    right_res_in_ring = ring_polygon.intersection(right_res_polygon)
 
     # Create the actual plot
     plt.figure()
-    area_facecolor = "xkcd:pale pink"
-    area_edgecolor = "xkcd:brick red"
-    plt.fill(*larea_in_ring.exterior.xy,
-             facecolor=area_facecolor,
-             edgecolor=area_edgecolor,
-             linewidth=1,
-             label="_nolegend_")
-    plt.fill(*rarea_in_ring.exterior.xy,
-             facecolor=area_facecolor,
-             edgecolor=area_edgecolor,
-             linewidth=1,
-             label="_nolegend_")
+    for area in [left_res_in_ring, right_res_in_ring]:
+        plt.fill(*area.exterior.xy,
+                 facecolor="xkcd:pale pink",
+                 edgecolor="xkcd:brick red",
+                 linewidth=1,
+                 label="_nolegend_")
     plt.plot(*ring_polygon.exterior.xy,
              "k",
              linewidth=1,
@@ -214,26 +248,8 @@ def make_geo_base_plot(geo_data):
     return plt
 
 
-def make_ac_conflict_location_plot():
-    conf_coords_lat = []
-    conf_coords_lon = []
-
-    with open("asaslog_locations.csv") as asasloc_file:
-        locfile_reader = csv.reader(asasloc_file, delimiter=",")
-        for row in locfile_reader:
-            # Only process rows
-            if not reso_method in row[0]:
-                continue
-
-    # Plot coordinates of conflicts
-    plt.figure(1)
-    plt.title("Hoi")
-    plt.plot(conf_coords_lon, conf_coords_lat, "ro")
-
-
-def make_ac_los_location_plot():
-    pass
-
-
 if __name__ == "__main__":
+    # timestamp = "20190701-034019"
+    # timestamp = "20190701-215433"
+    timestamp = "20190701-223908"
     make_batch_figures(timestamp)
