@@ -23,25 +23,47 @@ def make_batch_figures(timestamp):
     Generate the figures for the batch with given timestamp.
     """
 
-    BatchPlotGenerator(timestamp)
+    # GeoFigureGenerator(timestamp)
+    BoxPlotFigureGenerator(timestamp)
 
 
-class BatchPlotGenerator:
+def load_csv_data(filename, delimiter=",", comment_token="#"):
     """
-    Generates the figures for the batch with given timestamp.
+    Loads the csv data from filename and returns a list that contains lists
+    of row elements in string format.
+    """
+
+    with open(filename) as csv_file:
+        reader = csv.reader(csv_file, delimiter=delimiter)
+        data = [row for row in list(reader)
+                if not row[0].startswith(comment_token)]
+
+    return data
+
+
+class FigureGeneratorBase:
+    """
+    Base class that defines the directory in which all figures will be saved
+    for a given batch. Also creates this directory if it does not exist yet.
     """
 
     def __init__(self, timestamp):
         self.timestamp = timestamp
         self.combination_dict = {}
-        self.asas_location_list = []
+
         self.batch_dir = os.path.join("post_processing", self.timestamp)
         self.figure_dir = os.path.join(self.batch_dir, "figures")
-
-        self.make_combination_dict()
-        self.load_conflict_location_data()
         self.create_figure_dir_if_not_exists()
-        self.generate_geo_figures()
+        self.make_combination_dict()
+
+    def create_figure_dir_if_not_exists(self):
+        """
+        Ensures that the directory in which all figures will be saved is
+        created if it does not exist yet.
+        """
+
+        if not os.path.isdir(self.figure_dir):
+            os.makedirs(self.figure_dir)
 
     def make_combination_dict(self):
         """
@@ -70,6 +92,18 @@ class BatchPlotGenerator:
 
         self.combination_dict = combi_dict
 
+
+class GeoFigureGenerator(FigureGeneratorBase):
+    """
+    Generates the geographic figures for a batch with given timestamp.
+    """
+
+    def __init__(self, timestamp):
+        super().__init__(timestamp)
+
+        self.load_conflict_location_data()
+        self.generate_geo_figures()
+
     def load_conflict_location_data(self):
         """
         Load the locations of all conflicts from file.
@@ -79,15 +113,6 @@ class BatchPlotGenerator:
         asaslog_file = os.path.join(summary_dir, "asaslog_locations.csv")
         self.asas_location_list = load_csv_data(asaslog_file)
 
-    def create_figure_dir_if_not_exists(self):
-        """
-        Ensures that the directory in which all figures will be saved is
-        created if it does not exist yet.
-        """
-
-        if not os.path.isdir(self.figure_dir):
-            os.makedirs(self.figure_dir)
-
     def generate_geo_figures(self):
         """
         Creates the figures showing the geographic features of the scenario
@@ -95,7 +120,7 @@ class BatchPlotGenerator:
         per separation method.
         """
 
-        for geometry in self.combination_dict.keys():
+        for geometry in self.combination_dict:
             # Load the data for the current geometry
             geo_source_file_name = f"{self.timestamp}_{geometry}_geo.csv"
             geo_source_file = os.path.join("scenario",
@@ -104,7 +129,7 @@ class BatchPlotGenerator:
             geo_data = load_csv_data(geo_source_file)
 
             # Create and save the base plot with geometry only
-            geo_plot = make_geo_base_figure(geo_data)
+            geo_plot = self.make_geo_base_figure(geo_data)
             geo_plot_filename = os.path.join(self.figure_dir,
                                              f"{geometry}.png")
             geo_plot.savefig(geo_plot_filename, dpi=300)
@@ -124,6 +149,58 @@ class BatchPlotGenerator:
                                               geometry,
                                               separation_method,
                                               location_type="both")
+
+    def make_geo_base_figure(self, geo_data):
+        """
+        Plot the experiment area and airspace restrictions defined in 'geo_data'.
+
+        Returns a matplotlib.pyplot object that can then be used by the caller.
+        """
+
+        # Generate ring polygon
+        ring_data = geo_data[0]
+        ring_name = ring_data[0]
+        ring_lat = float(ring_data[1])
+        ring_lon = float(ring_data[2])
+        ring_radius = float(ring_data[3])
+        ring_coords = [bsgeo.qdrpos(ring_lat, ring_lon, angle, ring_radius)
+                       for angle in range(0, 361)]
+        ring_polygon = Polygon(ring_coords)
+
+        # Generate polygon for restriction on left side of corridor
+        left_res_name = geo_data[1][0]
+        left_res_coords = [(float(lon), float(lat)) for (lat, lon)
+                           in zip(geo_data[1][1:8:2], geo_data[1][2:9:2])]
+        left_res_polygon = Polygon(left_res_coords)
+
+        # Generate polygon for restriction on right side of corridor
+        right_res_name = geo_data[2][0]
+        right_res_coords = [(float(lon), float(lat)) for (lat, lon)
+                            in zip(geo_data[2][1:8:2], geo_data[2][2:9:2])]
+        right_res_polygon = Polygon(right_res_coords)
+
+        # Calculate the intersections of the restriction polygons
+        # and the experiment area ring polygon
+        left_res_in_ring = ring_polygon.intersection(left_res_polygon)
+        right_res_in_ring = ring_polygon.intersection(right_res_polygon)
+
+        # Create the actual plot
+        plt.figure()
+        for area in [left_res_in_ring, right_res_in_ring]:
+            plt.fill(*area.exterior.xy,
+                     facecolor="xkcd:pale pink",
+                     edgecolor="xkcd:brick red",
+                     linewidth=1,
+                     label="_nolegend_")
+        plt.plot(*ring_polygon.exterior.xy,
+                 "k",
+                 linewidth=1,
+                 label="_nolegend_")
+        plt.axis("scaled")
+        plt.xlabel("longitude [deg]")
+        plt.ylabel("latitude [deg]")
+
+        return plt
 
     def make_geo_location_figure(self,
                                  geo_data,
@@ -154,7 +231,7 @@ class BatchPlotGenerator:
                     conflict_locations[1].append(float(ac_lat))
 
         # Plot the locations on top of the geometry and save the figure
-        plt = make_geo_base_figure(geo_data)
+        plt = self.make_geo_base_figure(geo_data)
         alpha_plt = 0.02
         marker_plt = "."
         if location_type in ["conflict", "both"]:
@@ -181,75 +258,10 @@ class BatchPlotGenerator:
         plt.close()
 
 
-def load_csv_data(filename, delimiter=",", comment_token="#"):
-    """
-    Loads the csv data from filename and returns a list that contains lists
-    of row elements in string format.
-    """
-
-    with open(filename) as csv_file:
-        reader = csv.reader(csv_file, delimiter=delimiter)
-        data = [row for row in list(reader)
-                if not row[0].startswith(comment_token)]
-
-    return data
 
 
-def make_geo_base_figure(geo_data):
-    """
-    Plot the experiment area and airspace restrictions defined in 'geo_data'.
-
-    Returns a matplotlib.pyplot object that can then be used by the caller.
-    """
-
-    # Generate ring polygon
-    ring_data = geo_data[0]
-    ring_name = ring_data[0]
-    ring_lat = float(ring_data[1])
-    ring_lon = float(ring_data[2])
-    ring_radius = float(ring_data[3])
-    ring_coords = [bsgeo.qdrpos(ring_lat, ring_lon, angle, ring_radius)
-                   for angle in range(0, 361)]
-    ring_polygon = Polygon(ring_coords)
-
-    # Generate polygon for restriction on left side of corridor
-    left_res_name = geo_data[1][0]
-    left_res_coords = [(float(lon), float(lat)) for (lat, lon)
-                       in zip(geo_data[1][1:8:2], geo_data[1][2:9:2])]
-    left_res_polygon = Polygon(left_res_coords)
-
-    # Generate polygon for restriction on right side of corridor
-    right_res_name = geo_data[1][0]
-    right_res_coords = [(float(lon), float(lat)) for (lat, lon)
-                        in zip(geo_data[2][1:8:2], geo_data[2][2:9:2])]
-    right_res_polygon = Polygon(right_res_coords)
-
-    # Calculate the intersections of the restriction polygons
-    # and the experiment area ring polygon
-    left_res_in_ring = ring_polygon.intersection(left_res_polygon)
-    right_res_in_ring = ring_polygon.intersection(right_res_polygon)
-
-    # Create the actual plot
-    plt.figure()
-    for area in [left_res_in_ring, right_res_in_ring]:
-        plt.fill(*area.exterior.xy,
-                 facecolor="xkcd:pale pink",
-                 edgecolor="xkcd:brick red",
-                 linewidth=1,
-                 label="_nolegend_")
-    plt.plot(*ring_polygon.exterior.xy,
-             "k",
-             linewidth=1,
-             label="_nolegend_")
-    plt.axis("scaled")
-    plt.xlabel("longitude [deg]")
-    plt.ylabel("latitude [deg]")
-
-    return plt
 
 
 if __name__ == "__main__":
     # timestamp = "20190701-034019"
-    # timestamp = "20190701-215433"
-    timestamp = "20190701-223908"
     make_batch_figures(timestamp)
