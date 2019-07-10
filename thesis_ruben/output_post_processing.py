@@ -4,7 +4,7 @@ import shutil
 
 # Local imports
 import output_parser
-from conflict_plot_generator import make_batch_figures
+from plot_generator import make_batch_figures
 
 
 def summarize_logfiles(timestamp):
@@ -18,9 +18,9 @@ def summarize_logfiles(timestamp):
 
     # Set the source folder and create target folders if necessary
     source_dir = "output"
-    batch_save_dir = os.path.join("post_processing", timestamp + "/")
-    logfile_save_dir = os.path.join(batch_save_dir, "logfiles_raw/")
-    summary_save_dir = os.path.join(batch_save_dir, "logfiles_summary/")
+    batch_save_dir = os.path.join("post_processing", timestamp + os.sep)
+    logfile_save_dir = os.path.join(batch_save_dir, "logfiles_raw" + os.sep)
+    summary_save_dir = os.path.join(batch_save_dir, "logfiles_summary" + os.sep)
 
     for folder in [batch_save_dir, logfile_save_dir, summary_save_dir]:
         if not os.path.isdir(folder):
