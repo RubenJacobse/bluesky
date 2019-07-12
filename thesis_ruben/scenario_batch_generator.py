@@ -32,22 +32,25 @@ def main():
         os.mkdir(os.path.dirname(output_dir))
 
     # Input variables and the list of all combinations
-    random_seed = [x for x in range(1, 3)]
-    asas_reso_method = ["OFF", "LF", "MVP", "SWARM-V2"]
+    random_seed = [x for x in range(1, 2)]
+    traffic_level = ["LOW", "MID", "HIGH"]
+    asas_reso_method = ["OFF"]
     corridor_length = [40]
     corridor_width = [25]
     ac_creation_arc_angle = [100]
     combination_lst = list(itertools.product(random_seed,
+                                             traffic_level,
                                              asas_reso_method,
                                              corridor_length,
                                              corridor_width,
                                              ac_creation_arc_angle))
 
     # Create a scenario file for each combination of variables
-    for (seed, reso_method, length, width, angle) in combination_lst:
+    for (seed, level, reso_method, length, width, angle) in combination_lst:
         create_scenfile(output_dir,
                         timestamp,
                         seed,
+                        level,
                         reso_method,
                         length,
                         width,
@@ -57,13 +60,14 @@ def main():
     # Create a batch file that allows the BlueSky "BATCH" command to
     # process all scenario files using all CPU cores in parallel.
     with open(os.path.join(output_dir, "batch.scn"), "w") as batch_file:
-        for (seed, reso_method, length, width, angle) in combination_lst:
-            scenfile_name = ("{}_L{}_W{}_A{}_RESO-{}_SCEN{:03d}.scn"
+        for (seed, level, reso_method, length, width, angle) in combination_lst:
+            scenfile_name = ("{}_L{}_W{}_A{}_RESO-{}_T-{}_SCEN{:03d}.scn"
                              .format(timestamp,
                                      length,
                                      width,
                                      angle,
                                      reso_method,
+                                     level,
                                      seed))
             scenfile_path = os.path.join(scen_dir, scenfile_name)
             batch_file.write("0:00:00.00>SCEN {}\n".format(scenfile_name[:-4]))
@@ -75,16 +79,18 @@ def main():
     # Make a copy of the batch file to simplify calling from the
     # BlueSky command line by allowing the use of "BATCH thesis_latest"
     shutil.copy(os.path.join(output_dir, "batch.scn"),
-                os.path.join(current_dir, "scenario/thesis_latest.scn"))
+                os.path.join(current_dir, "scenario", "thesis_latest.scn"))
 
     # Store all combinations in csv format for easier post-processing
     with open(os.path.join(output_dir, "combinations.csv"), "w") as combi_file:
-        combi_header = "# scen name, corridor length, corridor width, angle, reso method\n"
+        combi_header = ("# scen name, corridor length, corridor width, angle,"
+                        + " reso method, traffic level\n")
         combi_file.write(combi_header)
         for combination in combination_lst:
-            (seed, reso_method, length, width, angle) = combination
+            (seed, level, reso_method, length, width, angle) = combination
             scen_name = "SCEN{:03d}".format(seed)
-            combi_file.write(f"{scen_name},{length},{width},{angle},{reso_method}\n")
+            combi_file.write(f"{scen_name},{length},{width},{angle},"
+                             + f"{reso_method},{level}\n")
 
 
 if __name__ == "__main__":

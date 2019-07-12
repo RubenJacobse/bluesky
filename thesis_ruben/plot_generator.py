@@ -6,6 +6,7 @@ Generate figures showing conflict locations.
 import os
 import sys
 import csv
+import random
 
 # Third-party imports
 import matplotlib.pyplot as plt
@@ -23,7 +24,7 @@ def make_batch_figures(timestamp):
     Generate the figures for the batch with given timestamp.
     """
 
-    # GeoFigureGenerator(timestamp)
+    GeoFigureGenerator(timestamp)
     BoxPlotFigureGenerator(timestamp)
 
 
@@ -68,7 +69,8 @@ class FigureGeneratorBase:
     def make_combination_dict(self):
         """
         Create a nested dictionary that contains a list of all scenarios runs
-        for each geometry-method combination that is present in this batch.
+        for each geometry, resolution method, and traffic level combination
+        that is present in this batch.
         """
 
         combi_file_name = os.path.join("scenario",
@@ -79,7 +81,7 @@ class FigureGeneratorBase:
 
         for combination in combination_list:
             # Get the values of the parameters in the current combination
-            [scenname, length, width, angle, method] = combination
+            [scenname, length, width, angle, method, level] = combination
             geometry = f"L{length}_W{width}_A{angle}"
 
             # Make sure that dictionary elements exist before
@@ -87,8 +89,10 @@ class FigureGeneratorBase:
             if not geometry in combi_dict.keys():
                 combi_dict[geometry] = {}
             if not method in combi_dict[geometry].keys():
-                combi_dict[geometry][method] = []
-            combi_dict[geometry][method].append(scenname)
+                combi_dict[geometry][method] = {}
+            if not level in combi_dict[geometry][method].keys():
+                combi_dict[geometry][method][level] = []
+            combi_dict[geometry][method][level].append(scenname)
 
         self.combination_dict = combi_dict
 
@@ -136,19 +140,23 @@ class GeoFigureGenerator(FigureGeneratorBase):
             geo_plot.close()
 
             # Create the plots showing the conflict and intrusion locations
-            for separation_method in self.combination_dict[geometry]:
-                self.make_geo_location_figure(geo_data,
-                                              geometry,
-                                              separation_method,
-                                              location_type="conflict")
-                self.make_geo_location_figure(geo_data,
-                                              geometry,
-                                              separation_method,
-                                              location_type="intrusion")
-                self.make_geo_location_figure(geo_data,
-                                              geometry,
-                                              separation_method,
-                                              location_type="both")
+            for method in self.combination_dict[geometry]:
+                for level in self.combination_dict[geometry][method]:
+                    self.make_geo_location_figure(geo_data,
+                                                  geometry,
+                                                  method,
+                                                  level,
+                                                  location_type="conflict")
+                    self.make_geo_location_figure(geo_data,
+                                                  geometry,
+                                                  method,
+                                                  level,
+                                                  location_type="intrusion")
+                    self.make_geo_location_figure(geo_data,
+                                                  geometry,
+                                                  method,
+                                                  level,
+                                                  location_type="both")
 
     def make_geo_base_figure(self, geo_data):
         """
@@ -206,6 +214,7 @@ class GeoFigureGenerator(FigureGeneratorBase):
                                  geo_data,
                                  geometry,
                                  separation_method,
+                                 traffic_level,
                                  location_type):
         """
         Generate a figure that overlays a set of location markers onto
@@ -222,7 +231,8 @@ class GeoFigureGenerator(FigureGeneratorBase):
         intrusion_locations = [[], []]
         for [filename, ac_lat, ac_lon, is_los] in self.asas_location_list:
             # if geometry in row[0] and separation_method in row[0]:
-            if all(x in filename for x in [geometry, separation_method]):
+            if all(x in filename
+                   for x in [geometry, separation_method, traffic_level]):
                 if is_los == "True":
                     intrusion_locations[0].append(float(ac_lon))
                     intrusion_locations[1].append(float(ac_lat))
@@ -252,16 +262,28 @@ class GeoFigureGenerator(FigureGeneratorBase):
                         label="Loss of separation")
         plt.title(f"Separation method: {separation_method}")
         # plt.legend()
-        plt_filename = f"{geometry}_{separation_method}_{location_type}.png"
+        plt_filename = (f"{geometry}_{separation_method}_{traffic_level}"
+                        + f"_{location_type}.png")
         plt_filepath = os.path.join(self.figure_dir, plt_filename)
         plt.savefig(plt_filepath, dpi=300)
         plt.close()
 
 
+class BoxPlotFigureGenerator(FigureGeneratorBase):
+    """
+    Generate the box plots for the
+    """
 
+    def __init__(self, timestamp):
+        super().__init__(timestamp)
+        self.make_single_plot()
 
+    def make_single_plot(self):
+        plt.figure()
+        plt.boxplot([random.random() for x in range(10)], vert=True)
+        plt.show()
 
 
 if __name__ == "__main__":
-    # timestamp = "20190701-034019"
+    timestamp = "20190701-215433"
     make_batch_figures(timestamp)

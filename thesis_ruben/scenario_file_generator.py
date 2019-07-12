@@ -42,11 +42,10 @@ NUM_AIRCRAFT = 25
 AC_TYPES = ["B744"]
 AC_TYPES_SPD = [280]
 SPD_STDDEV = 5  # [kts] Standard deviation of cruise speed distributions
-CRE_INTERVAL_MIN = 30  # [s] Minimum interval between creation of aircraft
-CRE_INTERVAL_MAX = 90  # [s] Maximum interval between creation of aircraft
 
 # Passing these as arguments to create() when called as __main__
 SEED = 1
+TRAFFIC_LEVEL = "LOW"
 CORRIDOR_LENGTH = 40  # [NM]
 CORRIDOR_WIDTH = 25  # [NM]
 RESTRICTION_ANGLE = 45  # [deg]
@@ -57,6 +56,7 @@ RESO_METHOD = "MVP"  # Conflict resolution method
 def create_scenfile(target_dir,
                     timestamp,
                     random_seed,
+                    traffic_level,
                     resolution_method,
                     corridor_length,
                     corridor_width,
@@ -72,12 +72,13 @@ def create_scenfile(target_dir,
     random.seed(random_seed)
 
     # Set the path of the resulting scenario file and geo file
-    scnfile_name = (("{}_L{}_W{}_A{}_RESO-{}_SCEN{:03d}.scn")
+    scnfile_name = (("{}_L{}_W{}_A{}_RESO-{}_T-{}_SCEN{:03d}.scn")
                     .format(timestamp,
                             corridor_length,
                             corridor_width,
                             angle,
                             resolution_method,
+                            traffic_level,
                             random_seed))
     scnfile_path = os.path.join(target_dir, scnfile_name)
 
@@ -104,8 +105,7 @@ def create_scenfile(target_dir,
          + f"# Aircraft average speed: {AC_TYPES_SPD} kts\n"
          + f"# Aircraft speed std dev: {SPD_STDDEV} kts\n"
          + f"# Number of aircraft created: {NUM_AIRCRAFT}\n"
-         + f"# Min creation interval: {CRE_INTERVAL_MIN} s\n"
-         + f"# Max creation interval: {CRE_INTERVAL_MAX} s\n"
+         + f"# Traffic level: {traffic_level}\n"
          + f"# Random number generator seed: {random_seed}\n"
          + "##################################################\n\n")
 
@@ -191,6 +191,7 @@ def create_scenfile(target_dir,
         # Create aircaft
         scnfile.write("\n# Create {} aircraft".format(NUM_AIRCRAFT))
         create_aircraft(scnfile,
+                        traffic_level,
                         NUM_AIRCRAFT,
                         angle_from_centerpoint,
                         corridor_bottom_lat,
@@ -337,6 +338,7 @@ def create_area(scnfile,
 
 
 def create_aircraft(scnfile,
+                    traffic_level,
                     num_total_ac,
                     angle,
                     corridor_entry_lat,
@@ -350,6 +352,17 @@ def create_aircraft(scnfile,
     # Minimum distance and time differences at creation
     min_dist_diff = 6  # [nm]
     min_time_diff = min_dist_diff / ac_spd * 3600  # [s]
+
+    # Set aircraft creation interval minimum and maximum values
+    if traffic_level == "LOW":  # Average 70 seconds
+        cre_interval_min = 50
+        cre_interval_max = 90
+    elif traffic_level == "MID":  # Average 35 seconds
+        cre_interval_min = 25
+        cre_interval_max = 45
+    elif traffic_level == "HIGH":  # Average 25 seconds
+        cre_interval_min = 15
+        cre_interval_max = 35
 
     # Store parameters of all created aircraft
     creation_time = []
@@ -368,8 +381,8 @@ def create_aircraft(scnfile,
 
         # Create an aircraft at random time and position
         prev_time = creation_time[-1] if num_created_ac else 0
-        curr_time = prev_time + random.randint(CRE_INTERVAL_MIN,
-                                               CRE_INTERVAL_MAX)
+        curr_time = prev_time + random.randint(cre_interval_min,
+                                               cre_interval_max)
 
         # Select an aircraft type and velocity
         type_idx = random.randint(0, len(AC_TYPES) - 1)
@@ -515,6 +528,7 @@ if __name__ == "__main__":
         create_scenfile(test_folder,
                         current_time,
                         SEED,
+                        TRAFFIC_LEVEL,
                         reso_method,
                         CORRIDOR_LENGTH,
                         CORRIDOR_WIDTH,
