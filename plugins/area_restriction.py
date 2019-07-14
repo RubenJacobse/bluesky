@@ -736,7 +736,7 @@ class AreaRestrictionManager(TrafficArrays):
         # the course to the current active waypoint. We choose the course with the
         # smallest angle difference
         wp_crs = self.crs_to_active_wp[ac_indices]
-        new_crs = crs_closest(wp_crs, vres_l_crs, vres_r_crs)
+        new_crs = crs_closest(bs.traf.hdg[ac_indices], vres_l_crs, vres_r_crs)
 
         # Calculate new velocities (currently easiest method to calculate delta v)
         new_v = ac_gs
@@ -861,8 +861,8 @@ class AreaRestrictionManager(TrafficArrays):
                     if (bs.traf.ap.route[ac_idx].wpname[iwpid] == "COR201"
                             and bs.traf.lat[ac_idx] > 0.332736):
                         print("t={}s: {} area avoidance -> direct to {}".format(bs.sim.simt,
-                                                                               bs.traf.id[ac_idx],
-                                                                               bs.traf.ap.route[ac_idx].wpname[iwpid]))
+                                                                                bs.traf.id[ac_idx],
+                                                                                bs.traf.ap.route[ac_idx].wpname[iwpid]))
 
                     if do_printdebug:
                         print("{} heading direct to {}"
