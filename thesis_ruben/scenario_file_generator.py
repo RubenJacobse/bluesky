@@ -43,15 +43,6 @@ AC_TYPES = ["B744"]
 AC_TYPES_SPD = [280]
 SPD_STDDEV = 5  # [kts] Standard deviation of cruise speed distributions
 
-# Passing these as arguments to create() when called as __main__
-SEED = 1
-TRAFFIC_LEVEL = "LOW"
-CORRIDOR_LENGTH = 40  # [NM]
-CORRIDOR_WIDTH = 25  # [NM]
-RESTRICTION_ANGLE = 45  # [deg]
-ARC_ANGLE = 90  # [deg]
-RESO_METHOD = "MVP"  # Conflict resolution method
-
 
 def create_scenfile(target_dir,
                     timestamp,
@@ -89,6 +80,18 @@ def create_scenfile(target_dir,
                             angle))
     geofile_path = os.path.join(target_dir, geofile_name)
 
+    # Set aircraft creation interval minimum and maximum values.
+    # (We do this here so we can print this in the scenario header)
+    if traffic_level == "LOW":  # Average 72 seconds
+        cre_interval_min = 52
+        cre_interval_max = 92
+    elif traffic_level == "MID":  # Average 36 seconds
+        cre_interval_min = 26
+        cre_interval_max = 46
+    elif traffic_level == "HIGH":  # Average 24 seconds
+        cre_interval_min = 14
+        cre_interval_max = 34
+
     # Create a header to simplify traceability of variable values
     scen_header = \
         ("##################################################\n"
@@ -106,6 +109,8 @@ def create_scenfile(target_dir,
          + f"# Aircraft speed std dev: {SPD_STDDEV} kts\n"
          + f"# Number of aircraft created: {NUM_AIRCRAFT}\n"
          + f"# Traffic level: {traffic_level}\n"
+         + f"# Aircraft creation interval min: {cre_interval_min} s\n"
+         + f"# Aircraft creation interval max: {cre_interval_max} s\n"
          + f"# Random number generator seed: {random_seed}\n"
          + "##################################################\n\n")
 
@@ -192,6 +197,8 @@ def create_scenfile(target_dir,
         scnfile.write("\n# Create {} aircraft".format(NUM_AIRCRAFT))
         create_aircraft(scnfile,
                         traffic_level,
+                        cre_interval_min,
+                        cre_interval_max,
                         NUM_AIRCRAFT,
                         angle_from_centerpoint,
                         corridor_bottom_lat,
@@ -339,6 +346,8 @@ def create_area(scnfile,
 
 def create_aircraft(scnfile,
                     traffic_level,
+                    cre_interval_min,
+                    cre_interval_max,
                     num_total_ac,
                     angle,
                     corridor_entry_lat,
@@ -352,17 +361,6 @@ def create_aircraft(scnfile,
     # Minimum distance and time differences at creation
     min_dist_diff = 6  # [nm]
     min_time_diff = min_dist_diff / ac_spd * 3600  # [s]
-
-    # Set aircraft creation interval minimum and maximum values
-    if traffic_level == "LOW":  # Average 70 seconds
-        cre_interval_min = 50
-        cre_interval_max = 90
-    elif traffic_level == "MID":  # Average 35 seconds
-        cre_interval_min = 25
-        cre_interval_max = 45
-    elif traffic_level == "HIGH":  # Average 25 seconds
-        cre_interval_min = 15
-        cre_interval_max = 35
 
     # Store parameters of all created aircraft
     creation_time = []
@@ -519,6 +517,13 @@ def calc_line_ring_intersection(ring_center_lat,
 
 
 if __name__ == "__main__":
+    # Passing these as arguments to create() when called as __main__
+    SEED = 1
+    TRAFFIC_LEVEL = "LOW"
+    CORRIDOR_LENGTH = 40  # [NM]
+    CORRIDOR_WIDTH = 25  # [NM]
+    ARC_ANGLE = 90  # [deg]
+
     # When running as main, generate a file for each relevant resolution
     # method using the default values of the other parameters.
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
