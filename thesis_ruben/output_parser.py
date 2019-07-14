@@ -47,7 +47,16 @@ class LogListParser:
 
             # Process the list containing the current file's contents and write
             # the summarized data to the output file
-            self.summarize_stats(logfile, log_data)
+            namesplit = logfile.split("_")
+            geometry = namesplit[4] + "_" + namesplit[5] + "_" + namesplit[6]
+            reso_method = namesplit[7][5:]
+            traffic_level = namesplit[8][2:]
+
+            self.summarize_stats(logfile,
+                                 log_data,
+                                 geometry,
+                                 reso_method,
+                                 traffic_level)
 
     def write_to_output_file(self, line):
         """
@@ -59,13 +68,18 @@ class LogListParser:
         with open(self.output_file, "a") as output:
             output.write(line + "\n")
 
-    # Function that needs to be overridden in the actual implementation
+    # Functions that need to be overridden in the actual implementation
     # classes
-    def summarize_stats(self, logfile, log_data):
-        pass
+    def summarize_stats(self,
+                        logfile,
+                        log_data,
+                        geometry,
+                        reso_method,
+                        traffic_level):
+        raise NotImplementedError
 
     def set_header(self):
-        pass
+        raise NotImplementedError
 
 
 class AREALogSummaryParser(LogListParser):
@@ -74,7 +88,12 @@ class AREALogSummaryParser(LogListParser):
     in 'input_list'.
     """
 
-    def summarize_stats(self, logfile, log_data):
+    def summarize_stats(self,
+                        logfile,
+                        log_data,
+                        geometry,
+                        reso_method,
+                        traffic_level):
         """
         Process the elements of the 'log_data' list and write the
         summary to logfile.
@@ -107,11 +126,11 @@ class AREALogSummaryParser(LogListParser):
 
             intrusion_dict[confpair].append(simt)
 
-        outputline = f"{logfile},{num_intrusions}"
+        outputline = f"{geometry},{reso_method},{traffic_level},{num_intrusions}"
         self.write_to_output_file(outputline)
 
     def set_header(self):
-        self.header = "logfile, num intrusions [-]"
+        self.header = "geometry,resolution method,traffic level,num intrusions"
 
 
 class ASASLogSummaryParser(LogListParser):
@@ -120,7 +139,12 @@ class ASASLogSummaryParser(LogListParser):
     in 'input_list' and summarize the stats for each scenario.
     """
 
-    def summarize_stats(self, logfile, log_data):
+    def summarize_stats(self,
+                        logfile,
+                        log_data,
+                        geometry,
+                        reso_method,
+                        traffic_level):
         """
         Process the elements of the 'log_data' list and write the
         summary to logfile.
@@ -172,11 +196,13 @@ class ASASLogSummaryParser(LogListParser):
 
         int_prev_rate = (num_conf - num_los) / num_conf
 
-        outputline = f"{logfile},{num_conf},{num_los},{int_prev_rate}"
+        outputline = (f"{geometry},{reso_method},{traffic_level},"
+                      + f"{num_conf},{num_los},{int_prev_rate}")
         self.write_to_output_file(outputline)
 
     def set_header(self):
-        self.header = "logfile, num conflicts [-], num LoS [-], IPR [-]"
+        self.header = ("geometry,resolution method,traffic level,"
+                       + "num conflicts [-],num LoS [-],IPR [-]")
 
 
 class ASASLogOccurrenceParser(LogListParser):
@@ -185,7 +211,12 @@ class ASASLogOccurrenceParser(LogListParser):
     in 'input_list' and summarize the stats for each individual conflict.
     """
 
-    def summarize_stats(self, logfile, log_data):
+    def summarize_stats(self,
+                        logfile,
+                        log_data,
+                        geometry,
+                        reso_method,
+                        traffic_level):
         """
         Process the elements of the 'log_data' list and for each flight
         write the summary to 'logfile'.
@@ -247,13 +278,15 @@ class ASASLogOccurrenceParser(LogListParser):
                 end = conflict["end_time"]
                 is_los = conflict["is_los"]
 
-                outputline = (f"{logfile},{confpair},{duration},{is_los}"
-                              + f",{los_severity},{start},{end}")
+                outputline = (f"{geometry},{reso_method},{traffic_level},"
+                              + f"{confpair},{duration},{is_los},"
+                              + f"{los_severity},{start},{end}")
                 self.write_to_output_file(outputline)
 
     def set_header(self):
-        self.header = ("logfile, confpair, conflict duration [s], is LoS [-],"
-                       + " LoS severity [-], t start [s], t end[s]")
+        self.header = ("geometry,resolution method,traffic level,confpair,"
+                       + "conflict duration [s],is LoS [-],LoS severity [-],"
+                       + "t start [s],t end[s]")
 
 
 class ASASLogLocationParser(LogListParser):
@@ -263,7 +296,12 @@ class ASASLogLocationParser(LogListParser):
     conflict to 'output_file'.
     """
 
-    def summarize_stats(self, logfile, log_data):
+    def summarize_stats(self,
+                        logfile,
+                        log_data,
+                        geometry,
+                        reso_method,
+                        traffic_level):
         """
         Process the elements of the 'log_data' list and for each flight
         write the summary to 'logfile'.
@@ -286,12 +324,15 @@ class ASASLogLocationParser(LogListParser):
             is_los = dist <= PZ_RADIUS
 
             # Write lines for ac1 and ac2 at once
-            outputlines = (f"{logfile},{ac1_lat},{ac1_lon},{is_los}\n"
-                           + f"{logfile},{ac2_lat},{ac2_lon},{is_los}")
+            outputlines = (f"{geometry},{reso_method},{traffic_level},"
+                           + f"{ac1_lat},{ac1_lon},{is_los}\n"
+                           + f"{geometry},{reso_method},{traffic_level},"
+                           + f"{ac2_lat},{ac2_lon},{is_los}")
             self.write_to_output_file(outputlines)
 
     def set_header(self):
-        self.header = "logfile, ac lat [deg], ac lon[deg], is LoS [-]"
+        self.header = ("geometry,resolution method,traffic level,"
+                       + "ac lat [deg],ac lon[deg],is LoS [-]")
 
 
 class FLSTLogOccurrenceParser(LogListParser):
@@ -300,11 +341,12 @@ class FLSTLogOccurrenceParser(LogListParser):
     in 'input_list' and summarize the stats for each individual flight.
     """
 
-    def set_header(self):
-        self.header = ("logfile, ac id, work [J], route efficiency [-],"
-                       + "dist to last wp [m]")
-
-    def summarize_stats(self, logfile, log_data):
+    def summarize_stats(self,
+                        logfile,
+                        log_data,
+                        geometry,
+                        reso_method,
+                        traffic_level):
         """
         Process the elements of the 'log_data' list and for each flight
         write the summary to 'logfile'.
@@ -319,29 +361,12 @@ class FLSTLogOccurrenceParser(LogListParser):
 
             route_efficiency = nominal_dist / actual_dist
 
-            outputline = (f"{logfile},{ac_id},{work_performed},{route_efficiency},"
+            outputline = (f"{geometry},{reso_method},{traffic_level},"
+                          + f"{ac_id},{work_performed},{route_efficiency},"
                           + f"{dist_to_last_wp}")
             self.write_to_output_file(outputline)
 
-
-if __name__ == "__main__":
-    arealog_list = [
-        "test_output/AREA_CONF_LOG_20190619_224422_L40_W25_A90_RESO-SWARM_V2_SCEN002.log",
-        "test_output/AREA_CONF_LOG_test.log"]
-    AREALogSummaryParser(arealog_list,
-                         "arealog_summary.csv")
-
-    asaslog_list = [
-        "test_output/ASAS_CONF_LOG_20190619_224422_L40_W25_A90_RESO-SWARM_V2_SCEN002.log",
-        "test_output/ASAS_CONF_LOG_test.log"]
-    ASASLogSummaryParser(asaslog_list,
-                         "asaslog_summary.csv")
-    ASASLogOccurrenceParser(asaslog_list,
-                            "asaslog_occurence.csv")
-    ASASLogLocationParser(asaslog_list,
-                          "asaslog_locations.csv")
-
-    flstlog_list = [
-        "test_output/FLSTLOG_20190619_224422_L40_W25_A90_RESO-SWARM_V2_SCEN002.log"]
-    FLSTLogOccurrenceParser(flstlog_list,
-                            "flstlog_occurence.csv")
+    def set_header(self):
+        self.header = ("geometry,resolution method,traffic level,"
+                       + "ac id,work [J],route efficiency [-],"
+                       + "dist to last wp [m]")
