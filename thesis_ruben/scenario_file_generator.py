@@ -112,47 +112,47 @@ def create_scenfile(target_dir,
          + f"# Aircraft creation interval min: {cre_interval_min} s\n"
          + f"# Aircraft creation interval max: {cre_interval_max} s\n"
          + f"# Random number generator seed: {random_seed}\n"
-         + "##################################################\n\n")
+         + "##################################################\n")
 
     # Create scenario file and geo file, overwrite if existing
     with open(scnfile_path, "w+") as scnfile, open(geofile_path, "w+") as geofile:
         scnfile.write(scen_header)
-        zero_time = "0:00:00.00>"
+        zero_time = "\n0:00:00.00>"
 
-        scnfile.write("# Sim commands\n")
-        scnfile.write(zero_time + f"PAN {CENTER_LAT},{CENTER_LON}\n")
-        scnfile.write(zero_time + f"DT {SIM_TIME_STEP}\n")
-        scnfile.write(zero_time + "TRAIL {}\n".format("ON" if SHOW_AC_TRAILS
-                                                      else "OFF"))
-        scnfile.write(zero_time + "SWRAD SYM\n")
-        scnfile.write(zero_time + "SWRAD LABEL 0\n")
-        scnfile.write(zero_time + "SWRAD WPT\n")
-        scnfile.write(zero_time + "SWRAD SAT\n")
-        scnfile.write(zero_time + "SWRAD APT\n")
-        scnfile.write(zero_time + "FF\n")
+        scnfile.write("\n# Sim commands")
+        scnfile.write(zero_time + f"PAN {CENTER_LAT},{CENTER_LON}")
+        scnfile.write(zero_time + f"DT {SIM_TIME_STEP}")
+        scnfile.write(zero_time + "TRAIL {}".format("ON" if SHOW_AC_TRAILS
+                                                    else "OFF"))
+        scnfile.write(zero_time + "SWRAD SYM")
+        scnfile.write(zero_time + "SWRAD LABEL 0")
+        scnfile.write(zero_time + "SWRAD WPT")
+        scnfile.write(zero_time + "SWRAD SAT")
+        scnfile.write(zero_time + "SWRAD APT")
+        scnfile.write(zero_time + "FF")
 
-        scnfile.write("\n# Setup circular experiment area and activate it"
-                      + " as a traffic area in BlueSky\n")
-        scnfile.write(zero_time + "PLUGINS LOAD AREA\n")
-        scnfile.write(zero_time + "CIRCLE EXPERIMENT {},{},{}\n"
+        scnfile.write("\n\n# Setup circular experiment area and activate it"
+                      + " as a traffic area in BlueSky")
+        scnfile.write(zero_time + "PLUGINS LOAD AREA")
+        scnfile.write(zero_time + "CIRCLE EXPERIMENT {},{},{}"
                       .format(CENTER_LAT, CENTER_LON, AREA_RADIUS))
-        scnfile.write(zero_time + "AREA EXPERIMENT\n")
-        scnfile.write(zero_time + "COLOR EXPERIMENT 0,128,0\n")
+        scnfile.write(zero_time + "AREA EXPERIMENT")
+        scnfile.write(zero_time + "COLOR EXPERIMENT 0,128,0")
 
-        scnfile.write("\n# Setup BlueSky ASAS module options\n")
-        scnfile.write(zero_time + "ASAS ON\n")
-        scnfile.write(zero_time + f"RESO {resolution_method}\n")
-        scnfile.write(zero_time + f"RMETHH {RMETHH}\n")
+        scnfile.write("\n\n# Setup BlueSky ASAS module options")
+        scnfile.write(zero_time + "ASAS ON")
+        scnfile.write(zero_time + f"RESO {resolution_method}")
+        scnfile.write(zero_time + f"RMETHH {RMETHH}")
 
         # Create csv file to allow generation of area restriction graphs
         geofile.write("{},{},{},{}\n".format(
             "ring", CENTER_LAT, CENTER_LON, AREA_RADIUS))
 
         # Create restricted areas
-        scnfile.write("\n# LOAD RAA plugin and create area restrictions\n")
-        scnfile.write(zero_time + f"PLUGINS LOAD {PLUGIN_NAME}\n")
-        scnfile.write(zero_time + f"RAALOG {timestamp}\n")
-        scnfile.write(zero_time + f"RAACONF {AREA_LOOKAHEAD_TIME}\n")
+        scnfile.write("\n\n# LOAD RAA plugin and create area restrictions")
+        scnfile.write(zero_time + f"PLUGINS LOAD {PLUGIN_NAME}")
+        scnfile.write(zero_time + f"RAALOG {timestamp}")
+        scnfile.write(zero_time + f"RAACONF {AREA_LOOKAHEAD_TIME}")
 
         _ = create_area(scnfile,
                         geofile,
@@ -178,7 +178,7 @@ def create_scenfile(target_dir,
             angle_from_centerpoint = angle / 2
 
         # Corridor waypoints
-        scnfile.write("\n# Corridor waypoints\n")
+        scnfile.write("\n\n# Corridor waypoints")
         corridor_top_lat, _ = bsgeo.qdrpos(CENTER_LAT,
                                            CENTER_LON,
                                            0,
@@ -188,13 +188,13 @@ def create_scenfile(target_dir,
                                               180,
                                               corridor_length/2)
 
-        scnfile.write(zero_time + "DEFWPT COR101,{:.6f},{:.6f},FIX\n"
+        scnfile.write(zero_time + "DEFWPT COR101,{:.6f},{:.6f},FIX"
                       .format(corridor_bottom_lat, CENTER_LON))
-        scnfile.write(zero_time + "DEFWPT COR201,{:.6f},{:.6f},FIX\n"
+        scnfile.write(zero_time + "DEFWPT COR201,{:.6f},{:.6f},FIX"
                       .format(corridor_top_lat, CENTER_LON))
 
         # Create aircaft
-        scnfile.write("\n# Create {} aircraft".format(NUM_AIRCRAFT))
+        scnfile.write("\n\n# Create {} aircraft".format(NUM_AIRCRAFT))
         create_aircraft(scnfile,
                         traffic_level,
                         cre_interval_min,
@@ -324,13 +324,13 @@ def create_area(scnfile,
                 outer_bottom_lon,
                 inner_bottom_lat,
                 inner_bottom_lon)
-    scnfile.write(zero_time + f"RAA RAA{area_idx},ON,{0},{0},{area_coords}\n")
-    scnfile.write(zero_time + f"COLOR RAA{area_idx},164,0,0\n")
-    scnfile.write(zero_time + "DEFWPT RAA_{},{:.6f},{:.6f},FIX\n".format(
+    scnfile.write(zero_time + f"RAA RAA{area_idx},ON,{0},{0},{area_coords}")
+    scnfile.write(zero_time + f"COLOR RAA{area_idx},164,0,0")
+    scnfile.write(zero_time + "DEFWPT RAA_{},{:.6f},{:.6f},FIX".format(
         area_idx, CENTER_LAT, (inner_bottom_lon + outer_lon) / 2))
 
     # Write coordinates to geo file
-    geofile.write(f"RAA{area_idx},{area_coords}\n")
+    geofile.write(f"RAA{area_idx},{area_coords}")
 
     # Calculate angle from the center point to intersection between ring and
     # area edge
