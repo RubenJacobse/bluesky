@@ -460,13 +460,13 @@ class AreaRestrictionManager(TrafficArrays):
         # Increment after adding variable elements
         self.num_areas += 1
 
-        return True, "Restricted Airspace Area {} is initialized".format(area_id)
+        return True, f"Restricted Airspace Area {area_id} is initialized"
 
     def delete_area(self, area_id):
         """ Delete an existing restricted airspace area. """
 
         if area_id not in self.area_ids:
-            return False, "Error: Airspace restriction {} does not exist".format(area_id)
+            return False, f"Error: Airspace restriction {area_id} does not exist"
         else:
             # Find index of area
             idx = self.area_ids.index(area_id)
@@ -483,7 +483,7 @@ class AreaRestrictionManager(TrafficArrays):
             for var in self._ndArrVars:
                 self._Vars[var] = np.delete(self._Vars[var], idx, 0)
 
-            return True, "Sucessfully deleted airspace restriction {}".format(area_id)
+            return True, f"Sucessfully deleted airspace restriction {area_id}"
 
     def set_t_lookahead(self, new_t_lookahead):
         """
@@ -494,7 +494,7 @@ class AreaRestrictionManager(TrafficArrays):
             self.t_lookahead = new_t_lookahead
             is_set_to_new = True
             console_str = "Aircraft-area conflict look-ahead-time set to " \
-                          + "{} seconds".format(new_t_lookahead)
+                          + f"{new_t_lookahead} seconds"
         else:
             is_set_to_new = False
             console_str = "Error: Look-ahead-time should be an integer value"
@@ -512,8 +512,8 @@ class AreaRestrictionManager(TrafficArrays):
 
         self.crs_to_active_wp = ned2crs(qdr_to_active_wp)
 
-        # Finding the course to the next waypoint is more tricky (if it even exists,
-        # otherwise use the active waypoint which should always exist)
+        # Finding the course to the next waypoint is more tricky (if it even
+        # exists, otherwise use the active waypoint which should always exist)
         nextwp_lat = np.zeros(np.shape(self.crs_to_next_wp))
         nextwp_lon = np.zeros(np.shape(self.crs_to_next_wp))
         for ac_idx in range(self.num_traf):
@@ -858,8 +858,9 @@ class AreaRestrictionManager(TrafficArrays):
                         continue
                     bs.traf.ap.route[ac_idx].direct(ac_idx,
                                                     bs.traf.ap.route[ac_idx].wpname[iwpid])
-                    if bs.traf.ap.route[ac_idx].wpname[iwpid] != "COR101":
-                        print("t={}s: {} area restriction direct to {}".format(bs.sim.simt,
+                    if (bs.traf.ap.route[ac_idx].wpname[iwpid] == "COR201"
+                            and bs.traf.lat[ac_idx] > 0.332736):
+                        print("t={}s: {} area avoidance -> direct to {}".format(bs.sim.simt,
                                                                                bs.traf.id[ac_idx],
                                                                                bs.traf.ap.route[ac_idx].wpname[iwpid]))
 
@@ -1016,7 +1017,7 @@ class RestrictedAirspaceArea():
         Convert list with coords in lat,lon order to numpy array of
         vertex pairs in lon,lat order.
 
-        coords = [lat_0, lon_0, ..., lat_n, lon_n] \n
+        coords = [lat_0, lon_0, ..., lat_n, lon_n]
         verts = np.array([[lon_0, lat_0], ..., [lon_n, lat_n]])
 
         (This is the inverse operation of self._verts2coords).
@@ -1032,7 +1033,7 @@ class RestrictedAirspaceArea():
         Convert numpy array of vertex coordinate pairs in lon,lat order to
         a single list of lat,lon coords.
 
-        verts = np.array([[lon_0, lat_0], ..., [lon_n, lat_n]]) \n
+        verts = np.array([[lon_0, lat_0], ..., [lon_n, lat_n]])
         coords = [lat_0, lon_0, ..., lat_n, lon_n]
 
         (Essentially the inverse operation of self._coords2verts).
