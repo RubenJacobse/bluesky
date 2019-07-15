@@ -281,150 +281,82 @@ class BoxPlotFigureGenerator(FigureGeneratorBase):
 
     def generate_boxplot_figures(self):
         """
-        Generate a box plot figure for each geometry.
+        Generate all box plot figures for each geometry in the batch.
         """
 
         for geometry in self.combination_dict:
-            self.make_boxplot_figure(geometry)
+            # Make figures based on data in asaslog_occurence.csv
+            df = pd.read_csv(os.path.join(self.batch_dir,
+                                          "logfiles_summary",
+                                          "asaslog_occurence.csv"))
+            df_geometry = df[df["#geometry"] == geometry]
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "conflict duration [s]",
+                                    "conflict_duration")
 
-    def make_boxplot_figure(self, geometry):
+            df_LoS_sev = df[(df["#geometry"] == geometry)
+                            & (df["is LoS [-]"] == True)]
+            self.make_single_figure(geometry,
+                                    df_LoS_sev,
+                                    "conflict duration [s]",
+                                    "conflict_duration")
+
+            # Make figures based on data in asaslog_summary.csv
+            df = pd.read_csv(os.path.join(self.batch_dir,
+                                          "logfiles_summary",
+                                          "asaslog_summary.csv"))
+            df_geometry = df[df["#geometry"] == geometry]
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "num conflicts [-]",
+                                    "num_conflicts")
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "num LoS [-]",
+                                    "num_LoS")
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "IPR [-]",
+                                    "IPR")
+
+            # Make figures based on data in flstlog_occurence.csv
+            df = pd.read_csv(os.path.join(self.batch_dir,
+                                          "logfiles_summary",
+                                          "flstlog_occurence.csv"))
+            df_geometry = df[df["#geometry"] == geometry]
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "work [J]",
+                                    "work")
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "route efficiency [-]",
+                                    "efficiency")
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "dist to last wp [m]",
+                                    "dist_to_last")
+
+    def make_single_figure(self, geometry, df, column, namestr):
         """
-        Make a single boxplot figure.
+        Make a single boxplot figure for a given geometry. The data used
+        is specified in a pandas dataframe 'df', 'column' is the column used
+        for the plot and 'namestr' is the last part of the figure file name.
         """
 
         plt.figure()
-        df = pd.read_csv(os.path.join(self.batch_dir,
-                                      "logfiles_summary",
-                                      "asaslog_occurence.csv"))
-        df_geometry = df[df["#geometry"] == geometry]
         ax = sbn.boxplot(x="resolution method",
-                         y="conflict duration [s]",
-                         data=df_geometry,
+                         y=column,
+                         data=df,
                          order=["OFF", "MVP", "LF"],
                          hue="traffic level",
-                         hue_order=["LOW", "MID", "HIGH"])
+                         hue_order=["LOW", "MID", "HIGH"],
+                         palette="Blues",
+                         linewidth=0.5)
+        plt.ticklabel_format(axis="y", style="sci", scilimits=(0, 2))
         ax.legend(loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.1))
-        plt_filename = (f"{geometry}_conflict_duration.png")
-        plt_filepath = os.path.join(self.figure_dir, plt_filename)
-        plt.savefig(plt_filepath, dpi=600)
-        plt.close()
-
-        plt.figure()
-        df = pd.read_csv(os.path.join(self.batch_dir,
-                                      "logfiles_summary",
-                                      "asaslog_occurence.csv"))
-        df_geometry = df[(df["#geometry"] == geometry) &
-                         (df["is LoS [-]"] == True)]
-        ax = sbn.boxplot(x="resolution method",
-                         y="LoS severity [-]",
-                         data=df_geometry,
-                         order=["OFF", "MVP", "LF"],
-                         hue="traffic level",
-                         hue_order=["LOW", "MID", "HIGH"])
-        ax.legend(loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.1))
-        plt_filename = (f"{geometry}_LoS_severity.png")
-        plt_filepath = os.path.join(self.figure_dir, plt_filename)
-        plt.savefig(plt_filepath, dpi=600)
-        plt.close()
-
-        plt.figure()
-        df = pd.read_csv(os.path.join(self.batch_dir,
-                                      "logfiles_summary",
-                                      "asaslog_summary.csv"))
-        df_geometry = df[df["#geometry"] == geometry]
-        ax = sbn.boxplot(x="resolution method",
-                         y="num conflicts [-]",
-                         data=df_geometry,
-                         order=["OFF", "MVP", "LF"],
-                         hue="traffic level",
-                         hue_order=["LOW", "MID", "HIGH"])
-        ax.legend(loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.1))
-        plt_filename = (f"{geometry}_num_conflicts.png")
-        plt_filepath = os.path.join(self.figure_dir, plt_filename)
-        plt.savefig(plt_filepath, dpi=600)
-        plt.close()
-
-        plt.figure()
-        df = pd.read_csv(os.path.join(self.batch_dir,
-                                      "logfiles_summary",
-                                      "asaslog_summary.csv"))
-        df_geometry = df[df["#geometry"] == geometry]
-        ax = sbn.boxplot(x="resolution method",
-                         y="num LoS [-]",
-                         data=df_geometry,
-                         order=["OFF", "MVP", "LF"],
-                         hue="traffic level",
-                         hue_order=["LOW", "MID", "HIGH"])
-        ax.legend(loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.1))
-        plt_filename = (f"{geometry}_num_LoS.png")
-        plt_filepath = os.path.join(self.figure_dir, plt_filename)
-        plt.savefig(plt_filepath, dpi=600)
-        plt.close()
-
-        plt.figure()
-        df = pd.read_csv(os.path.join(self.batch_dir,
-                                      "logfiles_summary",
-                                      "asaslog_summary.csv"))
-        df_geometry = df[df["#geometry"] == geometry]
-        ax = sbn.boxplot(x="resolution method",
-                         y="IPR [-]",
-                         data=df_geometry,
-                         order=["OFF", "MVP", "LF"],
-                         hue="traffic level",
-                         hue_order=["LOW", "MID", "HIGH"])
-        ax.legend(loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.1))
-        plt_filename = (f"{geometry}_IPR.png")
-        plt_filepath = os.path.join(self.figure_dir, plt_filename)
-        plt.savefig(plt_filepath, dpi=600)
-        plt.close()
-
-        plt.figure()
-        df = pd.read_csv(os.path.join(self.batch_dir,
-                                      "logfiles_summary",
-                                      "flstlog_occurence.csv"))
-        df_geometry = df[df["#geometry"] == geometry]
-        ax = sbn.boxplot(x="resolution method",
-                         y="work [J]",
-                         data=df_geometry,
-                         order=["OFF", "MVP", "LF"],
-                         hue="traffic level",
-                         hue_order=["LOW", "MID", "HIGH"])
-        ax.legend(loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.1))
-        plt_filename = (f"{geometry}_work.png")
-        plt_filepath = os.path.join(self.figure_dir, plt_filename)
-        plt.savefig(plt_filepath, dpi=600)
-        plt.close()
-
-        plt.figure()
-        df = pd.read_csv(os.path.join(self.batch_dir,
-                                      "logfiles_summary",
-                                      "flstlog_occurence.csv"))
-        df_geometry = df[df["#geometry"] == geometry]
-        ax = sbn.boxplot(x="resolution method",
-                         y="route efficiency [-]",
-                         data=df_geometry,
-                         order=["OFF", "MVP", "LF"],
-                         hue="traffic level",
-                         hue_order=["LOW", "MID", "HIGH"])
-        ax.legend(loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.1))
-        plt_filename = (f"{geometry}_efficiency.png")
-        plt_filepath = os.path.join(self.figure_dir, plt_filename)
-        plt.savefig(plt_filepath, dpi=600)
-        plt.close()
-
-        plt.figure()
-        df = pd.read_csv(os.path.join(self.batch_dir,
-                                      "logfiles_summary",
-                                      "flstlog_occurence.csv"))
-        df_geometry = df[df["#geometry"] == geometry]
-        ax = sbn.boxplot(x="resolution method",
-                         y="dist to last wp [m]",
-                         data=df_geometry,
-                         order=["OFF", "MVP", "LF"],
-                         hue="traffic level",
-                         hue_order=["LOW", "MID", "HIGH"])
-        ax.legend(loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.1))
-        plt_filename = (f"{geometry}_disttolast.png")
+        plt_filename = f"{geometry}_boxplot_{namestr}.png"
         plt_filepath = os.path.join(self.figure_dir, plt_filename)
         plt.savefig(plt_filepath, dpi=600)
         plt.close()
