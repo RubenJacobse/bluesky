@@ -233,7 +233,7 @@ class GeoFigureGenerator(FigureGeneratorBase):
         intrusion_locations = [[], []]
         for row in self.asas_location_list:
             if row[0:3] == [geometry, separation_method, traffic_level]:
-                [ac_lat, ac_lon, is_los] = row[3:6]
+                [ac_lat, ac_lon, is_los] = row[4:7]
                 if is_los == "True":
                     intrusion_locations[0].append(float(ac_lon))
                     intrusion_locations[1].append(float(ac_lat))
@@ -327,7 +327,7 @@ class BoxPlotFigureGenerator(FigureGeneratorBase):
             df_geometry = df[df["#geometry"] == geometry]
             self.make_single_figure(geometry,
                                     df_geometry,
-                                    "work [J]",
+                                    "work [GJ]",
                                     "work")
             self.make_single_figure(geometry,
                                     df_geometry,

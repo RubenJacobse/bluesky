@@ -46,16 +46,20 @@ class LogListParser:
                         if not row[0].startswith("#")]
 
             # Process the list containing the current file's contents and write
-            # the summarized data to the output file
+            # the summarized data to the output file.
+            # Expected logfile name format:
+            # "...\LOGNAME_YYYYMMDD-hhmmss_Lxx_Wxx_Axx_RESO-xx_T-xx_SCENxxx.log"
             namesplit = logfile.split("_")
-            geometry = namesplit[4] + "_" + namesplit[5] + "_" + namesplit[6]
-            reso_method = namesplit[7][5:]
-            traffic_level = namesplit[8][2:]
+            geometry = namesplit[-6] + "_" + namesplit[-5] + "_" + namesplit[-4]
+            reso_method = namesplit[-3][5:]
+            traffic_level = namesplit[-2][2:]
+            scenario = namesplit[-1][4:7]
 
             self.summarize_stats(logfile,
                                  log_data,
                                  geometry,
                                  reso_method,
+                                 scenario,
                                  traffic_level)
 
     def write_to_output_file(self, line):
@@ -68,13 +72,13 @@ class LogListParser:
         with open(self.output_file, "a") as output:
             output.write(line + "\n")
 
-    # Functions that need to be overridden in the actual implementation
-    # classes
+    # Virtual methods
     def summarize_stats(self,
                         logfile,
                         log_data,
                         geometry,
                         reso_method,
+                        scenario,
                         traffic_level):
         raise NotImplementedError
 
@@ -93,6 +97,7 @@ class AREALogSummaryParser(LogListParser):
                         log_data,
                         geometry,
                         reso_method,
+                        scenario,
                         traffic_level):
         """
         Process the elements of the 'log_data' list and write the
@@ -126,11 +131,13 @@ class AREALogSummaryParser(LogListParser):
 
             intrusion_dict[confpair].append(simt)
 
-        outputline = f"{geometry},{reso_method},{traffic_level},{num_intrusions}"
+        outputline = (f"{geometry},{reso_method},{traffic_level},"
+                      + f"{scenario},{num_intrusions}")
         self.write_to_output_file(outputline)
 
     def set_header(self):
-        self.header = "geometry,resolution method,traffic level,num intrusions"
+        self.header = ("geometry,resolution method,traffic level,"
+                       + "scenario,num intrusions")
 
 
 class ASASLogSummaryParser(LogListParser):
@@ -144,6 +151,7 @@ class ASASLogSummaryParser(LogListParser):
                         log_data,
                         geometry,
                         reso_method,
+                        scenario,
                         traffic_level):
         """
         Process the elements of the 'log_data' list and write the
@@ -196,12 +204,12 @@ class ASASLogSummaryParser(LogListParser):
 
         int_prev_rate = (num_conf - num_los) / num_conf
 
-        outputline = (f"{geometry},{reso_method},{traffic_level},"
-                      + f"{num_conf},{num_los},{int_prev_rate}")
+        outputline = (f"{geometry},{reso_method},{traffic_level},{scenario},"
+                      + f"{num_conf},{num_los},{int_prev_rate:0.3f}")
         self.write_to_output_file(outputline)
 
     def set_header(self):
-        self.header = ("geometry,resolution method,traffic level,"
+        self.header = ("geometry,resolution method,traffic level,scenario,"
                        + "num conflicts [-],num LoS [-],IPR [-]")
 
 
@@ -216,6 +224,7 @@ class ASASLogOccurrenceParser(LogListParser):
                         log_data,
                         geometry,
                         reso_method,
+                        scenario,
                         traffic_level):
         """
         Process the elements of the 'log_data' list and for each flight
@@ -279,14 +288,14 @@ class ASASLogOccurrenceParser(LogListParser):
                 is_los = conflict["is_los"]
 
                 outputline = (f"{geometry},{reso_method},{traffic_level},"
-                              + f"{confpair},{duration},{is_los},"
-                              + f"{los_severity},{start},{end}")
+                              + f"{scenario},{confpair},{duration},{is_los},"
+                              + f"{los_severity:0.3f},{start},{end}")
                 self.write_to_output_file(outputline)
 
     def set_header(self):
-        self.header = ("geometry,resolution method,traffic level,confpair,"
-                       + "conflict duration [s],is LoS [-],LoS severity [-],"
-                       + "t start [s],t end[s]")
+        self.header = ("geometry,resolution method,traffic level,scenario,"
+                       + "confpair,conflict duration [s],is LoS [-],"
+                       + "LoS severity [-],t start [s],t end[s]")
 
 
 class ASASLogLocationParser(LogListParser):
@@ -301,6 +310,7 @@ class ASASLogLocationParser(LogListParser):
                         log_data,
                         geometry,
                         reso_method,
+                        scenario,
                         traffic_level):
         """
         Process the elements of the 'log_data' list and for each flight
@@ -325,13 +335,15 @@ class ASASLogLocationParser(LogListParser):
 
             # Write lines for ac1 and ac2 at once
             outputlines = (f"{geometry},{reso_method},{traffic_level},"
-                           + f"{ac1_lat},{ac1_lon},{is_los}\n"
+                           + f"{scenario},{ac1_lat:0.6f},{ac1_lon:0.6f},"
+                           + f"{is_los}\n"
                            + f"{geometry},{reso_method},{traffic_level},"
-                           + f"{ac2_lat},{ac2_lon},{is_los}")
+                           + f"{scenario},{ac2_lat:0.6f},{ac2_lon:0.6f},"
+                           + f"{is_los}")
             self.write_to_output_file(outputlines)
 
     def set_header(self):
-        self.header = ("geometry,resolution method,traffic level,"
+        self.header = ("geometry,resolution method,traffic level,scenario,"
                        + "ac lat [deg],ac lon[deg],is LoS [-]")
 
 
@@ -346,6 +358,7 @@ class FLSTLogOccurrenceParser(LogListParser):
                         log_data,
                         geometry,
                         reso_method,
+                        scenario,
                         traffic_level):
         """
         Process the elements of the 'log_data' list and for each flight
@@ -356,17 +369,17 @@ class FLSTLogOccurrenceParser(LogListParser):
             ac_id = row[1]
             nominal_dist = float(row[4])
             actual_dist = float(row[5])
-            work_performed = float(row[7])
+            work_performed = float(row[7]) / 1e9
             dist_to_last_wp = float(row[8])
 
             route_efficiency = nominal_dist / actual_dist
 
-            outputline = (f"{geometry},{reso_method},{traffic_level},"
-                          + f"{ac_id},{work_performed},{route_efficiency},"
-                          + f"{dist_to_last_wp}")
-            self.write_to_output_file(outputline)
+            line = (f"{geometry},{reso_method},{traffic_level},{scenario},"
+                    + f"{ac_id},{work_performed:0.0f},{route_efficiency:0.3f},"
+                    + f"{dist_to_last_wp:0.0f}")
+            self.write_to_output_file(line)
 
     def set_header(self):
-        self.header = ("geometry,resolution method,traffic level,"
-                       + "ac id,work [J],route efficiency [-],"
+        self.header = ("geometry,resolution method,traffic level,scenario,"
+                       + "ac id,work [GJ],route efficiency [-],"
                        + "dist to last wp [m]")
