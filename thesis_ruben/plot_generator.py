@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from shapely.geometry import Polygon
 
 # Enable BlueSky imports by adding the project folder to the path
-sys.path.append(os.path.abspath(os.path.join('..')))
+sys.path.append(os.path.abspath(os.path.join("..")))
 
 # BlueSky imports
 import bluesky.tools.geo as bsgeo
@@ -28,6 +28,8 @@ def make_batch_figures(timestamp):
 
     GeoFigureGenerator(timestamp)
     BoxPlotFigureGenerator(timestamp)
+    ViolinPlotFigureGenerator(timestamp)
+    StripPlotFigureGenerator(timestamp)
 
 
 def load_csv_data(filename, delimiter=",", comment_token="#"):
@@ -369,14 +371,221 @@ class BoxPlotFigureGenerator(FigureGeneratorBase):
         ax = sbn.boxplot(x="resolution method",
                          y=column,
                          data=df,
-                         order=["OFF", "MVP", "LF"],
+                         order=["OFF", "MVP", "LF", "SWARM-V2"],
                          hue="traffic level",
                          hue_order=["LOW", "MID", "HIGH"],
                          palette="Blues",
                          linewidth=0.5)
         plt.ticklabel_format(axis="y", style="sci", scilimits=(0, 2))
         ax.legend(loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.1))
+        ax.set(xticklabels=["OFF", "MVP", "MVP+LF", "MVP+SWARM"])
         plt_filename = f"{geometry}_boxplot_{namestr}.png"
+        plt_filepath = os.path.join(self.figure_dir, plt_filename)
+        plt.savefig(plt_filepath, dpi=600)
+        plt.close()
+
+
+class ViolinPlotFigureGenerator(FigureGeneratorBase):
+    """
+    Generate the box plots for a batch with given timestamp.
+    """
+
+    def __init__(self, timestamp):
+        super().__init__(timestamp)
+        self.generate_violinplot_figures()
+
+    def create_figure_dir_if_not_exists(self):
+        """
+        Ensures that the subdirectory in which all violin plot figures
+        will be saved is created in case does not exist yet.
+        """
+
+        self.figure_dir = os.path.join(self.figure_dir, "violinplot")
+        if not os.path.isdir(self.figure_dir):
+            os.makedirs(self.figure_dir)
+
+    def generate_violinplot_figures(self):
+        """
+        Generate all box plot figures for each geometry in the batch.
+        """
+
+        for geometry in self.combination_dict:
+            # Make figures based on data in asaslog_occurence.csv
+            df = pd.read_csv(os.path.join(self.batch_dir,
+                                          "logfiles_summary",
+                                          "asaslog_occurence.csv"))
+            df_geometry = df[df["#geometry"] == geometry]
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "conflict duration [s]",
+                                    "conflict_duration")
+
+            df_LoS_sev = df[(df["#geometry"] == geometry)
+                            & (df["is LoS [-]"] == True)]
+            self.make_single_figure(geometry,
+                                    df_LoS_sev,
+                                    "conflict duration [s]",
+                                    "conflict_duration")
+
+            # Make figures based on data in asaslog_summary.csv
+            df = pd.read_csv(os.path.join(self.batch_dir,
+                                          "logfiles_summary",
+                                          "asaslog_summary.csv"))
+            df_geometry = df[df["#geometry"] == geometry]
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "num conflicts [-]",
+                                    "num_conflicts")
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "num LoS [-]",
+                                    "num_LoS")
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "IPR [-]",
+                                    "IPR")
+
+            # Make figures based on data in flstlog_occurence.csv
+            df = pd.read_csv(os.path.join(self.batch_dir,
+                                          "logfiles_summary",
+                                          "flstlog_occurence.csv"))
+            df_geometry = df[df["#geometry"] == geometry]
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "work [GJ]",
+                                    "work")
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "route efficiency [-]",
+                                    "efficiency")
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "dist to last wp [m]",
+                                    "dist_to_last")
+
+    def make_single_figure(self, geometry, df, column, namestr):
+        """
+        Make a single boxplot figure for a given geometry. The data used
+        is specified in a pandas dataframe 'df', 'column' is the column used
+        for the plot and 'namestr' is the last part of the figure file name.
+        """
+
+        plt.figure()
+        ax = sbn.violinplot(x="resolution method",
+                            y=column,
+                            data=df,
+                            order=["OFF", "MVP", "LF", "SWARM-V2"],
+                            hue="traffic level",
+                            hue_order=["LOW", "MID", "HIGH"],
+                            palette="Blues",
+                            linewidth=0.5)
+        plt.ticklabel_format(axis="y", style="sci", scilimits=(0, 2))
+        ax.legend(loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.1))
+        plt_filename = f"{geometry}_violinplot_{namestr}.png"
+        plt_filepath = os.path.join(self.figure_dir, plt_filename)
+        plt.savefig(plt_filepath, dpi=600)
+        plt.close()
+
+
+class StripPlotFigureGenerator(FigureGeneratorBase):
+    """
+    Generate the box plots for a batch with given timestamp.
+    """
+
+    def __init__(self, timestamp):
+        super().__init__(timestamp)
+        self.generate_stripplot_figures()
+
+    def create_figure_dir_if_not_exists(self):
+        """
+        Ensures that the directory in which all strip plot figures will
+        be saved is created in case it does not exist yet.
+        """
+
+        self.figure_dir = os.path.join(self.figure_dir, "stripplot")
+        if not os.path.isdir(self.figure_dir):
+            os.makedirs(self.figure_dir)
+
+    def generate_stripplot_figures(self):
+        """
+        Generate all box plot figures for each geometry in the batch.
+        """
+
+        for geometry in self.combination_dict:
+            # Make figures based on data in asaslog_occurence.csv
+            df = pd.read_csv(os.path.join(self.batch_dir,
+                                          "logfiles_summary",
+                                          "asaslog_occurence.csv"))
+            df_geometry = df[df["#geometry"] == geometry]
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "conflict duration [s]",
+                                    "conflict_duration")
+
+            df_LoS_sev = df[(df["#geometry"] == geometry)
+                            & (df["is LoS [-]"] == True)]
+            self.make_single_figure(geometry,
+                                    df_LoS_sev,
+                                    "conflict duration [s]",
+                                    "conflict_duration")
+
+            # Make figures based on data in asaslog_summary.csv
+            df = pd.read_csv(os.path.join(self.batch_dir,
+                                          "logfiles_summary",
+                                          "asaslog_summary.csv"))
+            df_geometry = df[df["#geometry"] == geometry]
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "num conflicts [-]",
+                                    "num_conflicts")
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "num LoS [-]",
+                                    "num_LoS")
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "IPR [-]",
+                                    "IPR")
+
+            # Make figures based on data in flstlog_occurence.csv
+            df = pd.read_csv(os.path.join(self.batch_dir,
+                                          "logfiles_summary",
+                                          "flstlog_occurence.csv"))
+            df_geometry = df[df["#geometry"] == geometry]
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "work [GJ]",
+                                    "work")
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "route efficiency [-]",
+                                    "efficiency")
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "dist to last wp [m]",
+                                    "dist_to_last")
+
+    def make_single_figure(self, geometry, df, column, namestr):
+        """
+        Make a single boxplot figure for a given geometry. The data used
+        is specified in a pandas dataframe 'df', 'column' is the column used
+        for the plot and 'namestr' is the last part of the figure file name.
+        """
+
+        plt.figure()
+        ax = sbn.stripplot(x="resolution method",
+                           y=column,
+                           data=df,
+                           order=["OFF", "MVP", "LF", "SWARM-V2"],
+                           hue="traffic level",
+                           hue_order=["LOW", "MID", "HIGH"],
+                           palette="Blues",
+                           linewidth=0.5,
+                           jitter=True,
+                           dodge=True)
+        plt.ticklabel_format(axis="y", style="sci", scilimits=(0, 2))
+        ax.legend(loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.1))
+        plt_filename = f"{geometry}_stripplot_{namestr}.png"
         plt_filepath = os.path.join(self.figure_dir, plt_filename)
         plt.savefig(plt_filepath, dpi=600)
         plt.close()
@@ -384,5 +593,6 @@ class BoxPlotFigureGenerator(FigureGeneratorBase):
 
 if __name__ == "__main__":
     # timestamp = "20190712-022110"
-    timestamp = "20190714-152439"
+    # timestamp = "20190714-152439"
+    timestamp = "20190717-015921"
     make_batch_figures(timestamp)
