@@ -110,6 +110,16 @@ class GeoFigureGenerator(FigureGeneratorBase):
         self.load_conflict_location_data()
         self.generate_geo_figures()
 
+    def create_figure_dir_if_not_exists(self):
+        """
+        Ensures that the subdirectory in which all geo figures will be
+        saved is created in case it does not exist yet.
+        """
+
+        self.figure_dir = os.path.join(self.figure_dir, "geo")
+        if not os.path.isdir(self.figure_dir):
+            os.makedirs(self.figure_dir)
+
     def load_conflict_location_data(self):
         """
         Load the locations of all conflicts from file.
@@ -278,6 +288,16 @@ class BoxPlotFigureGenerator(FigureGeneratorBase):
     def __init__(self, timestamp):
         super().__init__(timestamp)
         self.generate_boxplot_figures()
+
+    def create_figure_dir_if_not_exists(self):
+        """
+        Ensures that the subdirectory in which all box plot figures will
+        be saved is created in case does not exist yet.
+        """
+
+        self.figure_dir = os.path.join(self.figure_dir, "boxplot")
+        if not os.path.isdir(self.figure_dir):
+            os.makedirs(self.figure_dir)
 
     def generate_boxplot_figures(self):
         """
