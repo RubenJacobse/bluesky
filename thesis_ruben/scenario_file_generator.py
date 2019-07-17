@@ -330,7 +330,7 @@ def create_area(scnfile,
         area_idx, CENTER_LAT, (inner_bottom_lon + outer_lon) / 2))
 
     # Write coordinates to geo file
-    geofile.write(f"RAA{area_idx},{area_coords}")
+    geofile.write(f"RAA{area_idx},{area_coords}\n")
 
     # Calculate angle from the center point to intersection between ring and
     # area edge
