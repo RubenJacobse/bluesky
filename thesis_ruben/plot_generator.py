@@ -367,6 +367,12 @@ class BoxPlotFigureGenerator(FigureGeneratorBase):
         for the plot and 'namestr' is the last part of the figure file name.
         """
 
+        # Use the min and max of the unfiltered column in the dataframe
+        # to ensure all figures of this type have the same y-axis limits
+        yrange = df[column].max() - df[column].min()
+        ymin = df[column].min() - 0.05 * yrange
+        ymax = df[column].max() + 0.05 * yrange
+
         plt.figure()
         ax = sbn.boxplot(x="resolution method",
                          y=column,
@@ -379,6 +385,7 @@ class BoxPlotFigureGenerator(FigureGeneratorBase):
         plt.ticklabel_format(axis="y", style="sci", scilimits=(0, 2))
         ax.legend(loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.1))
         ax.set(xticklabels=["OFF", "MVP", "MVP+LF", "MVP+SWARM"])
+        ax.set_ylim(ymin, ymax)
         plt_filename = f"{geometry}_boxplot_{namestr}.png"
         plt_filepath = os.path.join(self.figure_dir, plt_filename)
         plt.savefig(plt_filepath, dpi=600)
