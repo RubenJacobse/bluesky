@@ -347,18 +347,53 @@ class BoxPlotFigureGenerator(FigureGeneratorBase):
                                           "logfiles_summary",
                                           "flstlog_occurence.csv"))
             df_geometry = df[df["#geometry"] == geometry]
+            df_destreached = df[(df["#geometry"] == geometry)
+                                & (df["dist to last wp [NM]"] <= 0.5)]
+            df_destnotreached = df[(df["#geometry"] == geometry)
+                                   & (df["dist to last wp [NM]"] > 0.5)]
+
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "work [GJ]",
                                     "work")
             self.make_single_figure(geometry,
+                                    df_destreached,
+                                    "work [GJ]",
+                                    "work_destreached")
+            self.make_single_figure(geometry,
                                     df_geometry,
                                     "route efficiency [-]",
                                     "efficiency")
             self.make_single_figure(geometry,
+                                    df_destreached,
+                                    "route efficiency [-]",
+                                    "efficiency_destreached")
+            self.make_single_figure(geometry,
                                     df_geometry,
                                     "dist to last wp [NM]",
                                     "dist_to_last")
+            # self.make_single_figure(geometry,
+            #                         df_destreached,
+            #                         "dist to last wp [NM]",
+            #                         "dist_to_last_destreached")
+            self.make_single_figure(geometry,
+                                    df_destnotreached,
+                                    "dist to last wp [NM]",
+                                    "dist_to_last_destnotreached")
+
+            # Make figures based on data in flstlog_occurence.csv
+            df = pd.read_csv(os.path.join(self.batch_dir,
+                                          "logfiles_summary",
+                                          "flstlog_summary.csv"))
+            df_geometry = df[df["#geometry"] == geometry]
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "num dest not reached [-]",
+                                    "num_destnotreached")
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "num turnaround [-]",
+                                    "num_turnaround")
 
     def make_single_figure(self, geometry, df, column, namestr):
         """
