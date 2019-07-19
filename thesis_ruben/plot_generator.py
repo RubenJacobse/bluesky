@@ -357,7 +357,7 @@ class BoxPlotFigureGenerator(FigureGeneratorBase):
                                     "efficiency")
             self.make_single_figure(geometry,
                                     df_geometry,
-                                    "dist to last wp [m]",
+                                    "dist to last wp [NM]",
                                     "dist_to_last")
 
     def make_single_figure(self, geometry, df, column, namestr):
@@ -467,7 +467,7 @@ class ViolinPlotFigureGenerator(FigureGeneratorBase):
                                     "efficiency")
             self.make_single_figure(geometry,
                                     df_geometry,
-                                    "dist to last wp [m]",
+                                    "dist to last wp [NM]",
                                     "dist_to_last")
 
     def make_single_figure(self, geometry, df, column, namestr):
@@ -569,7 +569,7 @@ class StripPlotFigureGenerator(FigureGeneratorBase):
                                     "efficiency")
             self.make_single_figure(geometry,
                                     df_geometry,
-                                    "dist to last wp [m]",
+                                    "dist to last wp [NM]",
                                     "dist_to_last")
 
     def make_single_figure(self, geometry, df, column, namestr):

@@ -66,6 +66,10 @@ def summarize_logfiles(timestamp):
         flstlogfiles,
         os.path.join(summary_save_dir, "flstlog_occurence.csv")
     )
+    output_parser.FLSTLogSummaryParser(
+        flstlogfiles,
+        os.path.join(summary_save_dir, "flstlog_summary.csv")
+    )
 
 
 if __name__ == "__main__":

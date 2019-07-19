@@ -370,16 +370,52 @@ class FLSTLogOccurrenceParser(LogListParser):
             nominal_dist = float(row[4])
             actual_dist = float(row[5])
             work_performed = float(row[7]) / 1e9
-            dist_to_last_wp = float(row[8])
+            dist_to_last_wp = float(row[8]) / 1852
 
             route_efficiency = nominal_dist / actual_dist
 
             line = (f"{geometry},{reso_method},{traffic_level},{scenario},"
                     + f"{ac_id},{work_performed:0.0f},{route_efficiency:0.3f},"
-                    + f"{dist_to_last_wp:0.0f}")
+                    + f"{dist_to_last_wp:0.1f}")
             self.write_to_output_file(line)
 
     def set_header(self):
         self.header = ("geometry,resolution method,traffic level,scenario,"
                        + "ac id,work [GJ],route efficiency [-],"
-                       + "dist to last wp [m]")
+                       + "dist to last wp [NM]")
+
+
+class FLSTLogSummaryParser(LogListParser):
+
+    def summarize_stats(self,
+                        logfile,
+                        log_data,
+                        geometry,
+                        reso_method,
+                        scenario,
+                        traffic_level):
+        """
+        Process the elements of the 'log_data' list and for each flight
+        write the summary to 'logfile'.
+        """
+
+        num_dest_not_reached = 0
+        num_turnaround = 0
+
+        for row in log_data:
+            dist_to_last_wp = float(row[8]) / 1852
+            lat = float(row[9])
+
+            if dist_to_last_wp > 0.5:
+                num_dest_not_reached += 1
+
+            if lat < 0:
+                num_turnaround += 1
+
+        outputline = (f"{geometry},{reso_method},{traffic_level},{scenario},"
+                      + f"{num_dest_not_reached},{num_turnaround}")
+        self.write_to_output_file(outputline)
+
+    def set_header(self):
+        self.header = ("geometry,resolution method,traffic level,scenario,"
+                       + "num dest not reached [-],num turnaround [-]")
