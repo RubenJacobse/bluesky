@@ -341,6 +341,10 @@ class BoxPlotFigureGenerator(FigureGeneratorBase):
                                     df_geometry,
                                     "IPR [-]",
                                     "IPR")
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "DEP [-]",
+                                    "DEP")
 
             # Make figures based on data in flstlog_occurence.csv
             df = pd.read_csv(os.path.join(self.batch_dir,
@@ -421,7 +425,7 @@ class BoxPlotFigureGenerator(FigureGeneratorBase):
         ax.legend(loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.1))
         ax.set(xticklabels=["OFF", "MVP", "MVP+LF", "MVP+SWARM"])
         ax.set_ylim(ymin, ymax)
-        plt_filename = f"{geometry}_boxplot_{namestr}.png"
+        plt_filename = f"{geometry}_{namestr}.png"
         plt_filepath = os.path.join(self.figure_dir, plt_filename)
         plt.savefig(plt_filepath, dpi=600)
         plt.close()
@@ -523,7 +527,7 @@ class ViolinPlotFigureGenerator(FigureGeneratorBase):
                             linewidth=0.5)
         plt.ticklabel_format(axis="y", style="sci", scilimits=(0, 2))
         ax.legend(loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.1))
-        plt_filename = f"{geometry}_violinplot_{namestr}.png"
+        plt_filename = f"{geometry}_{namestr}.png"
         plt_filepath = os.path.join(self.figure_dir, plt_filename)
         plt.savefig(plt_filepath, dpi=600)
         plt.close()
@@ -627,7 +631,7 @@ class StripPlotFigureGenerator(FigureGeneratorBase):
                            dodge=True)
         plt.ticklabel_format(axis="y", style="sci", scilimits=(0, 2))
         ax.legend(loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.1))
-        plt_filename = f"{geometry}_stripplot_{namestr}.png"
+        plt_filename = f"{geometry}_{namestr}.png"
         plt_filepath = os.path.join(self.figure_dir, plt_filename)
         plt.savefig(plt_filepath, dpi=600)
         plt.close()

@@ -146,6 +146,18 @@ class ASASLogSummaryParser(LogListParser):
     in 'input_list' and summarize the stats for each scenario.
     """
 
+    def __init__(self, input_list, output_file):
+        """
+        Extend LogListParser functionality to allow calculation of the
+        Domino Effect Parameter (DEP) after the summary file has been created.
+        This is necessary because each scenario needs to be compared to the
+        case in which aircraft-aircraft resolution methods are off.
+        """
+
+        self.summary_list = []
+        super().__init__(input_list, output_file)
+        self.calculate_domino_effect_parameter()
+
     def summarize_stats(self,
                         logfile,
                         log_data,
@@ -155,7 +167,7 @@ class ASASLogSummaryParser(LogListParser):
                         traffic_level):
         """
         Process the elements of the 'log_data' list and write the
-        summary to logfile.
+        summary to 'self.summary_list'.
         """
 
         num_los = 0
@@ -204,13 +216,57 @@ class ASASLogSummaryParser(LogListParser):
 
         int_prev_rate = (num_conf - num_los) / num_conf
 
-        outputline = (f"{geometry},{reso_method},{traffic_level},{scenario},"
-                      + f"{num_conf},{num_los},{int_prev_rate:0.3f}")
-        self.write_to_output_file(outputline)
+        current_stats = {"geometry": geometry,
+                         "reso_method": reso_method,
+                         "traffic_level": traffic_level,
+                         "scenario": scenario,
+                         "num_conf": num_conf,
+                         "num_los": num_los,
+                         "int_prev_rate": int_prev_rate}
+
+        self.summary_list.append(current_stats)
+
+    def calculate_domino_effect_parameter(self):
+        """
+        For each run calculate the domino effect parameter relative to the
+        same scenario baseline with resolution method "OFF".
+        """
+
+        for scen in self.summary_list:
+            if scen["reso_method"] == "OFF":
+                scen["dep"] = 0
+            else:
+                basescen = self.get_baseline_stats(scen["geometry"],
+                                                   scen["traffic_level"],
+                                                   scen["scenario"])
+                scen["dep"] = (scen["num_conf"] / basescen["num_conf"]) - 1
+
+            outputline = (f'{scen["geometry"]},{scen["reso_method"]},'
+                          + f'{scen["traffic_level"]},{scen["scenario"]},'
+                          + f'{scen["num_conf"]},{scen["num_los"]},'
+                          + f'{scen["int_prev_rate"]:.3f},{scen["dep"]:.3f}')
+            self.write_to_output_file(outputline)
+
+    def get_baseline_stats(self, geometry, traffic_level, scenario):
+        """
+        Returns the baseline scenario summary (reso method "OFF") for
+        the given geometry, traffic_level, and scenario combination.
+
+        Raises a ValueError if no baseline scenario summary is found.
+        """
+
+        for scen in self.summary_list:
+            if (scen["geometry"] == geometry
+                    and scen["reso_method"] == "OFF"
+                    and scen["traffic_level"] == traffic_level
+                    and scen["scenario"] == scenario):
+                return scen
+
+        raise ValueError(f"Baseline scenario stats not found.")
 
     def set_header(self):
         self.header = ("geometry,resolution method,traffic level,scenario,"
-                       + "num conflicts [-],num LoS [-],IPR [-]")
+                       + "num conflicts [-],num LoS [-],IPR [-],DEP [-]")
 
 
 class ASASLogOccurrenceParser(LogListParser):
@@ -386,6 +442,10 @@ class FLSTLogOccurrenceParser(LogListParser):
 
 
 class FLSTLogSummaryParser(LogListParser):
+    """
+    Parse and process the contents of all FLST_LOG_... files that are
+    in 'input_list' and summarize the stats for each scenario.
+    """
 
     def summarize_stats(self,
                         logfile,
