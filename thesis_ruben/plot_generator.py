@@ -26,7 +26,8 @@ def make_batch_figures(timestamp):
     Generate the figures for the batch with given timestamp.
     """
 
-    GeoFigureGenerator(timestamp)
+    ASASGeoFigureGenerator(timestamp)
+    AREAGeoFigureGenerator(timestamp)
     BoxPlotFigureGenerator(timestamp)
     ViolinPlotFigureGenerator(timestamp)
     StripPlotFigureGenerator(timestamp)
@@ -101,9 +102,12 @@ class FigureGeneratorBase:
         self.combination_dict = combi_dict
 
 
-class GeoFigureGenerator(FigureGeneratorBase):
+class GeoFigureGeneratorBase(FigureGeneratorBase):
     """
-    Generates the geographic figures for a batch with given timestamp.
+    Abstract base class that contains part of the logic to generate
+    the geographic figures for a batch with given timestamp. Actual
+    implementation is done via subclasses in which the source of the
+    location data is specified.
     """
 
     def __init__(self, timestamp):
@@ -112,26 +116,12 @@ class GeoFigureGenerator(FigureGeneratorBase):
         self.load_conflict_location_data()
         self.generate_geo_figures()
 
-    def create_figure_dir_if_not_exists(self):
-        """
-        Ensures that the subdirectory in which all geo figures will be
-        saved is created in case it does not exist yet.
-        """
-
-        self.figure_dir = os.path.join(self.figure_dir, "geo")
-        if not os.path.isdir(self.figure_dir):
-            os.makedirs(self.figure_dir)
-
     def load_conflict_location_data(self):
         """
         Load the locations of all conflicts from file.
         """
 
-        summary_dir = os.path.join(self.batch_dir, "logfiles_summary")
-        asaslog_file = os.path.join(summary_dir, "asaslog_locations.csv")
-        arealog_file = os.path.join(summary_dir, "arealog_locations.csv")
-        self.asas_location_list = load_csv_data(asaslog_file)
-        self.area_location_list = load_csv_data(arealog_file)
+        raise NotImplementedError
 
     def generate_geo_figures(self):
         """
@@ -159,38 +149,21 @@ class GeoFigureGenerator(FigureGeneratorBase):
             for method in self.combination_dict[geometry]:
                 for level in self.combination_dict[geometry][method]:
                     # Make area conflict figures
-                    self.make_area_geo_location_figure(geo_data,
-                                                       geometry,
-                                                       method,
-                                                       level,
-                                                       location_type="conflict")
-                    self.make_area_geo_location_figure(geo_data,
-                                                       geometry,
-                                                       method,
-                                                       level,
-                                                       location_type="intrusion")
-                    self.make_area_geo_location_figure(geo_data,
-                                                       geometry,
-                                                       method,
-                                                       level,
-                                                       location_type="both")
-
-                    # Make aircraft conflicts figures
-                    self.make_asas_geo_location_figure(geo_data,
-                                                       geometry,
-                                                       method,
-                                                       level,
-                                                       location_type="conflict")
-                    self.make_asas_geo_location_figure(geo_data,
-                                                       geometry,
-                                                       method,
-                                                       level,
-                                                       location_type="intrusion")
-                    self.make_asas_geo_location_figure(geo_data,
-                                                       geometry,
-                                                       method,
-                                                       level,
-                                                       location_type="both")
+                    self.make_geo_location_figure(geo_data,
+                                                  geometry,
+                                                  method,
+                                                  level,
+                                                  location_type="conflict")
+                    self.make_geo_location_figure(geo_data,
+                                                  geometry,
+                                                  method,
+                                                  level,
+                                                  location_type="intrusion")
+                    self.make_geo_location_figure(geo_data,
+                                                  geometry,
+                                                  method,
+                                                  level,
+                                                  location_type="both")
 
     def make_geo_base_figure(self, geo_data):
         """
@@ -244,12 +217,12 @@ class GeoFigureGenerator(FigureGeneratorBase):
 
         return plt
 
-    def make_asas_geo_location_figure(self,
-                                      geo_data,
-                                      geometry,
-                                      separation_method,
-                                      traffic_level,
-                                      location_type):
+    def make_geo_location_figure(self,
+                                 geo_data,
+                                 geometry,
+                                 separation_method,
+                                 traffic_level,
+                                 location_type):
         """
         Generate a figure that overlays a set of location markers onto
         the base figure for that geometry.
@@ -263,7 +236,7 @@ class GeoFigureGenerator(FigureGeneratorBase):
         # using the format [[lon0, lon1, ...], [lat0, lat1, ...]]
         conflict_locations = [[], []]
         intrusion_locations = [[], []]
-        for row in self.asas_location_list:
+        for row in self.location_list:
             if row[0:3] == [geometry, separation_method, traffic_level]:
                 [ac_lat, ac_lon, is_los] = row[4:7]
                 if is_los == "True":
@@ -296,67 +269,68 @@ class GeoFigureGenerator(FigureGeneratorBase):
         plt.title(f"Separation method: {separation_method}")
         # plt.legend()
         plt_filename = (f"{geometry}_{separation_method}_{traffic_level}"
-                        + f"_asas_{location_type}.png")
+                        + f"_{location_type}.png")
         plt_filepath = os.path.join(self.figure_dir, plt_filename)
         plt.savefig(plt_filepath, dpi=600)
         plt.close()
 
-    def make_area_geo_location_figure(self,
-                                      geo_data,
-                                      geometry,
-                                      separation_method,
-                                      traffic_level,
-                                      location_type):
+
+class ASASGeoFigureGenerator(GeoFigureGeneratorBase):
+    """
+    Generates the geographic figures showing the aircraft conflicts
+    and intrusions for a batch with given timestamp.
+    """
+
+    def __init__(self, timestamp):
+        super().__init__(timestamp)
+
+    def create_figure_dir_if_not_exists(self):
         """
-        Generate a figure that overlays a set of location markers onto
-        the base figure for that geometry.
-
-        The types of locations that can be shown is determined by
-        'location_type' and can take the values: "conflict",
-        "intrusion", or "both".
+        Ensures that the subdirectory in which all geo figures will be
+        saved is created in case it does not exist yet.
         """
 
-        # Store conflict and intrusion locations as list of lists
-        # using the format [[lon0, lon1, ...], [lat0, lat1, ...]]
-        conflict_locations = [[], []]
-        intrusion_locations = [[], []]
-        for row in self.area_location_list:
-            if row[0:3] == [geometry, separation_method, traffic_level]:
-                [ac_lat, ac_lon, is_int] = row[4:7]
-                if is_int == "True":
-                    intrusion_locations[0].append(float(ac_lon))
-                    intrusion_locations[1].append(float(ac_lat))
-                else:
-                    conflict_locations[0].append(float(ac_lon))
-                    conflict_locations[1].append(float(ac_lat))
+        self.figure_dir = os.path.join(self.figure_dir, "geo", "asas")
+        if not os.path.isdir(self.figure_dir):
+            os.makedirs(self.figure_dir)
 
-        # Plot the locations on top of the geometry and save the figure
-        plt = self.make_geo_base_figure(geo_data)
-        alpha_plt = 0.02
-        marker_plt = "."
-        if location_type in ["conflict", "both"]:
-            plt.scatter(conflict_locations[0],
-                        conflict_locations[1],
-                        alpha=alpha_plt,
-                        marker=marker_plt,
-                        edgecolors="none",
-                        c="blue",
-                        label="Conflict")
-        if location_type in ["intrusion", "both"]:
-            plt.scatter(intrusion_locations[0],
-                        intrusion_locations[1],
-                        alpha=alpha_plt,
-                        marker=marker_plt,
-                        edgecolors="none",
-                        c="red",
-                        label="Loss of separation")
-        plt.title(f"Separation method: {separation_method}")
-        # plt.legend()
-        plt_filename = (f"{geometry}_{separation_method}_{traffic_level}"
-                        + f"_area_{location_type}.png")
-        plt_filepath = os.path.join(self.figure_dir, plt_filename)
-        plt.savefig(plt_filepath, dpi=600)
-        plt.close()
+    def load_conflict_location_data(self):
+        """
+        Load the locations of all conflicts from file.
+        """
+
+        summary_dir = os.path.join(self.batch_dir, "logfiles_summary")
+        asaslog_file = os.path.join(summary_dir, "asaslog_locations.csv")
+        self.location_list = load_csv_data(asaslog_file)
+
+
+class AREAGeoFigureGenerator(GeoFigureGeneratorBase):
+    """
+    Generates the geographic figures showing the area conflicts
+    and intrusions for a batch with given timestamp.
+    """
+
+    def __init__(self, timestamp):
+        super().__init__(timestamp)
+
+    def create_figure_dir_if_not_exists(self):
+        """
+        Ensures that the subdirectory in which all geo figures will be
+        saved is created in case it does not exist yet.
+        """
+
+        self.figure_dir = os.path.join(self.figure_dir, "geo", "area")
+        if not os.path.isdir(self.figure_dir):
+            os.makedirs(self.figure_dir)
+
+    def load_conflict_location_data(self):
+        """
+        Load the locations of all conflicts from file.
+        """
+
+        summary_dir = os.path.join(self.batch_dir, "logfiles_summary")
+        arealog_file = os.path.join(summary_dir, "arealog_locations.csv")
+        self.location_list = load_csv_data(arealog_file)
 
 
 class BoxPlotFigureGenerator(FigureGeneratorBase):
