@@ -104,7 +104,9 @@ class AREALogSummaryParser(LogListParser):
         summary to logfile.
         """
 
+        num_conflicts = 0
         num_intrusions = 0
+        conflict_dict = {}
         intrusion_dict = {}
 
         for row in log_data:
@@ -116,28 +118,78 @@ class AREALogSummaryParser(LogListParser):
 
             confpair = f"{ac_id}-{area_id}"
 
-            if t_int > 1e-9:
+            # Check if conflict count needs to be incremented
+            if confpair not in conflict_dict.keys():
+                conflict_dict[confpair] = []
+            if conflict_dict[confpair]:
+                if not conflict_dict[confpair][-1] == simt-1:
+                    num_conflicts += 1
+            else:
+                num_conflicts += 1
+            conflict_dict[confpair].append(simt)
+
+            # Intrusions are flagged using t_int = 0
+            if not t_int == 0:
                 continue
 
+            # Check if intrusion count needs to be incremented
             if confpair not in intrusion_dict.keys():
                 intrusion_dict[confpair] = []
-
-            # Check if intrusion count needs to be incremented
             if intrusion_dict[confpair]:
                 if not intrusion_dict[confpair][-1] == simt-1:
                     num_intrusions += 1
             else:
                 num_intrusions += 1
-
             intrusion_dict[confpair].append(simt)
 
         outputline = (f"{geometry},{reso_method},{traffic_level},"
-                      + f"{scenario},{num_intrusions}")
+                      + f"{scenario},{num_conflicts},{num_intrusions}")
         self.write_to_output_file(outputline)
 
     def set_header(self):
         self.header = ("geometry,resolution method,traffic level,"
-                       + "scenario,num intrusions")
+                       + "scenario,num conflicts,num intrusions")
+
+
+class AREALogLocationParser(LogListParser):
+    """
+    Parse and process the contents of all ASAS_LOG_... files that are
+    in 'input_list' and write all coordinates at which aircraft are in
+    conflict to 'output_file'.
+    """
+
+    def summarize_stats(self,
+                        logfile,
+                        log_data,
+                        geometry,
+                        reso_method,
+                        scenario,
+                        traffic_level):
+        """
+        Process the elements of the 'log_data' list and for each flight
+        write the summary to 'logfile'.
+        """
+
+        # Loop over all rows and create a dictionary with each conflict
+        # and its parameters listed once
+        for row in log_data:
+            [simt, ac_id, area_id, t_int, ac_lat, ac_lon] = row
+            simt = int(float(simt))
+            t_int = float(t_int)
+            ac_lat = float(ac_lat)
+            ac_lon = float(ac_lon)
+
+            is_int = t_int == 0
+
+            # Write lines for ac1 and ac2 at once
+            outputlines = (f"{geometry},{reso_method},{traffic_level},"
+                           + f"{scenario},{ac_lat:0.6f},{ac_lon:0.6f},"
+                           + f"{is_int}")
+            self.write_to_output_file(outputlines)
+
+    def set_header(self):
+        self.header = ("geometry,resolution method,traffic level,scenario,"
+                       + "ac lat [deg],ac lon[deg],is intrusion [-]")
 
 
 class ASASLogSummaryParser(LogListParser):

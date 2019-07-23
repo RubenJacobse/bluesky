@@ -35,6 +35,30 @@ def summarize_logfiles(timestamp):
                      os.path.join(logfile_save_dir, logfile))
     logfiles = [filename for filename in os.listdir(logfile_save_dir)]
 
+    # Process the AREA log files
+    arealogfiles = [os.path.join(logfile_save_dir, filename)
+                    for filename in logfiles if "AREALOG" in filename]
+    output_parser.AREALogSummaryParser(
+        arealogfiles,
+        os.path.join(summary_save_dir, "arealog_summary.csv")
+    )
+    output_parser.AREALogLocationParser(
+        arealogfiles,
+        os.path.join(summary_save_dir, "arealog_locations.csv")
+    )
+
+    # Process the FLST log files
+    flstlogfiles = [os.path.join(logfile_save_dir, filename)
+                    for filename in logfiles if "FLSTLOG" in filename]
+    output_parser.FLSTLogOccurrenceParser(
+        flstlogfiles,
+        os.path.join(summary_save_dir, "flstlog_occurence.csv")
+    )
+    output_parser.FLSTLogSummaryParser(
+        flstlogfiles,
+        os.path.join(summary_save_dir, "flstlog_summary.csv")
+    )
+
     # Process the ASAS log files
     asaslogfiles = [os.path.join(logfile_save_dir, filename)
                     for filename in logfiles if "ASASLOG" in filename]
@@ -49,26 +73,6 @@ def summarize_logfiles(timestamp):
     output_parser.ASASLogLocationParser(
         asaslogfiles,
         os.path.join(summary_save_dir, "asaslog_locations.csv")
-    )
-
-    # Process the AREA log files
-    arealogfiles = [os.path.join(logfile_save_dir, filename)
-                    for filename in logfiles if "AREALOG" in filename]
-    output_parser.AREALogSummaryParser(
-        arealogfiles,
-        os.path.join(summary_save_dir, "arealog_summary.csv")
-    )
-
-    # Process the FLST log files
-    flstlogfiles = [os.path.join(logfile_save_dir, filename)
-                    for filename in logfiles if "FLSTLOG" in filename]
-    output_parser.FLSTLogOccurrenceParser(
-        flstlogfiles,
-        os.path.join(summary_save_dir, "flstlog_occurence.csv")
-    )
-    output_parser.FLSTLogSummaryParser(
-        flstlogfiles,
-        os.path.join(summary_save_dir, "flstlog_summary.csv")
     )
 
 
