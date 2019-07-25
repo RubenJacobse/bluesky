@@ -46,7 +46,8 @@ SPD_STDDEV = 5  # [kts] Standard deviation of cruise speed distributions
 
 class ScenarioGenerator():
     """
-    Generate
+    Create a scenario file which name reflects the properties of the
+    experiment geometry.
     """
 
     def __init__(self,
@@ -96,14 +97,22 @@ class ScenarioGenerator():
         Calculate the 'top' and 'bottom' latitudes of the corridor.
         """
 
-        self.corridor_top_lat, _ = bsgeo.qdrpos(CENTER_LAT,
-                                                CENTER_LON,
-                                                0,
-                                                self.corridor_length/2)
-        self.corridor_bottom_lat, _ = bsgeo.qdrpos(CENTER_LAT,
-                                                   CENTER_LON,
-                                                   180,
-                                                   self.corridor_length/2)
+        self.corridor_north_lat, _ = bsgeo.qdrpos(CENTER_LAT,
+                                                  CENTER_LON,
+                                                  0,
+                                                  self.corridor_length/2)
+        self.corridor_south_lat, _ = bsgeo.qdrpos(CENTER_LAT,
+                                                  CENTER_LON,
+                                                  180,
+                                                  self.corridor_length/2)
+        _, self.corridor_left_lon = bsgeo.qdrpos(CENTER_LAT,
+                                                 CENTER_LON,
+                                                 270,
+                                                 self.corridor_width/2)
+        _, self.corridor_right_lon = bsgeo.qdrpos(CENTER_LAT,
+                                                  CENTER_LON,
+                                                  90,
+                                                  self.corridor_width/2)
 
     def create_airspace_restriction(self, corridor_side):
         """
@@ -313,7 +322,7 @@ class ScenarioGenerator():
             # Heading to waypoint at start of corridor
             curr_hdg, _ = bsgeo.qdrdist(curr_lat,
                                         curr_lon,
-                                        self.corridor_bottom_lat,
+                                        self.corridor_south_lat,
                                         CENTER_LON)
 
             # The first generated aircraft is always accepted. Each aircraft
@@ -440,9 +449,9 @@ class ScenarioGenerator():
             # Corridor waypoints
             scnfile.write("\n\n# Corridor waypoints")
             scnfile.write(zero_time + "DEFWPT COR101,{:.6f},{:.6f},FIX"
-                          .format(self.corridor_bottom_lat, CENTER_LON))
+                          .format(self.corridor_south_lat, CENTER_LON))
             scnfile.write(zero_time + "DEFWPT COR201,{:.6f},{:.6f},FIX"
-                          .format(self.corridor_top_lat, CENTER_LON))
+                          .format(self.corridor_north_lat, CENTER_LON))
 
             # Write each aircraft to file
             scnfile.write("\n\n# Create {} aircraft".format(NUM_AIRCRAFT))

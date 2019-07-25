@@ -48,14 +48,14 @@ def main():
     # Create a scenario file for each combination of variables
     for (seed, level, reso_method, length, width, angle) in combination_lst:
         ScenarioGenerator(output_dir,
-                        timestamp,
-                        seed,
-                        level,
-                        reso_method,
-                        length,
-                        width,
-                        angle,
-                        is_edge_angle=False)
+                          timestamp,
+                          seed,
+                          level,
+                          reso_method,
+                          length,
+                          width,
+                          angle,
+                          is_edge_angle=False)
 
     # Create a batch file that allows the BlueSky "BATCH" command to
     # process all scenario files using all CPU cores in parallel.
