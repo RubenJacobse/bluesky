@@ -44,434 +44,462 @@ AC_TYPES_SPD = [280]
 SPD_STDDEV = 5  # [kts] Standard deviation of cruise speed distributions
 
 
-def create_scenfile(target_dir,
-                    timestamp,
-                    random_seed,
-                    traffic_level,
-                    resolution_method,
-                    corridor_length,
-                    corridor_width,
-                    angle,
-                    is_edge_angle=False):
+class ScenarioGenerator():
     """
-    Create a scenario file which name reflects the properties of the
-    experiment geometry.
+    Generate
     """
 
-    # Initialize random number generator before we do anything where
-    # random numbers are used.
-    random.seed(random_seed)
+    def __init__(self,
+                 target_dir,
+                 timestamp,
+                 random_seed,
+                 traffic_level,
+                 resolution_method,
+                 corridor_length,
+                 corridor_width,
+                 angle,
+                 is_edge_angle=False):
 
-    # Set the path of the resulting scenario file and geo file
-    scnfile_name = (("{}_L{}_W{}_A{}_RESO-{}_T-{}_SCEN{:03d}.scn")
-                    .format(timestamp,
-                            corridor_length,
-                            corridor_width,
-                            angle,
-                            resolution_method,
-                            traffic_level,
-                            random_seed))
-    scnfile_path = os.path.join(target_dir, scnfile_name)
+        # Set input variables as attributes
+        self.target_dir = target_dir
+        self.timestamp = timestamp
+        self.random_seed = random_seed
+        self.traffic_level = traffic_level
+        self.resolution_method = resolution_method
+        self.corridor_length = corridor_length
+        self.corridor_width = corridor_width
+        self.angle = angle
+        self.is_edge_angle = is_edge_angle
 
-    geofile_name = (("{}_L{}_W{}_A{}_geo.csv")
-                    .format(timestamp,
-                            corridor_length,
-                            corridor_width,
-                            angle))
-    geofile_path = os.path.join(target_dir, geofile_name)
+        # Initialize random number generator before we do anything where
+        # random numbers are used.
+        random.seed(self.random_seed)
 
-    # Set aircraft creation interval minimum and maximum values.
-    # (We do this here so we can print this in the scenario header)
-    if traffic_level == "LOW":  # Average 72 seconds
-        cre_interval_min = 52
-        cre_interval_max = 92
-    elif traffic_level == "MID":  # Average 36 seconds
-        cre_interval_min = 26
-        cre_interval_max = 46
-    elif traffic_level == "HIGH":  # Average 24 seconds
-        cre_interval_min = 14
-        cre_interval_max = 34
+        # Calculate airspace restriction and corridor parameters
+        self.airspace_restrictions = []
+        self.create_airspace_restriction("LEFT")
+        self.create_airspace_restriction("RIGHT")
+        self.calculate_corridor_parameters()
 
-    # Create a header to simplify traceability of variable values
-    scen_header = \
-        ("##################################################\n"
-         + f"# File created at: {timestamp}\n"
-         + f"# Center latitude: {CENTER_LAT} deg\n"
-         + f"# Center longitude: {CENTER_LON} deg\n"
-         + f"# Corridor length: {corridor_length} NM\n"
-         + f"# Corridor width: {corridor_width} NM\n"
-         + f"# Angle: {angle} deg "
-         + (" (Defined by area edge angle)\n" if is_edge_angle
-            else "(Defined by arc angle)\n")
-         + f"# Experiment area radius: {AREA_RADIUS} NM\n"
-         + f"# Aircraft types: {AC_TYPES}\n"
-         + f"# Aircraft average speed: {AC_TYPES_SPD} kts\n"
-         + f"# Aircraft speed std dev: {SPD_STDDEV} kts\n"
-         + f"# Number of aircraft created: {NUM_AIRCRAFT}\n"
-         + f"# Traffic level: {traffic_level}\n"
-         + f"# Aircraft creation interval min: {cre_interval_min} s\n"
-         + f"# Aircraft creation interval max: {cre_interval_max} s\n"
-         + f"# Random number generator seed: {random_seed}\n"
-         + "##################################################\n")
+        # Create aircraft and store for further use
+        self.set_ac_creation_intervals()
+        self.calculate_creation_arc_angle_range()
+        self.aircraft_list = []
+        self.create_all_aircraft()
 
-    # Create scenario file and geo file, overwrite if existing
-    with open(scnfile_path, "w+") as scnfile, open(geofile_path, "w+") as geofile:
-        scnfile.write(scen_header)
-        zero_time = "\n0:00:00.00>"
+        # Save the results to file
+        self.write_scenfile()
+        self.write_geofile()
 
-        scnfile.write("\n# Sim commands")
-        scnfile.write(zero_time + f"PAN {CENTER_LAT},{CENTER_LON}")
-        scnfile.write(zero_time + f"DT {SIM_TIME_STEP}")
-        scnfile.write(zero_time + "TRAIL {}".format("ON" if SHOW_AC_TRAILS
-                                                    else "OFF"))
-        scnfile.write(zero_time + "SWRAD SYM")
-        scnfile.write(zero_time + "SWRAD LABEL 0")
-        scnfile.write(zero_time + "SWRAD WPT")
-        scnfile.write(zero_time + "SWRAD SAT")
-        scnfile.write(zero_time + "SWRAD APT")
-        scnfile.write(zero_time + "FF")
+    def calculate_corridor_parameters(self):
+        """
+        Calculate the 'top' and 'bottom' latitudes of the corridor.
+        """
 
-        scnfile.write("\n\n# Setup circular experiment area and activate it"
-                      + " as a traffic area in BlueSky")
-        scnfile.write(zero_time + "PLUGINS LOAD AREA")
-        scnfile.write(zero_time + "CIRCLE EXPERIMENT {},{},{}"
-                      .format(CENTER_LAT, CENTER_LON, AREA_RADIUS))
-        scnfile.write(zero_time + "AREA EXPERIMENT")
-        scnfile.write(zero_time + "COLOR EXPERIMENT 0,128,0")
+        self.corridor_top_lat, _ = bsgeo.qdrpos(CENTER_LAT,
+                                                CENTER_LON,
+                                                0,
+                                                self.corridor_length/2)
+        self.corridor_bottom_lat, _ = bsgeo.qdrpos(CENTER_LAT,
+                                                   CENTER_LON,
+                                                   180,
+                                                   self.corridor_length/2)
 
-        scnfile.write("\n\n# Setup BlueSky ASAS module options")
-        scnfile.write(zero_time + "ASAS ON")
-        scnfile.write(zero_time + f"RESO {resolution_method}")
-        scnfile.write(zero_time + f"RMETHH {RMETHH}")
+    def create_airspace_restriction(self, corridor_side):
+        """
+        Create the restricted area on a given corridor side.
+        """
 
-        # Create csv file to allow generation of area restriction graphs
-        geofile.write("{},{},{},{}\n".format(
-            "ring", CENTER_LAT, CENTER_LON, AREA_RADIUS))
+        # Area on left side is located at 270 and right side at 90
+        # degrees relative to the corridor center.
+        east_west_angle = 270 if corridor_side == "LEFT" else 90
 
-        # Create restricted areas
-        scnfile.write("\n\n# LOAD RAA plugin and create area restrictions")
-        scnfile.write(zero_time + f"PLUGINS LOAD {PLUGIN_NAME}")
-        scnfile.write(zero_time + f"RAALOG {timestamp}")
-        scnfile.write(zero_time + f"RAACONF {AREA_LOOKAHEAD_TIME}")
-
-        _ = create_area(scnfile,
-                        geofile,
-                        zero_time,
-                        corridor_width,
-                        corridor_length,
-                        "LEFT",
-                        angle,
-                        is_edge_angle)
-        angle_to_ring_intersect = create_area(scnfile,
-                                              geofile,
-                                              zero_time,
-                                              corridor_width,
-                                              corridor_length,
-                                              "RIGHT",
-                                              angle,
-                                              is_edge_angle)
-
-        # Angle range for traffic creation
-        if is_edge_angle:
-            angle_from_centerpoint = angle_to_ring_intersect
-        else:
-            angle_from_centerpoint = angle / 2
-
-        # Corridor waypoints
-        scnfile.write("\n\n# Corridor waypoints")
-        corridor_top_lat, _ = bsgeo.qdrpos(CENTER_LAT,
+        # Calculate coordinates of area edge bordering the corridor
+        inner_top_lat, _ = bsgeo.qdrpos(CENTER_LAT,
+                                        CENTER_LON,
+                                        0,
+                                        self.corridor_length/2)
+        _, inner_top_lon = bsgeo.qdrpos(CENTER_LAT,
+                                        CENTER_LON,
+                                        east_west_angle,
+                                        self.corridor_width/2)
+        inner_bottom_lat, _ = bsgeo.qdrpos(CENTER_LAT,
                                            CENTER_LON,
-                                           0,
-                                           corridor_length/2)
-        corridor_bottom_lat, _ = bsgeo.qdrpos(CENTER_LAT,
+                                           180,
+                                           self.corridor_length/2)
+        _, inner_bottom_lon = bsgeo.qdrpos(CENTER_LAT,
+                                           CENTER_LON,
+                                           east_west_angle,
+                                           self.corridor_width/2)
+
+        # Determine the angle of the area edge, either by using the
+        # input edge angle or by calculating the intersection of the
+        # area edge with the ring
+        if self.is_edge_angle:
+            edge_angle = (self.angle if corridor_side == "RIGHT"
+                          else -self.angle)
+        else:
+            arc_angle = (self.angle/2 if corridor_side == "RIGHT"
+                         else -self.angle/2)
+            arc_ext_lat, arc_ext_lon = bsgeo.qdrpos(CENTER_LAT,
+                                                    CENTER_LON,
+                                                    arc_angle,
+                                                    AREA_RADIUS*1.1)
+            arc_point_lat, arc_point_lon, _\
+                = calc_line_ring_intersection(CENTER_LAT,
                                               CENTER_LON,
-                                              180,
-                                              corridor_length/2)
+                                              AREA_RADIUS,
+                                              CENTER_LAT,
+                                              CENTER_LON,
+                                              arc_ext_lat,
+                                              arc_ext_lon)
+            edge_angle, _ = bsgeo.qdrdist(inner_top_lat,
+                                          inner_top_lon,
+                                          arc_point_lat,
+                                          arc_point_lon)
 
-        scnfile.write(zero_time + "DEFWPT COR101,{:.6f},{:.6f},FIX"
-                      .format(corridor_bottom_lat, CENTER_LON))
-        scnfile.write(zero_time + "DEFWPT COR201,{:.6f},{:.6f},FIX"
-                      .format(corridor_top_lat, CENTER_LON))
+        # Calculate coordinates of points on the extended angled edges
+        ext_dist = abs(2 * AREA_RADIUS / math.sin(math.radians(edge_angle)))
+        ext_top_angle = edge_angle
+        ext_bottom_angle = 180 - edge_angle
+        ext_top_lat, ext_top_lon = bsgeo.qdrpos(inner_top_lat,
+                                                inner_top_lon,
+                                                ext_top_angle,
+                                                ext_dist)
+        ext_bottom_lat, ext_bottom_lon = bsgeo.qdrpos(inner_bottom_lat,
+                                                      inner_bottom_lon,
+                                                      ext_bottom_angle,
+                                                      ext_dist)
 
-        # Create aircaft
-        scnfile.write("\n\n# Create {} aircraft".format(NUM_AIRCRAFT))
-        create_aircraft(scnfile,
-                        traffic_level,
-                        cre_interval_min,
-                        cre_interval_max,
-                        NUM_AIRCRAFT,
-                        angle_from_centerpoint,
-                        corridor_bottom_lat,
-                        CENTER_LON)
-
-
-def create_area(scnfile,
-                geofile,
-                zero_time,
-                corridor_width,
-                corridor_length,
-                corridor_side,
-                angle,
-                is_edge_angle=False):
-    """
-    Create the restricted area on a given corridor side.
-    """
-
-    # Area on left side is located at 270 and right side at 90
-    # degrees relative to the corridor center.
-    east_west_angle = 270 if corridor_side == "LEFT" else 90
-
-    # Calculate coordinates of area edge bordering the corridor
-    inner_top_lat, _ = bsgeo.qdrpos(CENTER_LAT,
-                                    CENTER_LON,
-                                    0,
-                                    corridor_length/2)
-    _, inner_top_lon = bsgeo.qdrpos(CENTER_LAT,
+        # Calculate coordinates of points on north and south lines extending the
+        # edge furthest from the corridor
+        vert_dist = ext_dist * 2
+        _, outer_lon = bsgeo.qdrpos(CENTER_LAT,
                                     CENTER_LON,
                                     east_west_angle,
-                                    corridor_width/2)
-    inner_bottom_lat, _ = bsgeo.qdrpos(CENTER_LAT,
-                                       CENTER_LON,
-                                       180,
-                                       corridor_length/2)
-    _, inner_bottom_lon = bsgeo.qdrpos(CENTER_LAT,
-                                       CENTER_LON,
-                                       east_west_angle,
-                                       corridor_width/2)
+                                    AREA_RADIUS)
+        vert_top_lat, vert_top_lon = bsgeo.qdrpos(CENTER_LAT,
+                                                  outer_lon,
+                                                  360,
+                                                  vert_dist)
+        vert_bottom_lat, vert_bottom_lon = bsgeo.qdrpos(CENTER_LAT,
+                                                        outer_lon,
+                                                        180,
+                                                        vert_dist)
 
-    # Determine the angle of the area edge, either by using the
-    # input edge angle or by calculating the intersection of the
-    # area edge with the ring
-    if is_edge_angle:
-        edge_angle = (angle if corridor_side == "RIGHT" else -angle)
-    else:
-        arc_angle = (angle/2 if corridor_side == "RIGHT" else -angle/2)
-        arc_ext_lat, arc_ext_lon = bsgeo.qdrpos(CENTER_LAT,
-                                                CENTER_LON,
-                                                arc_angle,
-                                                AREA_RADIUS*1.1)
-        arc_point_lat, arc_point_lon, _ \
-            = calc_line_ring_intersection(CENTER_LAT,
-                                          CENTER_LON,
-                                          AREA_RADIUS,
-                                          CENTER_LAT,
-                                          CENTER_LON,
-                                          arc_ext_lat,
-                                          arc_ext_lon)
-        edge_angle, _ = bsgeo.qdrdist(inner_top_lat,
-                                      inner_top_lon,
-                                      arc_point_lat,
-                                      arc_point_lon)
-
-    # Calculate coordinates of points on the extended angled edges
-    ext_dist = abs(2 * AREA_RADIUS / math.sin(math.radians(edge_angle)))
-    ext_top_angle = edge_angle
-    ext_bottom_angle = 180 - edge_angle
-    ext_top_lat, ext_top_lon = bsgeo.qdrpos(inner_top_lat,
+        # Calculate the coordinates of the edge furthest from the corridor by
+        # intersecting the extended lines with the vertical lines
+        outer_top_lat, outer_top_lon = \
+            tg.sphere_greatcircle_intersect(inner_top_lat,
                                             inner_top_lon,
-                                            ext_top_angle,
-                                            ext_dist)
-    ext_bottom_lat, ext_bottom_lon = bsgeo.qdrpos(inner_bottom_lat,
-                                                  inner_bottom_lon,
-                                                  ext_bottom_angle,
-                                                  ext_dist)
+                                            ext_top_lat,
+                                            ext_top_lon,
+                                            CENTER_LAT,
+                                            outer_lon,
+                                            vert_top_lat,
+                                            vert_top_lon)
+        outer_bottom_lat, outer_bottom_lon = \
+            tg.sphere_greatcircle_intersect(inner_bottom_lat,
+                                            inner_bottom_lon,
+                                            ext_bottom_lat,
+                                            ext_bottom_lon,
+                                            CENTER_LAT,
+                                            outer_lon,
+                                            vert_bottom_lat,
+                                            vert_bottom_lon)
 
-    # Calculate coordinates of points on north and south lines extending the
-    # edge furthest from the corridor
-    vert_dist = ext_dist * 2
-    _, outer_lon = bsgeo.qdrpos(CENTER_LAT,
-                                CENTER_LON,
-                                east_west_angle,
-                                AREA_RADIUS)
-    vert_top_lat, vert_top_lon = bsgeo.qdrpos(CENTER_LAT,
-                                              outer_lon,
-                                              360,
-                                              vert_dist)
-    vert_bottom_lat, vert_bottom_lon = bsgeo.qdrpos(CENTER_LAT,
-                                                    outer_lon,
-                                                    180,
-                                                    vert_dist)
+        # Calculate the approximate midpoint of the area, this is used to
+        # place a waypoint with the area name in the scenario.
+        midpoint_lat = CENTER_LAT
+        midpoint_lon = (inner_bottom_lon + outer_lon) / 2
 
-    # Calculate the coordinates of the edge furthest from the corridor by
-    # intersecting the extended lines with the vertical lines
-    outer_top_lat, outer_top_lon = \
-        tg.sphere_greatcircle_intersect(inner_top_lat,
-                                        inner_top_lon,
-                                        ext_top_lat,
-                                        ext_top_lon,
-                                        CENTER_LAT,
-                                        outer_lon,
-                                        vert_top_lat,
-                                        vert_top_lon)
-    outer_bottom_lat, outer_bottom_lon = \
-        tg.sphere_greatcircle_intersect(inner_bottom_lat,
-                                        inner_bottom_lon,
-                                        ext_bottom_lat,
-                                        ext_bottom_lon,
-                                        CENTER_LAT,
-                                        outer_lon,
-                                        vert_bottom_lat,
-                                        vert_bottom_lon)
+        # Store the area data
+        area = {}
+        area["inner_top"] = (inner_top_lat, inner_top_lon)
+        area["inner_bottom"] = (inner_bottom_lat, inner_bottom_lon)
+        area["outer_top"] = (outer_top_lat, outer_top_lon)
+        area["outer_bottom"] = (outer_bottom_lat, outer_bottom_lon)
+        area["coord_str"] = \
+            "{:.6f},{:.6f},{:.6f},{:.6f},{:.6f},{:.6f},{:.6f},{:.6f}"\
+            .format(inner_top_lat,
+                    inner_top_lon,
+                    outer_top_lat,
+                    outer_top_lon,
+                    outer_bottom_lat,
+                    outer_bottom_lon,
+                    inner_bottom_lat,
+                    inner_bottom_lon)
+        area["midpoint_str"] = f"{midpoint_lat:.6f},{midpoint_lon:.6f}"
+        self.airspace_restrictions.append(area)
 
-    # Write the area and waypoint with area name to the scenario file
-    area_idx = 1 if corridor_side == "LEFT" else 2
-    area_coords = "{:.6f},{:.6f},{:.6f},{:.6f},{:.6f},{:.6f},{:.6f},{:.6f}"\
-        .format(inner_top_lat,
-                inner_top_lon,
-                outer_top_lat,
-                outer_top_lon,
-                outer_bottom_lat,
-                outer_bottom_lon,
-                inner_bottom_lat,
-                inner_bottom_lon)
-    scnfile.write(zero_time + f"RAA RAA{area_idx},ON,{0},{0},{area_coords}")
-    scnfile.write(zero_time + f"COLOR RAA{area_idx},164,0,0")
-    scnfile.write(zero_time + "DEFWPT RAA_{},{:.6f},{:.6f},FIX".format(
-        area_idx, CENTER_LAT, (inner_bottom_lon + outer_lon) / 2))
+    def calculate_creation_arc_angle_range(self):
+        """
+        Calculate angle from the center point to intersection between ring and
+        area edge
+        """
+        area = self.airspace_restrictions[1]
+        _, _, top_angle_from_center = \
+            calc_line_ring_intersection(CENTER_LAT,
+                                        CENTER_LON,
+                                        AREA_RADIUS,
+                                        area["inner_top"][0],
+                                        area["inner_top"][1],
+                                        area["outer_top"][0],
+                                        area["outer_top"][1])
+        if self.is_edge_angle:
+            self.ac_creation_arc_angle_range = top_angle_from_center
+        else:
+            self.ac_creation_arc_angle_range = self.angle / 2
 
-    # Write coordinates to geo file
-    geofile.write(f"RAA{area_idx},{area_coords}\n")
+    def set_ac_creation_intervals(self):
+        """
+        Set aircraft creation interval minimum and maximum values. (We do
+        this here so we can print these values in the scenario header)
+        """
 
-    # Calculate angle from the center point to intersection between ring and
-    # area edge
-    _, _, top_angle_from_center = calc_line_ring_intersection(CENTER_LAT,
-                                                              CENTER_LON,
-                                                              AREA_RADIUS,
-                                                              inner_top_lat,
-                                                              inner_top_lon,
-                                                              outer_top_lat,
-                                                              outer_top_lon)
-    return top_angle_from_center
+        if self.traffic_level == "LOW":  # Average 72 seconds = ~50 ac/hr
+            cre_interval_min = 52
+            cre_interval_max = 92
+        elif self.traffic_level == "MID":  # Average 36 seconds = ~100 ac/hr
+            cre_interval_min = 26
+            cre_interval_max = 46
+        elif self.traffic_level == "HIGH":  # Average 24 seconds = ~150 ac/hr
+            cre_interval_min = 14
+            cre_interval_max = 34
 
+        self.cre_interval_min = cre_interval_min
+        self.cre_interval_max = cre_interval_max
 
-def create_aircraft(scnfile,
-                    traffic_level,
-                    cre_interval_min,
-                    cre_interval_max,
-                    num_total_ac,
-                    angle,
-                    corridor_entry_lat,
-                    corridor_entry_lon):
-    """
-    Create all aircraft
-    """
+    def create_all_aircraft(self):
+        """
+        Create all aircraft in this scenario
+        """
 
-    ac_spd = 280  # [kts] Speed
+        angle = self.ac_creation_arc_angle_range
+        ac_spd = 280  # [kts] Speed
 
-    # Minimum distance and time differences at creation
-    min_dist_diff = 6  # [nm]
-    min_time_diff = min_dist_diff / ac_spd * 3600  # [s]
+        # Minimum distance and time differences at creation
+        min_dist_diff = 6  # [nm]
+        min_time_diff = min_dist_diff / ac_spd * 3600  # [s]
 
-    # Store parameters of all created aircraft
-    creation_time = []
-    creation_type = []
-    creation_spd = []
-    creation_dep_lat = []
-    creation_dep_lon = []
-    creation_dest_lat = []
-    creation_dest_lon = []
-    creation_hdg = []
+        num_created_ac = 0
+        while num_created_ac < NUM_AIRCRAFT:
+            # Will be set True if creation results in a conflict
+            in_conflict_at_creation = False
 
-    num_created_ac = 0
-    while num_created_ac < num_total_ac:
-        # Will be set True if creation results in a conflict
-        in_conflict_at_creation = False
+            # Create an aircraft at random time and position
+            prev_time = self.aircraft_list[-1]["time"] if num_created_ac else 0
+            curr_time = prev_time + random.randint(self.cre_interval_min,
+                                                   self.cre_interval_max)
 
-        # Create an aircraft at random time and position
-        prev_time = creation_time[-1] if num_created_ac else 0
-        curr_time = prev_time + random.randint(cre_interval_min,
-                                               cre_interval_max)
+            # Select an aircraft type and velocity
+            type_idx = random.randint(0, len(AC_TYPES) - 1)
+            curr_type = AC_TYPES[type_idx]
+            curr_spd = random.gauss(AC_TYPES_SPD[type_idx], SPD_STDDEV)
 
-        # Select an aircraft type and velocity
-        type_idx = random.randint(0, len(AC_TYPES) - 1)
-        curr_type = AC_TYPES[type_idx]
-        curr_spd = random.gauss(AC_TYPES_SPD[type_idx], SPD_STDDEV)
+            # Select random departure and destination waypoint
+            curr_dep_angle = random.uniform(180 - angle + 3, 180 + angle - 3)
+            (curr_lat, curr_lon) = bsgeo.qdrpos(CENTER_LAT,
+                                                CENTER_LON,
+                                                curr_dep_angle,
+                                                AREA_RADIUS)
 
-        # Select random departure and destination waypoint
-        curr_dep_angle = random.uniform(180 - angle + 3, 180 + angle - 3)
-        (curr_lat, curr_lon) = bsgeo.qdrpos(CENTER_LAT,
-                                            CENTER_LON,
-                                            curr_dep_angle,
-                                            AREA_RADIUS)
-        curr_dest_angle = random.uniform(-angle + 3, angle - 3)
-        (dest_lat, dest_lon) = bsgeo.qdrpos(CENTER_LAT,
-                                            CENTER_LON,
-                                            curr_dest_angle,
-                                            AREA_RADIUS + 0.5)
+            curr_dest_angle = random.uniform(-angle + 3, angle - 3)
+            (dest_lat, dest_lon) = bsgeo.qdrpos(CENTER_LAT,
+                                                CENTER_LON,
+                                                curr_dest_angle,
+                                                AREA_RADIUS + 0.5)
 
-        # Heading to waypoint at start of corridor
-        curr_hdg, _ = bsgeo.qdrdist(curr_lat,
-                                    curr_lon,
-                                    corridor_entry_lat,
-                                    corridor_entry_lon)
+            # Heading to waypoint at start of corridor
+            curr_hdg, _ = bsgeo.qdrdist(curr_lat,
+                                        curr_lon,
+                                        self.corridor_bottom_lat,
+                                        CENTER_LON)
 
-        # The first generated aircraft is always accepted. Each aircraft
-        # thereafter has to have at least minimum separation in space
-        # OR time with ALL existing aircraft at the time of its creation.
-        if num_created_ac:
-            time_diff_list = [curr_time - t for t in creation_time]
-            dist_diff_list = \
-                [bsgeo.kwikdist(lat, lon, curr_lat, curr_lon)
-                 for (lat, lon) in zip(creation_dep_lat, creation_dep_lon)]
+            # The first generated aircraft is always accepted. Each aircraft
+            # thereafter has to have at least minimum separation in space
+            # OR time with ALL existing aircraft at the time of its creation.
+            if num_created_ac:
+                time_diff_list = [curr_time - aircraft["time"]
+                                  for aircraft in self.aircraft_list]
+                dist_diff_list = [bsgeo.kwikdist(aircraft["dep_lat"],
+                                                 aircraft["dep_lon"],
+                                                 curr_lat,
+                                                 curr_lon)
+                                  for aircraft in self.aircraft_list]
 
-            for time_diff, dist_diff in zip(time_diff_list, dist_diff_list):
-                # Either time OR distance difference must be smaller than minimum
-                if not (((dist_diff < min_dist_diff) and (time_diff > min_time_diff))
-                        or ((dist_diff > min_dist_diff) and (time_diff < min_time_diff))
-                        or ((dist_diff > min_dist_diff) and (time_diff > min_time_diff))):
-                    in_conflict_at_creation = True
-                    break
+                for time_diff, dist_diff in zip(time_diff_list, dist_diff_list):
+                    # Either time OR distance difference must be smaller than minimum
+                    if not (((dist_diff < min_dist_diff) and (time_diff > min_time_diff))
+                            or ((dist_diff > min_dist_diff) and (time_diff < min_time_diff))
+                            or ((dist_diff > min_dist_diff) and (time_diff > min_time_diff))):
+                        in_conflict_at_creation = True
+                        break
 
-            # If the current aircraft is in conflict, continue the while loop
-            # and try another random creation.
-            if in_conflict_at_creation:
-                continue
+                # If the current aircraft is in conflict, continue the while loop
+                # and try another random creation.
+                if in_conflict_at_creation:
+                    continue
 
-        # Keep track of created aircraft that are not in conflict
-        creation_time.append(curr_time)
-        creation_type.append(curr_type)
-        creation_spd.append(curr_spd)
-        creation_dep_lat.append(curr_lat)
-        creation_dep_lon.append(curr_lon)
-        creation_hdg.append(curr_hdg % 360)
-        creation_dest_lat.append(dest_lat)
-        creation_dest_lon.append(dest_lon)
-        num_created_ac += 1
+            # Store the current aircraft as a dictionary in the aircraft list
+            curr_ac = {}
+            curr_ac["time"] = curr_time
+            curr_ac["type"] = curr_type
+            curr_ac["spd"] = curr_spd
+            curr_ac["dep_lat"] = curr_lat
+            curr_ac["dep_lon"] = curr_lon
+            curr_ac["hdg"] = curr_hdg % 360
+            curr_ac["dest_lat"] = dest_lat
+            curr_ac["dest_lon"] = dest_lon
+            self.aircraft_list.append(curr_ac)
+            num_created_ac += 1
 
-    # Write each aircraft to file
-    for ac_idx in range(num_created_ac):
-        # Altitude is the same for all aircraft
-        ac_alt = "36000"
+    def write_scenfile(self):
+        """
+        Create the .scn file containing all commands to be executed by
+        BlueSky for the given scenario.
+        """
 
-        time_str = time.strftime('%H:%M:%S',
-                                 time.gmtime(creation_time[ac_idx]))
-        time_str = "{}.00>".format(time_str)
-        aircraft_str = (time_str
-                        + "CRE AC{:03d} {},{:.6f},{:.6f},{:.2f},{},{:.0f}\n"
-                        .format(ac_idx,
-                                creation_type[ac_idx],
-                                creation_dep_lat[ac_idx],
-                                creation_dep_lon[ac_idx],
-                                creation_hdg[ac_idx],
-                                ac_alt,
-                                creation_spd[ac_idx]))
+        scnfile_name = (("{}_L{}_W{}_A{}_RESO-{}_T-{}_SCEN{:03d}.scn")
+                        .format(self.timestamp,
+                                self.corridor_length,
+                                self.corridor_width,
+                                self.angle,
+                                self.resolution_method,
+                                self.traffic_level,
+                                self.random_seed))
+        scnfile_path = os.path.join(self.target_dir, scnfile_name)
 
-        aircraft_str += time_str + ("DEFWPT DEP{:03d},{:06f},{:06f},FIX\n"
-                                    .format(ac_idx,
-                                            creation_dep_lat[ac_idx],
-                                            creation_dep_lon[ac_idx]))
-        aircraft_str += time_str + ("DEFWPT DST{:03d},{:06f},{:06f},FIX\n"
-                                    .format(ac_idx,
-                                            creation_dest_lat[ac_idx],
-                                            creation_dest_lon[ac_idx]))
-        aircraft_str += time_str + ("AC{:03d} ADDWPT DEP{:03d}\n"
-                                    .format(ac_idx, ac_idx))
-        aircraft_str += time_str + "AC{:03d} ADDWPT COR101\n".format(ac_idx)
-        aircraft_str += time_str + "AC{:03d} ADDWPT COR201\n".format(ac_idx)
-        aircraft_str += time_str + ("AC{:03d} ADDWPT DST{:03d}\n"
-                                    .format(ac_idx, ac_idx))
+        # Create a header to simplify traceability of variable values
+        # after creation.
+        scen_header = \
+            ("##################################################\n"
+             + f"# File created at: {self.timestamp}\n"
+             + f"# Center latitude: {CENTER_LAT} deg\n"
+             + f"# Center longitude: {CENTER_LON} deg\n"
+             + f"# Corridor length: {self.corridor_length} NM\n"
+             + f"# Corridor width: {self.corridor_width} NM\n"
+             + f"# Angle: {self.angle} deg "
+             + (" (Defined by area edge angle)\n" if self.is_edge_angle
+                else "(Defined by arc angle)\n")
+             + f"# Experiment area radius: {AREA_RADIUS} NM\n"
+             + f"# Aircraft types: {AC_TYPES}\n"
+             + f"# Aircraft average speed: {AC_TYPES_SPD} kts\n"
+             + f"# Aircraft speed std dev: {SPD_STDDEV} kts\n"
+             + f"# Number of aircraft created: {NUM_AIRCRAFT}\n"
+             + f"# Traffic level: {self.traffic_level}\n"
+             + f"# Aircraft creation interval min: {self.cre_interval_min} s\n"
+             + f"# Aircraft creation interval max: {self.cre_interval_max} s\n"
+             + f"# Random number generator seed: {self.random_seed}\n"
+             + "##################################################\n")
 
-        scnfile.write("\n" + aircraft_str)
+        with open(scnfile_path, "w+") as scnfile:
+            # All commands not related to aircraft creation are executed at
+            # t = 0
+            zero_time = "\n0:00:00.00>"
+            scnfile.write(scen_header)
+
+            scnfile.write("\n# Sim commands")
+            scnfile.write(zero_time + f"PAN {CENTER_LAT},{CENTER_LON}")
+            scnfile.write(zero_time + f"DT {SIM_TIME_STEP}")
+            scnfile.write(zero_time + "TRAIL {}"
+                          .format("ON" if SHOW_AC_TRAILS else "OFF"))
+            scnfile.write(zero_time + "SWRAD SYM")
+            scnfile.write(zero_time + "SWRAD LABEL 0")
+            scnfile.write(zero_time + "SWRAD WPT")
+            scnfile.write(zero_time + "SWRAD SAT")
+            scnfile.write(zero_time + "SWRAD APT")
+            scnfile.write(zero_time + "FF")
+
+            scnfile.write("\n\n# Setup circular experiment area and activate"
+                          + " it as a traffic area in BlueSky")
+            scnfile.write(zero_time + "PLUGINS LOAD AREA")
+            scnfile.write(zero_time + "CIRCLE EXPERIMENT {},{},{}"
+                          .format(CENTER_LAT, CENTER_LON, AREA_RADIUS))
+            scnfile.write(zero_time + "AREA EXPERIMENT")
+            scnfile.write(zero_time + "COLOR EXPERIMENT 0,128,0")
+
+            scnfile.write("\n\n# Setup BlueSky ASAS module options")
+            scnfile.write(zero_time + "ASAS ON")
+            scnfile.write(zero_time + f"RESO {self.resolution_method}")
+            scnfile.write(zero_time + f"RMETHH {RMETHH}")
+
+            # Restricted airspaces
+            scnfile.write("\n\n# LOAD RAA plugin and create area restrictions")
+            scnfile.write(zero_time + f"PLUGINS LOAD {PLUGIN_NAME}")
+            scnfile.write(zero_time + f"RAALOG {self.timestamp}")
+            scnfile.write(zero_time + f"RAACONF {AREA_LOOKAHEAD_TIME}")
+
+            for idx, area in enumerate(self.airspace_restrictions):
+                scnfile.write(zero_time + f"RAA RAA{idx + 1},ON,{0},{0},"
+                              + f"{area['coord_str']}")
+                scnfile.write(zero_time + f"COLOR RAA{idx + 1},164,0,0")
+                scnfile.write(zero_time + f"DEFWPT RAA_{idx + 1},"
+                              + f"{area['midpoint_str']},FIX")
+
+            # Corridor waypoints
+            scnfile.write("\n\n# Corridor waypoints")
+            scnfile.write(zero_time + "DEFWPT COR101,{:.6f},{:.6f},FIX"
+                          .format(self.corridor_bottom_lat, CENTER_LON))
+            scnfile.write(zero_time + "DEFWPT COR201,{:.6f},{:.6f},FIX"
+                          .format(self.corridor_top_lat, CENTER_LON))
+
+            # Write each aircraft to file
+            scnfile.write("\n\n# Create {} aircraft".format(NUM_AIRCRAFT))
+
+            for idx, ac in enumerate(self.aircraft_list):
+                # Altitude is the same for all aircraft
+                ac_alt = "36000"
+
+                # Write the aircraft creation and route commands to file
+                time_str = time.strftime('%H:%M:%S', time.gmtime(ac["time"]))
+                time_str = "{}.00>".format(time_str)
+                ac_str = (time_str +
+                          "CRE AC{:03d} {},{:.6f},{:.6f},{:.2f},{},{:.0f}\n"
+                          .format(idx,
+                                  ac["type"],
+                                  ac["dep_lat"],
+                                  ac["dep_lon"],
+                                  ac["hdg"],
+                                  ac_alt,
+                                  ac["spd"]))
+
+                ac_str += time_str + ("DEFWPT DEP{:03d},{:06f},{:06f},FIX\n"
+                                      .format(idx,
+                                              ac["dep_lat"],
+                                              ac["dep_lon"]))
+                ac_str += time_str + ("DEFWPT DST{:03d},{:06f},{:06f},FIX\n"
+                                      .format(idx,
+                                              ac["dest_lat"],
+                                              ac["dest_lon"]))
+                ac_str += time_str + f"AC{idx:03d} ADDWPT DEP{idx:03d}\n"
+                ac_str += time_str + f"AC{idx:03d} ADDWPT COR101\n"
+                ac_str += time_str + f"AC{idx:03d} ADDWPT COR201\n"
+                ac_str += time_str + f"AC{idx:03d} ADDWPT DST{idx:03d}\n"
+
+                scnfile.write("\n" + ac_str)
+
+    def write_geofile(self):
+        """
+        Create csv file containing the experiment area and airspace
+        restriction geometric parameters to allow generation of area
+        restriction graphs during post-processing.
+        """
+
+        geofile_name = (("{}_L{}_W{}_A{}_geo.csv")
+                        .format(self.timestamp,
+                                self.corridor_length,
+                                self.corridor_width,
+                                self.angle))
+        geofile_path = os.path.join(self.target_dir, geofile_name)
+
+        with open(geofile_path, 'w+') as geofile:
+            geofile.write("{},{},{},{}\n".format(
+                "ring", CENTER_LAT, CENTER_LON, AREA_RADIUS))
+
+            # Write coordinates to geo file
+            for idx, area in enumerate(self.airspace_restrictions):
+                geofile.write(f"RAA{idx+1},{area['coord_str']}\n")
 
 
 def calc_line_ring_intersection(ring_center_lat,
@@ -530,12 +558,12 @@ if __name__ == "__main__":
     test_folder = "scengen_test"
 
     for reso_method in ["OFF", "MVP", "LF", "SWARM-V2"]:
-        create_scenfile(test_folder,
-                        current_time,
-                        SEED,
-                        TRAFFIC_LEVEL,
-                        reso_method,
-                        CORRIDOR_LENGTH,
-                        CORRIDOR_WIDTH,
-                        ARC_ANGLE,
-                        is_edge_angle=False)
+        ScenarioGenerator(test_folder,
+                          current_time,
+                          SEED,
+                          TRAFFIC_LEVEL,
+                          reso_method,
+                          CORRIDOR_LENGTH,
+                          CORRIDOR_WIDTH,
+                          ARC_ANGLE,
+                          is_edge_angle=False)

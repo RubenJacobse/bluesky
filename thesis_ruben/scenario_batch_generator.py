@@ -10,7 +10,7 @@ import itertools
 import datetime
 
 # Local imports
-from scenario_file_generator import create_scenfile
+from scenario_file_generator import ScenarioGenerator
 
 
 def main():
@@ -47,7 +47,7 @@ def main():
 
     # Create a scenario file for each combination of variables
     for (seed, level, reso_method, length, width, angle) in combination_lst:
-        create_scenfile(output_dir,
+        ScenarioGenerator(output_dir,
                         timestamp,
                         seed,
                         level,
