@@ -42,7 +42,8 @@ def deleteArea(areaname):
 
 def reset():
     """ Clear all data. """
-    areas.clear()
+    for areaname in list(areas.keys()):
+        deleteArea(areaname)
 
 class Shape:
     def __init__(self, shape, name, coordinates, top=1e9, bottom=-1e9):
