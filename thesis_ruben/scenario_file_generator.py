@@ -13,6 +13,9 @@ import time
 import random
 import datetime
 
+# Third party imports
+from shapely.geometry import Polygon
+
 # Enable BlueSky imports by adding the project folder to the path
 sys.path.append(os.path.abspath(os.path.join('..')))
 sys.path.append(os.path.abspath(os.path.join('../plugins')))
@@ -244,27 +247,43 @@ class ScenarioGenerator():
                      "crs_min": "",
                      "crs_max": ""}
 
+        # Coordinates of corridor rectangular area
+        corridor_coords = [self.corridor["south_lat"],
+                           self.corridor["left_lon"],
+                           self.corridor["south_lat"],
+                           self.corridor["right_lon"],
+                           self.corridor["north_lat"],
+                           self.corridor["right_lon"],
+                           self.corridor["north_lat"],
+                           self.corridor["left_lon"]]
+
+        # Coordinates of circular area
+        ring_radius = self.corridor_length/2 + 30
+        ring_tuples = [bsgeo.qdrpos(CENTER_LAT,
+                                    CENTER_LON,
+                                    angle,
+                                    ring_radius)
+                       for angle in range(0, 360)]
+        ring_poly = Polygon(ring_tuples)
+        ring_coords = [x for (lat, lon) in ring_tuples for x in (lat, lon)]
+
+        # Coordinates of wedge shaped area
+        merge_area = [self.airspace_restrictions[0]["inner_bottom"],
+                      self.airspace_restrictions[0]["outer_bottom"],
+                      self.airspace_restrictions[1]["outer_bottom"],
+                      self.airspace_restrictions[1]["inner_bottom"]]
+        merge_area_poly = Polygon(merge_area)
+        wedge_poly = ring_poly.intersection(merge_area_poly)
+        wedge_coords = [x for (lat, lon) in wedge_poly.exterior.coords
+                        for x in (lat, lon)]
+
         # Set the geo vector coordinates
         if "CORRIDOR" in self.resolution_method:
-            # Create a geovector area that only applies to the corridor
-            # itself
-            coords = [self.corridor["south_lat"], self.corridor["left_lon"],
-                      self.corridor["south_lat"], self.corridor["right_lon"],
-                      self.corridor["north_lat"], self.corridor["right_lon"],
-                      self.corridor["north_lat"], self.corridor["left_lon"]]
+            geovector["coords"] = corridor_coords
         elif "CIRCLE" in self.resolution_method:
-            # Create a geovector that applies to a circular area centered
-            # on the experiment area center
-            coord_tuples = [bsgeo.qdrpos(CENTER_LAT,
-                                         CENTER_LON,
-                                         angle,
-                                         self.corridor_length/2 + 30)
-                            for angle in range(0, 361)]
-            coords = [x for (lat, lon) in coord_tuples for x in (lat, lon)]
+            geovector["coords"] = ring_coords
         elif "WEDGE" in self.resolution_method:
-            coords = []
-
-        geovector["coords"] = coords
+            geovector["coords"] = wedge_coords
 
         # A two dimensional geovector can restrict either:
         # ground speed, course, or both ground speed and course
@@ -679,7 +698,8 @@ if __name__ == "__main__":
                         "LF",
                         "SWARM-V2",
                         "GV_CORRIDOR_SPD",
-                        "GV_CIRCLE_SPD"]:
+                        "GV_CIRCLE_SPD",
+                        "GV_WEDGE_SPD"]:
         ScenarioGenerator(test_folder,
                           current_time,
                           SEED,
