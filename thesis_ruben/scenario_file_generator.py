@@ -76,11 +76,16 @@ class ScenarioGenerator():
         # random numbers are used.
         random.seed(self.random_seed)
 
-        # Calculate airspace restriction and corridor parameters
+        # Calculate airspace restriction, corridor, and geovector parameters
         self.airspace_restrictions = []
         self.create_airspace_restriction("LEFT")
         self.create_airspace_restriction("RIGHT")
+
+        self.corridor = {}
         self.calculate_corridor_parameters()
+
+        self.geovectors = []
+        self.create_geovectors()
 
         # Create aircraft and store for further use
         self.set_ac_creation_intervals()
@@ -91,6 +96,7 @@ class ScenarioGenerator():
         # Save the results to file
         self.write_scenfile()
         self.write_geofile()
+        self.write_geovectorfile()
 
     def create_airspace_restriction(self, corridor_side):
         """
@@ -218,6 +224,67 @@ class ScenarioGenerator():
                     inner_bottom_lon)
         area["midpoint_str"] = f"{midpoint_lat:.6f},{midpoint_lon:.6f}"
         self.airspace_restrictions.append(area)
+
+    def create_geovectors(self):
+        """
+        If required, creates all geovector restrictions for the scenario.
+
+        NOTE: Currently only creates a single geovector area!
+        """
+
+        if not self.resolution_method.startswith("GV"):
+            return
+
+        # Set up the dictionary, relevant values will be overwritten depending
+        # on the type of geovector that will be used
+        geovector = {"name": self.resolution_method,
+                     "coords": [],
+                     "gs_min": "",
+                     "gs_max": "",
+                     "crs_min": "",
+                     "crs_max": ""}
+
+        # Set the geo vector coordinates
+        if "CORRIDOR" in self.resolution_method:
+            # Create a geovector area that only applies to the corridor
+            # itself
+            coords = [self.corridor["south_lat"], self.corridor["left_lon"],
+                      self.corridor["south_lat"], self.corridor["right_lon"],
+                      self.corridor["north_lat"], self.corridor["right_lon"],
+                      self.corridor["north_lat"], self.corridor["left_lon"]]
+        elif "CIRCLE" in self.resolution_method:
+            # Create a geovector that applies to a circular area centered
+            # on the experiment area center
+            coord_tuples = [bsgeo.qdrpos(CENTER_LAT,
+                                         CENTER_LON,
+                                         angle,
+                                         self.corridor_length/2 + 30)
+                            for angle in range(0, 361)]
+            coords = [x for (lat, lon) in coord_tuples for x in (lat, lon)]
+        elif "WEDGE" in self.resolution_method:
+            coords = []
+
+        geovector["coords"] = coords
+
+        # A two dimensional geovector can restrict either:
+        # ground speed, course, or both ground speed and course
+        gs_min = 480
+        gs_max = 480
+        crs_min = 360
+        crs_max = 0
+        if "SPD" in self.resolution_method:
+            geovector["gs_min"] = gs_min
+            geovector["gs_max"] = gs_max
+        elif "CRS" in self.resolution_method:
+            geovector["crs_min"] = crs_min
+            geovector["crs_max"] = crs_max
+        elif "BOTH" in self.resolution_method:
+            geovector["gs_min"] = gs_min
+            geovector["gs_max"] = gs_max
+            geovector["crs_min"] = crs_min
+            geovector["crs_max"] = crs_max
+
+        self.geovectors.append(geovector)
 
     def calculate_corridor_parameters(self):
         """
@@ -446,6 +513,24 @@ class ScenarioGenerator():
                 scnfile.write(zero_time + f"DEFWPT RAA_{idx + 1},"
                               + f"{area['midpoint_str']},FIX")
 
+            # Geovectors (skip if no geovectors are defined)
+            if self.geovectors:
+                scnfile.write("\n\n# Create GEOVECTOR area(s)")
+                scnfile.write(zero_time + "PLUGINS LOAD GEOVECTOR")
+            for geovector in self.geovectors:
+                coords = geovector["coords"]
+                coord_str = ",".join(str(f"{x:.6f}") for x in coords)
+                area_str = f"POLY {geovector['name']} {coord_str}"
+
+                scnfile.write(zero_time + area_str)
+                scnfile.write(zero_time + (f"COLOR {geovector['name']},"
+                                           + "102,178,255"))
+                scnfile.write(zero_time + f"GEOVECTOR {geovector['name']},"
+                              + f"{geovector['gs_min']},"
+                              + f"{geovector['gs_max']},"
+                              + f"{geovector['crs_min']},"
+                              + f"{geovector['crs_max']},,")
+
             # Corridor waypoints
             scnfile.write("\n\n# Corridor waypoints")
             scnfile.write(zero_time + "DEFWPT COR101,{:.6f},{:.6f},FIX"
@@ -501,7 +586,7 @@ class ScenarioGenerator():
                                 self.angle))
         geofile_path = os.path.join(self.target_dir, geofile_name)
 
-        with open(geofile_path, 'w+') as geofile:
+        with open(geofile_path, "w+") as geofile:
             # Write experiment area parameters to file
             geofile.write("{},{},{},{}\n".format(
                 "ring", CENTER_LAT, CENTER_LON, AREA_RADIUS))
@@ -509,6 +594,29 @@ class ScenarioGenerator():
             # Write restriction coordinates to file
             for idx, area in enumerate(self.airspace_restrictions):
                 geofile.write(f"RAA{idx+1},{area['coord_str']}\n")
+
+    def write_geovectorfile(self):
+        """
+        Create csv file containing the geovector areas geometric parameters
+        to allow generation of figures during post-processing.
+        """
+
+        if not self.geovectors:
+            return
+
+        file_name = (("{}_L{}_W{}_A{}_RESO-{}_geovector.csv")
+                     .format(self.timestamp,
+                             self.corridor_length,
+                             self.corridor_width,
+                             self.angle,
+                             self.resolution_method))
+        file_path = os.path.join(self.target_dir, file_name)
+
+        with open(file_path, "w+") as geovectorfile:
+            for idx, geovector in enumerate(self.geovectors):
+                coords = geovector["coords"]
+                coord_str = ",".join(str(f"{x:.6f}") for x in coords)
+                geovectorfile.write(f"GV{idx+1},{coord_str}\n")
 
 
 def calc_line_ring_intersection(ring_center_lat,
@@ -556,7 +664,7 @@ def calc_line_ring_intersection(ring_center_lat,
 if __name__ == "__main__":
     # Passing these as arguments to create() when called as __main__
     SEED = 1
-    TRAFFIC_LEVEL = "LOW"
+    TRAFFIC_LEVEL = "HIGH"
     CORRIDOR_LENGTH = 40  # [NM]
     CORRIDOR_WIDTH = 25  # [NM]
     ARC_ANGLE = 90  # [deg]
@@ -566,7 +674,12 @@ if __name__ == "__main__":
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     test_folder = "scengen_test"
 
-    for reso_method in ["OFF", "MVP", "LF", "SWARM-V2"]:
+    for reso_method in ["OFF",
+                        "MVP",
+                        "LF",
+                        "SWARM-V2",
+                        "GV_CORRIDOR_SPD",
+                        "GV_CIRCLE_SPD"]:
         ScenarioGenerator(test_folder,
                           current_time,
                           SEED,
