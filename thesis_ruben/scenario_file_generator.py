@@ -92,28 +92,6 @@ class ScenarioGenerator():
         self.write_scenfile()
         self.write_geofile()
 
-    def calculate_corridor_parameters(self):
-        """
-        Calculate the 'top' and 'bottom' latitudes of the corridor.
-        """
-
-        self.corridor_north_lat, _ = bsgeo.qdrpos(CENTER_LAT,
-                                                  CENTER_LON,
-                                                  0,
-                                                  self.corridor_length/2)
-        self.corridor_south_lat, _ = bsgeo.qdrpos(CENTER_LAT,
-                                                  CENTER_LON,
-                                                  180,
-                                                  self.corridor_length/2)
-        _, self.corridor_left_lon = bsgeo.qdrpos(CENTER_LAT,
-                                                 CENTER_LON,
-                                                 270,
-                                                 self.corridor_width/2)
-        _, self.corridor_right_lon = bsgeo.qdrpos(CENTER_LAT,
-                                                  CENTER_LON,
-                                                  90,
-                                                  self.corridor_width/2)
-
     def create_airspace_restriction(self, corridor_side):
         """
         Create the restricted area on a given corridor side.
@@ -180,8 +158,8 @@ class ScenarioGenerator():
                                                       ext_bottom_angle,
                                                       ext_dist)
 
-        # Calculate coordinates of points on north and south lines extending the
-        # edge furthest from the corridor
+        # Calculate coordinates of points on north and south lines extending
+        # the edge furthest from the corridor
         vert_dist = ext_dist * 2
         _, outer_lon = bsgeo.qdrpos(CENTER_LAT,
                                     CENTER_LON,
@@ -241,10 +219,32 @@ class ScenarioGenerator():
         area["midpoint_str"] = f"{midpoint_lat:.6f},{midpoint_lon:.6f}"
         self.airspace_restrictions.append(area)
 
+    def calculate_corridor_parameters(self):
+        """
+        Calculate the 'top' and 'bottom' latitudes of the corridor.
+        """
+
+        self.corridor["north_lat"], _ = bsgeo.qdrpos(CENTER_LAT,
+                                                     CENTER_LON,
+                                                     0,
+                                                     self.corridor_length/2)
+        self.corridor["south_lat"], _ = bsgeo.qdrpos(CENTER_LAT,
+                                                     CENTER_LON,
+                                                     180,
+                                                     self.corridor_length/2)
+        _, self.corridor["left_lon"] = bsgeo.qdrpos(CENTER_LAT,
+                                                    CENTER_LON,
+                                                    270,
+                                                    self.corridor_width/2)
+        _, self.corridor["right_lon"] = bsgeo.qdrpos(CENTER_LAT,
+                                                     CENTER_LON,
+                                                     90,
+                                                     self.corridor_width/2)
+
     def calculate_creation_arc_angle_range(self):
         """
-        Calculate angle from the center point to intersection between ring and
-        area edge
+        Calculate angle from the center point to intersection between
+        ring and area edge.
         """
         area = self.airspace_restrictions[1]
         _, _, top_angle_from_center = \
@@ -288,8 +288,8 @@ class ScenarioGenerator():
         ac_spd = 280  # [kts] Speed
 
         # Minimum distance and time differences at creation
-        min_dist_diff = 6  # [nm]
-        min_time_diff = min_dist_diff / ac_spd * 3600  # [s]
+        min_dist = 6  # [nm]
+        min_dt = min_dist / ac_spd * 3600  # [s]
 
         num_created_ac = 0
         while num_created_ac < NUM_AIRCRAFT:
@@ -312,7 +312,6 @@ class ScenarioGenerator():
                                                 CENTER_LON,
                                                 curr_dep_angle,
                                                 AREA_RADIUS)
-
             curr_dest_angle = random.uniform(-angle + 3, angle - 3)
             (dest_lat, dest_lon) = bsgeo.qdrpos(CENTER_LAT,
                                                 CENTER_LON,
@@ -322,7 +321,7 @@ class ScenarioGenerator():
             # Heading to waypoint at start of corridor
             curr_hdg, _ = bsgeo.qdrdist(curr_lat,
                                         curr_lon,
-                                        self.corridor_south_lat,
+                                        self.corridor["south_lat"],
                                         CENTER_LON)
 
             # The first generated aircraft is always accepted. Each aircraft
@@ -338,15 +337,16 @@ class ScenarioGenerator():
                                   for aircraft in self.aircraft_list]
 
                 for time_diff, dist_diff in zip(time_diff_list, dist_diff_list):
-                    # Either time OR distance difference must be smaller than minimum
-                    if not (((dist_diff < min_dist_diff) and (time_diff > min_time_diff))
-                            or ((dist_diff > min_dist_diff) and (time_diff < min_time_diff))
-                            or ((dist_diff > min_dist_diff) and (time_diff > min_time_diff))):
+                    # Either time OR distance difference must be smaller than
+                    # the minimum value; if not: the aircraft is in conflict
+                    if not (((dist_diff < min_dist) and (time_diff > min_dt))
+                            or ((dist_diff > min_dist) and (time_diff < min_dt))
+                            or ((dist_diff > min_dist) and (time_diff > min_dt))):
                         in_conflict_at_creation = True
                         break
 
-                # If the current aircraft is in conflict, continue the while loop
-                # and try another random creation.
+                # If the current aircraft is in conflict, continue the
+                # while loop and try another random creation.
                 if in_conflict_at_creation:
                     continue
 
@@ -449,13 +449,12 @@ class ScenarioGenerator():
             # Corridor waypoints
             scnfile.write("\n\n# Corridor waypoints")
             scnfile.write(zero_time + "DEFWPT COR101,{:.6f},{:.6f},FIX"
-                          .format(self.corridor_south_lat, CENTER_LON))
+                          .format(self.corridor["south_lat"], CENTER_LON))
             scnfile.write(zero_time + "DEFWPT COR201,{:.6f},{:.6f},FIX"
-                          .format(self.corridor_north_lat, CENTER_LON))
+                          .format(self.corridor["north_lat"], CENTER_LON))
 
             # Write each aircraft to file
             scnfile.write("\n\n# Create {} aircraft".format(NUM_AIRCRAFT))
-
             for idx, ac in enumerate(self.aircraft_list):
                 # Altitude is the same for all aircraft
                 ac_alt = "36000"
@@ -503,10 +502,11 @@ class ScenarioGenerator():
         geofile_path = os.path.join(self.target_dir, geofile_name)
 
         with open(geofile_path, 'w+') as geofile:
+            # Write experiment area parameters to file
             geofile.write("{},{},{},{}\n".format(
                 "ring", CENTER_LAT, CENTER_LON, AREA_RADIUS))
 
-            # Write coordinates to geo file
+            # Write restriction coordinates to file
             for idx, area in enumerate(self.airspace_restrictions):
                 geofile.write(f"RAA{idx+1},{area['coord_str']}\n")
 
