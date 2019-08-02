@@ -27,6 +27,7 @@ from bluesky.tools.trafficarrays import TrafficArrays, RegisterElementParameters
 
 # Temporary import
 import tempgeo as tg
+import geovector as gv
 
 # Default variable values for numpy arrays
 VAR_DEFAULTS = {"float": 0.0,
@@ -94,7 +95,17 @@ def init_plugin():
             "RAACONF t_lookahead",
             "int",
             areas.set_t_lookahead,
-            "Set the lookahead time used for area avoidance in seconds."]
+            "Set the lookahead time used for area avoidance in seconds."],
+        'GEOVECTOR': [
+            'GEOVECTOR area,[gsmin,gsmax,trkmin,trkmax,vsmin,vsmax]',
+            'txt,[spd,spd,hdg,hdg,vspd,vspd]',
+            gv.defgeovec,
+            'Define a geovector for an area defined with the BOX,POLY(ALT) area commands'],
+        'DELGEOVECTOR': [
+            'DELGEOVECTOR area',
+            'txt',
+            gv.delgeovec,
+            'Remove geovector from the area ']
     }
 
     return config, stackfunctions
@@ -331,6 +342,9 @@ class AreaRestrictionManager(TrafficArrays):
         self.num_areas = 0
         self.num_traf = 0
         self.t_lookahead = DEFAULT_AREA_T_LOOKAHEAD
+
+        if gv.geovecs:
+            gv.reset()
 
     def remove(self):
         """ Called when plugin is removed. """
@@ -793,6 +807,38 @@ class AreaRestrictionManager(TrafficArrays):
                 print("{} asas active: {}".format(
                     bs.traf.id[ac_idx], bs.traf.asas.active[ac_idx]))
 
+            if self.control_mode_curr[ac_idx] == "asas":
+                pass
+
+            if self.control_mode_curr[ac_idx] == "lnav":
+                # # NOTE: current implementation is naive, could result in all sorts of turning
+                # # behaviour if the active waypoint is behind the aircraft.
+                #
+                # Waypoint recovery after conflict: Find the next active waypoint
+                # and send the aircraft to that waypoint.
+                if self.control_mode_prev[ac_idx] == "area":
+                    iwpid = bs.traf.ap.route[ac_idx].findact(ac_idx)
+                    if iwpid == -1:  # To avoid problems if there are no waypoints
+                        continue
+                    bs.traf.ap.route[ac_idx].direct(ac_idx,
+                                                    bs.traf.ap.route[ac_idx].wpname[iwpid])
+                    if (bs.traf.ap.route[ac_idx].wpname[iwpid] == "COR201"
+                            and bs.traf.lat[ac_idx] > 0.332736):
+                        print("t={}s: {} area avoidance -> direct to {}".format(bs.sim.simt,
+                                                                                bs.traf.id[ac_idx],
+                                                                                bs.traf.ap.route[ac_idx].wpname[iwpid]))
+
+                    if do_printdebug:
+                        print("{} heading direct to {}"
+                              .format(bs.traf.id[ac_idx],
+                                      bs.traf.ap.route[ac_idx].wpname[iwpid]))
+
+            # "asas" and "lnav" modes can be overridden by geovectors
+            # if present, but "area" mode should always be followed even
+            # if it conflicts with a geovector.
+            if gv.geovecs:
+                gv.applygeovec()
+
             if self.control_mode_curr[ac_idx] == "area":
                 if not self.is_in_area_reso[ac_idx]:
                     # Initiate new manoeuvre
@@ -842,32 +888,6 @@ class AreaRestrictionManager(TrafficArrays):
                                           bs.traf.hdg[ac_idx],
                                           self.commanded_crs[ac_idx],
                                           bs.traf.ap.trk[ac_idx]))
-
-            if self.control_mode_curr[ac_idx] == "asas":
-                pass
-
-            if self.control_mode_curr[ac_idx] == "lnav":
-                # # NOTE: current implementation is naive, could result in all sorts of turning
-                # # behaviour if the active waypoint is behind the aircraft.
-                #
-                # Waypoint recovery after conflict: Find the next active waypoint
-                # and send the aircraft to that waypoint.
-                if self.control_mode_prev[ac_idx] == "area":
-                    iwpid = bs.traf.ap.route[ac_idx].findact(ac_idx)
-                    if iwpid == -1:  # To avoid problems if there are no waypoints
-                        continue
-                    bs.traf.ap.route[ac_idx].direct(ac_idx,
-                                                    bs.traf.ap.route[ac_idx].wpname[iwpid])
-                    if (bs.traf.ap.route[ac_idx].wpname[iwpid] == "COR201"
-                            and bs.traf.lat[ac_idx] > 0.332736):
-                        print("t={}s: {} area avoidance -> direct to {}".format(bs.sim.simt,
-                                                                                bs.traf.id[ac_idx],
-                                                                                bs.traf.ap.route[ac_idx].wpname[iwpid]))
-
-                    if do_printdebug:
-                        print("{} heading direct to {}"
-                              .format(bs.traf.id[ac_idx],
-                                      bs.traf.ap.route[ac_idx].wpname[iwpid]))
 
         # For debugging purposes only
         for ac_idx in range(self.num_traf):
