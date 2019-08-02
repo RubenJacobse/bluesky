@@ -1,8 +1,8 @@
 """
 Restricted Airspace Area Plugin
 
-Uses the AreaRestrictionManager class to keep track of restricted
-areas wich are themselves are represented by instances of the
+Defines the AreaRestrictionManager class to keep track of restricted
+areas. These areas are themselves are represented by instances of the
 RestrictedAirspaceArea class.
 
 Current implementation is heavily work-in-progress and unstable.
@@ -20,14 +20,15 @@ import shapely.ops as spops
 
 # BlueSky imports
 import bluesky as bs
-from bluesky.tools import areafilter, datalog
-from bluesky.tools.aero import Rearth
+from bluesky.tools import datalog
 from bluesky.tools.geo import qdrdist
 from bluesky.tools.trafficarrays import TrafficArrays, RegisterElementParameters
+import plugins.geovector as gv
 
-# Temporary import
-import tempgeo as tg
-import geovector as gv
+# Local imports
+from . import RestrictedAirspaceArea
+from . import geo as tg
+
 
 # Default variable values for numpy arrays
 VAR_DEFAULTS = {"float": 0.0,
@@ -61,54 +62,6 @@ ASASLOG_HEADER = ("simt [s], "
 
 # Ensure log files are saved in separate directory
 bs.settings.set_variable_defaults(log_path="thesis_ruben/output")
-
-
-def init_plugin():
-    """Initialize the RAA plugin"""
-
-    # Addtional initilisation code
-    areas = AreaRestrictionManager()
-
-    # Configuration parameters
-    config = {
-        "plugin_name": "RAA",
-        "plugin_type": "sim",
-        "update_interval": 1.0,
-        "update": areas.update,
-        "preupdate": areas.preupdate,
-        "reset": areas.reset,
-        "remove": areas.remove,
-    }
-
-    stackfunctions = {
-        "RAA": [
-            "RAA name, ON/OFF, gsnorth, gseast, [lat1,lon1,lat2,lon2,...]",
-            "txt,onoff,spd,spd,[latlon,...]",
-            areas.create_area,
-            "Create restricted airspace areas that are to be avoided by all traffic."],
-        "DELRAA": [
-            "DELRAA name",
-            "txt",
-            areas.delete_area,
-            "Delete a given restricted airspace area."],
-        "RAACONF": [
-            "RAACONF t_lookahead",
-            "int",
-            areas.set_t_lookahead,
-            "Set the lookahead time used for area avoidance in seconds."],
-        'GEOVECTOR': [
-            'GEOVECTOR area,[gsmin,gsmax,trkmin,trkmax,vsmin,vsmax]',
-            'txt,[spd,spd,hdg,hdg,vspd,vspd]',
-            gv.defgeovec,
-            'Define a geovector for an area defined with the BOX,POLY(ALT) area commands'],
-        'DELGEOVECTOR': [
-            'DELGEOVECTOR area',
-            'txt',
-            gv.delgeovec,
-            'Remove geovector from the area ']
-    }
-
-    return config, stackfunctions
 
 
 class AreaRestrictionManager(TrafficArrays):
@@ -524,7 +477,7 @@ class AreaRestrictionManager(TrafficArrays):
         qdr_to_active_wp, _ = qdrdist(bs.traf.lat, bs.traf.lon,
                                       bs.traf.actwp.lat, bs.traf.actwp.lon)
 
-        self.crs_to_active_wp = ned2crs(qdr_to_active_wp)
+        self.crs_to_active_wp = tg.ned2crs(qdr_to_active_wp)
 
         # Finding the course to the next waypoint is more tricky (if it even
         # exists, otherwise use the active waypoint which should always exist)
@@ -543,7 +496,7 @@ class AreaRestrictionManager(TrafficArrays):
 
         qdr_to_next_wp, _ = qdrdist(bs.traf.lat, bs.traf.lon,
                                     nextwp_lat, nextwp_lon)
-        self.crs_to_next_wp = ned2crs(qdr_to_next_wp)
+        self.crs_to_next_wp = tg.ned2crs(qdr_to_next_wp)
 
     def calculate_positions_and_relative_tracks(self):
         """
@@ -569,11 +522,11 @@ class AreaRestrictionManager(TrafficArrays):
             # Calculate position of each aircraft relative to the area after
             # lookahead time
             future_relative_lon, future_relative_lat \
-                = calc_future_pos(self.t_lookahead,
-                                  bs.traf.lon,
-                                  bs.traf.lat,
-                                  self.rel_gseast[area_idx, :],
-                                  self.rel_gsnorth[area_idx, :])
+                = tg.calc_future_pos(self.t_lookahead,
+                                     bs.traf.lon,
+                                     bs.traf.lat,
+                                     self.rel_gseast[area_idx, :],
+                                     self.rel_gsnorth[area_idx, :])
 
             # Create shapely points for future relative position
             future_relative_position \
@@ -750,7 +703,7 @@ class AreaRestrictionManager(TrafficArrays):
         # the course to the current active waypoint. We choose the course with the
         # smallest angle difference
         wp_crs = self.crs_to_active_wp[ac_indices]
-        new_crs = crs_closest(bs.traf.hdg[ac_indices], vres_l_crs, vres_r_crs)
+        new_crs = tg.crs_closest(bs.traf.hdg[ac_indices], vres_l_crs, vres_r_crs)
 
         # Calculate new velocities (currently easiest method to calculate delta v)
         new_v = ac_gs
@@ -791,7 +744,7 @@ class AreaRestrictionManager(TrafficArrays):
         # if bs.sim.simt > debugprinttime:
         #     print("\nt={}s".format(bs.sim.simt))
 
-        current_crs = ned2crs(bs.traf.trk)
+        current_crs = tg.ned2crs(bs.traf.trk)
         # NOTE: Some of the branches of the if-statements inside this loop are
         # redundant, but are still explicitly included to improve readability.
         for ac_idx in range(self.num_traf):
@@ -934,357 +887,3 @@ class AreaRestrictionManager(TrafficArrays):
 
         hdg_cmd = "HDG {},{:.2f}".format(ac_id, ac_crs)
         bs.stack.stack(hdg_cmd)
-
-
-class RestrictedAirspaceArea():
-    """ Class that represents a single Restricted Airspace Area. """
-
-    def __init__(self, area_id, status, gseast, gsnorth, coords):
-
-        # Store input parameters as attributes
-        self.area_id = area_id
-        self.status = status
-        self.gsnorth = gsnorth
-        self.gseast = gseast
-        self.gs = np.sqrt(gsnorth ** 2 + gseast ** 2)
-
-        # Enforce that the coordinate list defines a valid ring
-        coords = self._check_poly(coords)
-
-        # Area coordinates will be stored in four formats:
-        #  - self.verts  : numpy array containing [lon, lat] pairs per vertex
-        #  For geometrical calculations:
-        #  - self.ring   : Shapely LinearRing (in lon,lat order)
-        #  - self.poly   : Shapely Polygon (in lon, lat order)
-        # For use in BlueSky functions
-        #  - self.coords : List of sequential lat,lon pairs
-        self.verts = self._coords2verts(coords)
-        self.ring = spgeom.LinearRing(self.verts)
-        self.poly = spgeom.Polygon(self.verts)
-        self.coords = coords
-
-        # Numpy array with ground speed vector of each vertex
-        self.gs_verts = np.full(np.shape(self.verts), [self.gseast, self.gsnorth])
-
-        # Draw polygon on BlueSky RadarWidget canvas
-        self._draw()
-
-    def update_pos(self, dt):
-        """
-        Update the position of the area (only if its groundspeed is
-        nonzero). Recalculates the coordinates and updates the polygon
-        position drawn in the BlueSky RadarWidget.
-        """
-
-        if not (self.gsnorth or self.gseast):
-            return
-
-        # Calculate new vertex positions after timestep dt
-        curr_lon = self.verts[:, 0]
-        curr_lat = self.verts[:, 1]
-        newlon, newlat = calc_future_pos(dt,
-                                         curr_lon,
-                                         curr_lat,
-                                         self.gseast,
-                                         self.gsnorth)
-
-        # Update vertex representations in all formats
-        self.verts = np.array([newlon, newlat]).T
-        self.ring = spgeom.LinearRing(self.verts)
-        self.poly = spgeom.Polygon(self.verts)
-        self.coords = self._verts2coords(self.verts)
-
-        # Remove current drawing and redraw new position on the BlueSky
-        # RadarWidget canvas
-        # NOTE: Can probably be improved by a lot!
-        self._undraw()
-        self._draw()
-
-    def delete(self):
-        """
-        On deletion, remove the drawing of current area from the
-        BlueSky RadarWidget canvas.
-        """
-
-        self._undraw()
-
-    def _check_poly(self, coords):
-        """
-        During initialization check that the user specified polygon
-        is valid.
-
-        - Vertices shall form a closed ring (first and last vertex are the same)
-        - Vertices shall be ordered counterclockwise
-
-        If this is not already the case then create a valid polygon.
-        """
-
-        # Ensure the border is a closed ring
-        if (coords[0], coords[1]) != (coords[-2], coords[-1]):
-            coords = coords + [coords[0], coords[1]]
-
-        # Ensure coordinates are defined in ccw direction
-        if not self.is_ccw(coords):
-            reordered = []
-            for ii in range(0, len(coords) - 1, 2):
-                reordered = [coords[ii], coords[ii + 1]] + reordered
-            coords = reordered
-
-        return coords
-
-    def _coords2verts(self, coords):
-        """
-        Convert list with coords in lat,lon order to numpy array of
-        vertex pairs in lon,lat order.
-
-        coords = [lat_0, lon_0, ..., lat_n, lon_n]
-        verts = np.array([[lon_0, lat_0], ..., [lon_n, lat_n]])
-
-        (This is the inverse operation of self._verts2coords).
-        """
-
-        verts_latlon = np.reshape(coords, (len(coords) // 2, 2))
-        verts_lonlat = np.flip(verts_latlon, 1)
-
-        return verts_lonlat
-
-    def _verts2coords(self, verts):
-        """
-        Convert numpy array of vertex coordinate pairs in lon,lat order to
-        a single list of lat,lon coords.
-
-        verts = np.array([[lon_0, lat_0], ..., [lon_n, lat_n]])
-        coords = [lat_0, lon_0, ..., lat_n, lon_n]
-
-        (Essentially the inverse operation of self._coords2verts).
-        """
-
-        verts_latlon = np.flip(verts, 1)
-        coords_latlon = list(verts_latlon.flatten("C"))
-
-        return coords_latlon
-
-    def _draw(self):
-        """ Draw the polygon corresponding to the current area in the
-            RadarWidget window. """
-
-        areafilter.defineArea(self.area_id, "POLY", self.coords)
-
-    def _undraw(self):
-        """ Remove the polygon corresponding to the current area from
-            the RadarWidget window. """
-
-        areafilter.deleteArea(self.area_id)
-
-    # NOTE: Can this be vectorized further?
-    def calc_qdr_tangents(self, num_traf, ac_lon, ac_lat):
-        """
-        For a given aircraft position find left- and rightmost courses
-        that are tangent to a given polygon as well as the distance to
-        the corresponding vertices.
-        """
-
-        # Initialize arrays to store qdrs and distances
-        qdr_left = np.zeros(num_traf, dtype=float)
-        qdr_right = np.zeros(num_traf, dtype=float)
-
-        # Create array containing [lon, lat] for each vertex
-        vertex = np.array(self.ring.coords.xy).T
-
-        # Calculate qdrs for each aircraft
-        for ii in range(num_traf):
-            ac_pos = [ac_lon[ii], ac_lat[ii]]
-
-            # Start by assuming both tangents touch at vertex with index 0
-            idx_left_vert = 0
-            idx_right_vert = 0
-
-            # Loop over vertices 1:n-1 and evaluate position of aircraft wrt
-            # the edges to find the indices of the vertices at which the tangents
-            # touch the polygon
-            #
-            # Algorithm from: http://geomalgorithms.com/a15-_tangents.html
-            for jj in range(1, len(vertex) - 1):
-                edge_prev = self.is_left_of_line(vertex[jj - 1], vertex[jj], ac_pos)
-                edge_next = self.is_left_of_line(vertex[jj], vertex[jj + 1], ac_pos)
-
-                if edge_prev <= 0 and edge_next > 0:
-                    if not self.is_left_of_line(ac_pos, vertex[jj], vertex[idx_right_vert]) < 0:
-                        idx_right_vert = jj
-                elif edge_prev > 0 and edge_next <= 0:
-                    if not self.is_left_of_line(ac_pos, vertex[jj], vertex[idx_left_vert]) > 0:
-                        idx_left_vert = jj
-
-            # Calculate tangent courses from aircraft to left- and rightmost vertices
-            qdr_left[ii], _ = qdrdist(ac_pos[1],
-                                      ac_pos[0],
-                                      vertex[idx_left_vert][1],
-                                      vertex[idx_left_vert][0])
-            qdr_right[ii], _ = qdrdist(ac_pos[1],
-                                       ac_pos[0],
-                                       vertex[idx_right_vert][1],
-                                       vertex[idx_right_vert][0])
-
-        return qdr_left, qdr_right
-
-    # NOTE: Can this be vectorized further?
-    def calc_rhumb_tangents(self, num_traf, ac_lon, ac_lat):
-        """
-        For a given aircraft position find left- and rightmost courses
-        that are tangent to a given polygon as well as the distance to
-        the corresponding vertices.
-        """
-
-        # Initialize arrays to store loxodrome angles
-        lox_angle_left = np.zeros(num_traf, dtype=float)
-        lox_angle_right = np.zeros(num_traf, dtype=float)
-
-        # Create array containing [lon, lat] for each vertex
-        vertex = np.array(self.ring.coords.xy).T
-
-        # Calculate loxodrome angles for each aircraft
-        for ii in range(num_traf):
-            ac_pos = [ac_lon[ii], ac_lat[ii]]
-
-            # Start by assuming both tangents touch at polygon vertex with index 0
-            idx_left_vert = 0
-            idx_right_vert = 0
-
-            # Loop over vertices 1:n-1 and evaluate position of aircraft wrt the edges
-            # to find the indices of the vertices at which the tangents touch the polygon.
-            #
-            # Algorithm from: http://geomalgorithms.com/a15-_tangents.html
-            for jj in range(1, len(vertex) - 1):
-                edge_prev = self.is_left_of_line(vertex[jj - 1], vertex[jj], ac_pos)
-                edge_next = self.is_left_of_line(vertex[jj], vertex[jj + 1], ac_pos)
-
-                if edge_prev <= 0 and edge_next > 0:
-                    if not self.is_left_of_line(ac_pos, vertex[jj], vertex[idx_right_vert]) < 0:
-                        idx_right_vert = jj
-                elif edge_prev > 0 and edge_next <= 0:
-                    if not self.is_left_of_line(ac_pos, vertex[jj], vertex[idx_left_vert]) > 0:
-                        idx_left_vert = jj
-
-            # Calculate tangent loxodrome angles from aircraft to left- and rightmost vertices
-            lox_angle_left[ii] = tg.rhumb_azimuth(ac_pos[1],
-                                                  ac_pos[0],
-                                                  vertex[idx_left_vert][1],
-                                                  vertex[idx_left_vert][0])
-            lox_angle_right[ii] = tg.rhumb_azimuth(ac_pos[1],
-                                                   ac_pos[0],
-                                                   vertex[idx_right_vert][1],
-                                                   vertex[idx_right_vert][0])
-
-        return lox_angle_left, lox_angle_right
-
-    @staticmethod
-    def is_ccw(coords):
-        """
-        Check if a list of lat,lon coordinates is defined in
-        counterclockwise order.
-        """
-
-        dir_sum = 0
-        for ii in range(0, len(coords) - 2, 2):  # ii = 0,2,4,...
-            edge = (coords[ii + 3] - coords[ii + 1]) * \
-                (coords[ii] + coords[ii + 2])
-            dir_sum += edge
-
-        return False if dir_sum > 0 else True
-
-    @staticmethod
-    def is_left_of_line(line_start, line_end, point):
-        """
-        Check if point lies to the left of the line through line_start
-        to line_end.
-
-        Returns:
-            > 0 if point lies on the left side of the line
-            = 0 if point lies exactly on the line
-            < 0 if point lies on the right side of the line
-        """
-
-        return (line_end[0] - line_start[0]) * (point[1] - line_start[1]) \
-            - (point[0] - line_start[0]) * (line_end[1] - line_start[1])
-
-
-def crs_middle(crs_left, crs_right):
-    """
-    Find the course that forms the bisector of the angle
-    between crs_left and crs_right (in clockwise direction).
-    """
-
-    if crs_left < crs_right:
-        crs_mid = 0.5 * (crs_left + crs_right)
-    elif crs_left > crs_right:
-        # North in between crs_l and crs_r
-        crs_mid = (crs_left + 0.5 * (360 - crs_left + crs_right)) % 360
-    else:
-        # Ensure when crs_l,crs_r = 360 then crs_mid = 0
-        crs_mid = crs_left % 360
-
-    return crs_mid
-
-
-def crs_is_between(crs, crs_left, crs_right):
-    """
-    Check if a given magnetic course crs on [0 .. 360] deg lies
-    in between crs_left and crs_right (in clockwise direction).
-    """
-
-    is_between = ((crs_left > crs_right) and (crs > crs_left or crs < crs_right)) or \
-        ((crs_left < crs_right) and (crs > crs_left and crs < crs_right))
-
-    return is_between
-
-
-def calc_future_pos(dt, lon, lat, gseast, gsnorth):
-    """
-    Calculate future lon and lat vectors after time dt based on
-    current position and velocity vectors.
-    """
-
-    newlat = lat + np.degrees(dt * gsnorth / Rearth)
-    newcoslat = np.cos(np.deg2rad(newlat))
-    newlon = lon + np.degrees(dt * gseast / newcoslat / Rearth)
-
-    return newlon, newlat
-
-
-def enu2crs(enu):
-    """
-    Convert an array of angles defined in East-North-Up on
-    [-180,180] degrees to compass angles on [0,360].
-    """
-
-    crs = ((90 - enu) + 360) % 360
-
-    return crs
-
-
-def ned2crs(ned):
-    """
-    Convert an array of angles defined in North-East-Down on
-    [-180,180] degrees to compass angles on [0,360].
-    """
-
-    crs = (ned + 360) % 360
-
-    return crs
-
-
-def crs_closest(ref_crs, crs_a, crs_b):
-    """
-    Takes three course vectors ref_rs, crs_a, and crs_b and per element
-    returns the value of either crs_a or crs_b depending on which has
-    the smallest angle difference with respect to ref_crs.
-    """
-
-    # Calculate absolute angle difference between both courses and the reference
-    diff_ref_a = np.absolute(np.remainder(ref_crs - crs_a + 180, 360) - 180)
-    diff_ref_b = np.absolute(np.remainder(ref_crs - crs_b + 180, 360) - 180)
-
-    # Select the course with the smallest angle difference
-    crs = np.where(diff_ref_a < diff_ref_b, crs_a, crs_b)
-
-    return crs

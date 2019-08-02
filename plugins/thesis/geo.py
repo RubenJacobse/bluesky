@@ -12,8 +12,12 @@ by arctan2(y,x) to return angles in the correct quadrant.
 # Third-party imports
 import numpy as np
 
-# Module constants 
+# BlueSky imports
+from bluesky.tools.aero import Rearth
+
+# Module constants
 ITER_CALC_LAT_MARGIN = 1e-6
+
 
 def rhumb_azimuth(lat_start, lon_start, lat_end, lon_end):
     """
@@ -55,8 +59,8 @@ def _rhumb_azimuth_scalar(lat_start, lon_start, lat_end, lon_end):
     delta_lon_rad = np.radians(delta_lon)
 
     # Azimuth angle calculation
-    azimuth_rad = np.arctan2(delta_lon_rad, (natlog_factor(lat_end_rad) \
-        - natlog_factor(lat_begin_rad)))
+    azimuth_rad = np.arctan2(delta_lon_rad, (natlog_factor(lat_end_rad)
+                                             - natlog_factor(lat_begin_rad)))
 
     azimuth_deg = np.degrees(azimuth_rad)
 
@@ -87,8 +91,8 @@ def _rhumb_azimuth_vector(lat_start, lon_start, lat_end, lon_end):
     delta_lon_rad = np.radians(delta_lon)
 
     # Azimuth angle calculation
-    azimuth_rad = np.arctan2(delta_lon_rad, (natlog_factor(lat_end_rad) \
-        - natlog_factor(lat_begin_rad)))
+    azimuth_rad = np.arctan2(delta_lon_rad, (natlog_factor(lat_end_rad)
+                                             - natlog_factor(lat_begin_rad)))
 
     azimuth_deg = np.degrees(azimuth_rad)
 
@@ -104,11 +108,12 @@ def natlog_factor(lat):
     """
 
     # Calculate eccentricity
-    a = 6378137.0 # [m] WGS84 Earth semi-major axis
-    b = 6356752.314245 # [m] WGS84 Earth semi-minor axis
+    a = 6378137.0  # [m] WGS84 Earth semi-major axis
+    b = 6356752.314245  # [m] WGS84 Earth semi-minor axis
     a_squared = a ** 2
     b_squared = b ** 2
-    eccentricity = np.sqrt(1 - (b_squared / a_squared)) # [-] WGS84 Earth eccentricity factor
+    # [-] WGS84 Earth eccentricity factor
+    eccentricity = np.sqrt(1 - (b_squared / a_squared))
 
     tan_term = np.tan(np.pi / 4 + lat / 2)
     lat_term = ((1 - eccentricity * np.sin(lat)) / (1 + eccentricity * np.sin(lat))) \
@@ -190,7 +195,8 @@ def sphere_greatcircle_intersect(p1_lat, p1_lon, p2_lat, p2_lon, p3_lat, p3_lon,
     intersect_y = intersect_t[1]
     intersect_z = intersect_t[2]
 
-    intersect_lat, intersect_lon = unitvector_to_latlon(intersect_x, intersect_y, intersect_z)
+    intersect_lat, intersect_lon = unitvector_to_latlon(
+        intersect_x, intersect_y, intersect_z)
 
     return np.degrees(intersect_lat), np.degrees(intersect_lon)
 
@@ -252,7 +258,7 @@ def ellipsoid_greatcircle_intersect(p1_lat, p1_lon, p2_lat, p2_lon, p3_lat, p3_l
 
         lat_prev = lat_init
         while True:
-            N = 1 / np.sqrt(1 - (e ** 2) * (np.sin(lat_prev) ** 2) )
+            N = 1 / np.sqrt(1 - (e ** 2) * (np.sin(lat_prev) ** 2))
             h = (p / np.cos(lat_prev)) - N
 
             lat_curr = np.arctan2(cart_z, (1 - (e ** 2) * (N / (N + h))) * p)
@@ -301,9 +307,11 @@ def ellipsoid_greatcircle_intersect(p1_lat, p1_lon, p2_lat, p2_lon, p3_lat, p3_l
     intersect_y = intersect_t[1]
     intersect_z = intersect_t[2]
 
-    intersect_lat, intersect_lon = vector_to_latlon(intersect_x, intersect_y, intersect_z)
+    intersect_lat, intersect_lon = vector_to_latlon(
+        intersect_x, intersect_y, intersect_z)
 
     return np.degrees(intersect_lat), np.degrees(intersect_lon)
+
 
 def calc_midpoint(lat_1, lon_1, lat_2, lon_2):
     """
@@ -318,14 +326,97 @@ def calc_midpoint(lat_1, lon_1, lat_2, lon_2):
     By = np.cos(np.radians(lat_2)) * np.sin(delta_lon)
 
     lat_mid = np.degrees(np.arctan2(np.sin(np.radians(lat_1)) + np.sin(np.radians(lat_2)),
-                         np.sqrt((np.cos(np.radians(lat_1)) + Bx) ** 2 + By ** 2)))
+                                    np.sqrt((np.cos(np.radians(lat_1)) + Bx) ** 2 + By ** 2)))
     lon_mid = lon_1 + np.degrees(np.arctan2(By, np.cos(np.radians(lat_1)) + Bx))
 
     return lat_mid, lon_mid
 
+
+def crs_middle(crs_left, crs_right):
+    """
+    Find the course that forms the bisector of the angle
+    between crs_left and crs_right (in clockwise direction).
+    """
+
+    if crs_left < crs_right:
+        crs_mid = 0.5 * (crs_left + crs_right)
+    elif crs_left > crs_right:
+        # North in between crs_l and crs_r
+        crs_mid = (crs_left + 0.5 * (360 - crs_left + crs_right)) % 360
+    else:
+        # Ensure when crs_l,crs_r = 360 then crs_mid = 0
+        crs_mid = crs_left % 360
+
+    return crs_mid
+
+
+def crs_is_between(crs, crs_left, crs_right):
+    """
+    Check if a given magnetic course crs on [0 .. 360] deg lies
+    in between crs_left and crs_right (in clockwise direction).
+    """
+
+    is_between = ((crs_left > crs_right) and (crs > crs_left or crs < crs_right)) or \
+        ((crs_left < crs_right) and (crs > crs_left and crs < crs_right))
+
+    return is_between
+
+
+def calc_future_pos(dt, lon, lat, gseast, gsnorth):
+    """
+    Calculate future lon and lat vectors after time dt based on
+    current position and velocity vectors.
+    """
+
+    newlat = lat + np.degrees(dt * gsnorth / Rearth)
+    newcoslat = np.cos(np.deg2rad(newlat))
+    newlon = lon + np.degrees(dt * gseast / newcoslat / Rearth)
+
+    return newlon, newlat
+
+
+def enu2crs(enu):
+    """
+    Convert an array of angles defined in East-North-Up on
+    [-180,180] degrees to compass angles on [0,360].
+    """
+
+    crs = ((90 - enu) + 360) % 360
+
+    return crs
+
+
+def ned2crs(ned):
+    """
+    Convert an array of angles defined in North-East-Down on
+    [-180,180] degrees to compass angles on [0,360].
+    """
+
+    crs = (ned + 360) % 360
+
+    return crs
+
+
+def crs_closest(ref_crs, crs_a, crs_b):
+    """
+    Takes three course vectors ref_rs, crs_a, and crs_b and per element
+    returns the value of either crs_a or crs_b depending on which has
+    the smallest angle difference with respect to ref_crs.
+    """
+
+    # Calculate absolute angle difference between both courses and the reference
+    diff_ref_a = np.absolute(np.remainder(ref_crs - crs_a + 180, 360) - 180)
+    diff_ref_b = np.absolute(np.remainder(ref_crs - crs_b + 180, 360) - 180)
+
+    # Select the course with the smallest angle difference
+    crs = np.where(diff_ref_a < diff_ref_b, crs_a, crs_b)
+
+    return crs
+
+
 # if __name__ == "__main__":
 #     (lat00, lon00) = sphere_greatcircle_intersect(52.2, 5.0, 51.7, 5.4, 51.5, 4.5, 52.0, 5.5)
-    
+
 #     # (lat, lon) = ellipse_greatcircle_intersect(51.88158, 4.60602,
 #     #                                    52.18404, 5.44647,
 #     #                                    51.5, 4.5,
@@ -336,12 +427,12 @@ def calc_midpoint(lat_1, lon_1, lat_2, lon_2):
 #                                               51.53950, 7.26196,
 #                                               51.5, 4.5,
 #                                               53.03461, 5.41626)
-    
+
 #     (lat03, lon03) = sphere_greatcircle_intersect(42.94034, -74.70703,
 #                                               -7.18810, 84.90234,
 #                                               -18.64625, -10.72266,
 #                                               55.77657, 104.76563)
-    
+
 #     (lat04, lon04) = sphere_greatcircle_intersect(52, 5,
 #                                               37, -120,
 #                                               0, -60,
@@ -349,7 +440,7 @@ def calc_midpoint(lat_1, lon_1, lat_2, lon_2):
 
 # # Ellipsoid
 #     (lat10, lon10) = ellipsoid_greatcircle_intersect(52.2, 5.0, 51.7, 5.4, 51.5, 4.5, 52.0, 5.5)
-    
+
 #     # (lat, lon) = ellipse_greatcircle_intersect(51.88158, 4.60602,
 #     #                                    52.18404, 5.44647,
 #     #                                    51.5, 4.5,
@@ -360,12 +451,12 @@ def calc_midpoint(lat_1, lon_1, lat_2, lon_2):
 #                                                  51.53950, 7.26196,
 #                                                  51.5, 4.5,
 #                                                  53.03461, 5.41626)
-    
+
 #     (lat13, lon13) = ellipsoid_greatcircle_intersect(42.94034, -74.70703,
 #                                                  -7.18810, 84.90234,
 #                                                  -18.64625, -10.72266,
 #                                                  55.77657, 104.76563)
-    
+
 #     (lat14, lon14) = ellipsoid_greatcircle_intersect(52, 5,
 #                                                  37, -120,
 #                                                  0, -60,
