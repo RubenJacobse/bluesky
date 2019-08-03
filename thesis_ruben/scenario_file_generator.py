@@ -22,8 +22,7 @@ sys.path.append(os.path.abspath(os.path.join('../plugins')))
 
 # BlueSky imports
 import bluesky.tools.geo as bsgeo
-import plugins.area_restriction as ar
-import plugins.tempgeo as tg
+import plugins.thesis.geo as tg
 
 # BlueSky simulator settings
 SIM_TIME_STEP = 0.1  # [s] Simulation time step
@@ -248,14 +247,17 @@ class ScenarioGenerator():
                      "crs_max": ""}
 
         # Coordinates of corridor rectangular area
-        corridor_coords = [self.corridor["south_lat"],
-                           self.corridor["left_lon"],
-                           self.corridor["south_lat"],
-                           self.corridor["right_lon"],
-                           self.corridor["north_lat"],
-                           self.corridor["right_lon"],
-                           self.corridor["north_lat"],
-                           self.corridor["left_lon"]]
+        corridor_tuples = [(self.corridor["south_lat"],
+                            self.corridor["left_lon"]),
+                           (self.corridor["south_lat"],
+                            self.corridor["right_lon"]),
+                           (self.corridor["north_lat"],
+                            self.corridor["right_lon"]),
+                           (self.corridor["north_lat"],
+                            self.corridor["left_lon"])]
+        corridor_poly = Polygon(corridor_tuples)
+        corridor_coords = [x for (lat, lon) in corridor_tuples
+                           for x in (lat, lon)]
 
         # Coordinates of circular area
         ring_radius = self.corridor_length/2 + 30
@@ -277,13 +279,20 @@ class ScenarioGenerator():
         wedge_coords = [x for (lat, lon) in wedge_poly.exterior.coords
                         for x in (lat, lon)]
 
+        # Coordinates of (wedge, corridor) union
+        cor_wedge_poly = wedge_poly.union(corridor_poly)
+        cor_wedge_coords = [x for (lat, lon) in cor_wedge_poly.exterior.coords
+                            for x in (lat, lon)]
+
         # Set the geo vector coordinates
-        if "CORRIDOR" in self.resolution_method:
+        if "_CORRIDOR_" in self.resolution_method:
             geovector["coords"] = corridor_coords
-        elif "CIRCLE" in self.resolution_method:
+        elif "_CIRCLE_" in self.resolution_method:
             geovector["coords"] = ring_coords
-        elif "WEDGE" in self.resolution_method:
+        elif "_WEDGE_" in self.resolution_method:
             geovector["coords"] = wedge_coords
+        elif "_CORWEDGE" in self.resolution_method:
+            geovector["coords"] = cor_wedge_coords
 
         # A two dimensional geovector can restrict either:
         # ground speed, course, or both ground speed and course
@@ -516,7 +525,10 @@ class ScenarioGenerator():
 
             scnfile.write("\n\n# Setup BlueSky ASAS module options")
             scnfile.write(zero_time + "ASAS ON")
-            scnfile.write(zero_time + f"RESO {self.resolution_method}")
+            if self.resolution_method.startswith("GV"):
+                scnfile.write(zero_time + f"RESO MVP")
+            else:
+                scnfile.write(zero_time + f"RESO {self.resolution_method}")
             scnfile.write(zero_time + f"RMETHH {RMETHH}")
 
             # Restricted airspaces
@@ -675,7 +687,7 @@ def calc_line_ring_intersection(ring_center_lat,
         elif dist_from_center < ring_radius:
             line_start_lat, line_start_lon = intersect_lat, intersect_lon
 
-    angle_from_center = ar.ned2crs(qdr_from_center)
+    angle_from_center = tg.ned2crs(qdr_from_center)
 
     return intersect_lat, intersect_lon, angle_from_center
 
@@ -699,7 +711,8 @@ if __name__ == "__main__":
                         "SWARM-V2",
                         "GV_CORRIDOR_SPD",
                         "GV_CIRCLE_SPD",
-                        "GV_WEDGE_SPD"]:
+                        "GV_WEDGE_SPD",
+                        "GV_CORWEDGE_SPD"]:
         ScenarioGenerator(test_folder,
                           current_time,
                           SEED,
