@@ -531,9 +531,9 @@ class AreaRestrictionManager(TrafficArrays):
     def find_bearings_tangent_to_area(self, area_idx, area):
         """ For each aircraft find the tangent bearings to the current area ."""
 
-        # Constant heading requires loxodrome (rhumb line) angle
+        # Calculate left- and right tangent bearings
         self.brg_left_tangent[area_idx, :], self.brg_right_tangent[area_idx, :] \
-            = area.calc_rhumb_tangents(bs.traf.ntraf, bs.traf.lon, bs.traf.lat)
+            = area.calc_tangents(bs.traf.ntraf, bs.traf.lon, bs.traf.lat)
 
         # Convert to course on [0..360] degrees
         self.crs_left_tangent[area_idx, :] \

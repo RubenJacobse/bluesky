@@ -121,7 +121,7 @@ class RestrictedAirspaceArea():
         areafilter.deleteArea(self.area_id)
 
     # NOTE: Can this be vectorized further?
-    def calc_qdr_tangents(self, num_traf, ac_lon, ac_lat):
+    def calc_tangents(self, num_traf, ac_lon, ac_lat):
         """
         For a given aircraft position find left- and rightmost courses
         that are tangent to a given polygon as well as the distance to
@@ -144,82 +144,40 @@ class RestrictedAirspaceArea():
             idx_right_vert = 0
 
             # Loop over vertices 1:n-1 and evaluate position of aircraft wrt
-            # the edges to find the indices of the vertices at which the tangents
-            # touch the polygon
+            # the edges to find the indices of the vertices at which the
+            # tangents touch the polygon
             #
             # Algorithm from: http://geomalgorithms.com/a15-_tangents.html
             for jj in range(1, len(vertex) - 1):
-                edge_prev = self.is_left_of_line(vertex[jj - 1], vertex[jj], ac_pos)
-                edge_next = self.is_left_of_line(vertex[jj], vertex[jj + 1], ac_pos)
+                edge_prev = self.is_left_of_line(vertex[jj - 1],
+                                                 vertex[jj],
+                                                 ac_pos)
+                edge_next = self.is_left_of_line(vertex[jj],
+                                                 vertex[jj + 1],
+                                                 ac_pos)
 
                 if edge_prev <= 0 and edge_next > 0:
-                    if not self.is_left_of_line(ac_pos, vertex[jj], vertex[idx_right_vert]) < 0:
+                    if not self.is_left_of_line(ac_pos,
+                                                vertex[jj],
+                                                vertex[idx_right_vert]) < 0:
                         idx_right_vert = jj
                 elif edge_prev > 0 and edge_next <= 0:
-                    if not self.is_left_of_line(ac_pos, vertex[jj], vertex[idx_left_vert]) > 0:
+                    if not self.is_left_of_line(ac_pos,
+                                                vertex[jj],
+                                                vertex[idx_left_vert]) > 0:
                         idx_left_vert = jj
 
-            # Calculate tangent courses from aircraft to left- and rightmost vertices
-            qdr_left[ii], _ = qdrdist(ac_pos[1],
-                                      ac_pos[0],
-                                      vertex[idx_left_vert][1],
-                                      vertex[idx_left_vert][0])
-            qdr_right[ii], _ = qdrdist(ac_pos[1],
-                                       ac_pos[0],
-                                       vertex[idx_right_vert][1],
-                                       vertex[idx_right_vert][0])
+            # Calculate tangents from aircraft to left- and rightmost vertices
+            qdr_left[ii] = tg.rhumb_azimuth(ac_pos[1],
+                                            ac_pos[0],
+                                            vertex[idx_left_vert][1],
+                                            vertex[idx_left_vert][0])
+            qdr_right[ii] = tg.rhumb_azimuth(ac_pos[1],
+                                             ac_pos[0],
+                                             vertex[idx_right_vert][1],
+                                             vertex[idx_right_vert][0])
 
         return qdr_left, qdr_right
-
-    # NOTE: Can this be vectorized further?
-    def calc_rhumb_tangents(self, num_traf, ac_lon, ac_lat):
-        """
-        For a given aircraft position find left- and rightmost courses
-        that are tangent to a given polygon as well as the distance to
-        the corresponding vertices.
-        """
-
-        # Initialize arrays to store loxodrome angles
-        lox_angle_left = np.zeros(num_traf, dtype=float)
-        lox_angle_right = np.zeros(num_traf, dtype=float)
-
-        # Create array containing [lon, lat] for each vertex
-        vertex = np.array(self.ring.coords.xy).T
-
-        # Calculate loxodrome angles for each aircraft
-        for ii in range(num_traf):
-            ac_pos = [ac_lon[ii], ac_lat[ii]]
-
-            # Start by assuming both tangents touch at polygon vertex with index 0
-            idx_left_vert = 0
-            idx_right_vert = 0
-
-            # Loop over vertices 1:n-1 and evaluate position of aircraft wrt the edges
-            # to find the indices of the vertices at which the tangents touch the polygon.
-            #
-            # Algorithm from: http://geomalgorithms.com/a15-_tangents.html
-            for jj in range(1, len(vertex) - 1):
-                edge_prev = self.is_left_of_line(vertex[jj - 1], vertex[jj], ac_pos)
-                edge_next = self.is_left_of_line(vertex[jj], vertex[jj + 1], ac_pos)
-
-                if edge_prev <= 0 and edge_next > 0:
-                    if not self.is_left_of_line(ac_pos, vertex[jj], vertex[idx_right_vert]) < 0:
-                        idx_right_vert = jj
-                elif edge_prev > 0 and edge_next <= 0:
-                    if not self.is_left_of_line(ac_pos, vertex[jj], vertex[idx_left_vert]) > 0:
-                        idx_left_vert = jj
-
-            # Calculate tangent loxodrome angles from aircraft to left- and rightmost vertices
-            lox_angle_left[ii] = tg.rhumb_azimuth(ac_pos[1],
-                                                  ac_pos[0],
-                                                  vertex[idx_left_vert][1],
-                                                  vertex[idx_left_vert][0])
-            lox_angle_right[ii] = tg.rhumb_azimuth(ac_pos[1],
-                                                   ac_pos[0],
-                                                   vertex[idx_right_vert][1],
-                                                   vertex[idx_right_vert][0])
-
-        return lox_angle_left, lox_angle_right
 
     @staticmethod
     def is_ccw(coords):
