@@ -11,6 +11,7 @@ Current implementation is heavily work-in-progress and unstable.
 """
 
 # General imports
+from enum import Enum
 from collections.abc import Collection
 
 # Third-party imports
@@ -29,26 +30,27 @@ import plugins.geovector as gv
 from . import RestrictedAirspaceArea
 from . import geo as tg
 
+# Default settings
+DEFAULT_AREA_T_LOOKAHEAD = 120  # [s] Area conflict detection threshold
+AREA_AVOIDANCE_CRS_MARGIN = 1  # [deg] Avoid restriction by <x> degree margin
+COMMANDED_CRS_MARGIN = 0.2  # [deg] Verify if commanded heading has been reached
+NM_TO_M = 1852.  # Conversion factor nautical miles to metres
 
-# Default variable values for numpy arrays
+# Default variable values used to initialize numpy arrays
 VAR_DEFAULTS = {"float": 0.0,
                 "int": 0,
                 "bool": False,
                 "S": "",
                 "str": "",
                 "object": None}
-DEFAULT_AREA_T_LOOKAHEAD = 120  # [s]
-AREA_AVOIDANCE_CRS_MARGIN = 1  # [deg]
-COMMANDED_CRS_MARGIN = 0.2  # [deg] Verify if commanded heading has been reached
-NM_TO_M = 1852.  # Conversion factor nautical miles to metres
 
+# Headers for log files written from this module
 AREALOG_HEADER = ("simt [s], "
                   + "ac callsign [-], "
                   + "area idx[-], "
                   + "t_int [s], "
                   + "ac lat [deg], "
                   + "ac lon [deg]")
-
 ASASLOG_HEADER = ("simt [s], "
                   + "ac1 [-], "
                   + "ac2 [-], "
@@ -62,6 +64,18 @@ ASASLOG_HEADER = ("simt [s], "
 
 # Ensure log files are saved in separate directory
 bs.settings.set_variable_defaults(log_path="thesis_ruben/output")
+
+
+class SteeringMode(Enum):
+    """
+    Object used to signal which steering mode is to be used
+    by an aircraft.
+    Valid modes that can be used: ASAS, AREA, and LNAV
+    """
+
+    ASAS = 1
+    AREA = 2
+    LNAV = 3
 
 
 class AreaRestrictionManager(TrafficArrays):
@@ -717,19 +731,19 @@ class AreaRestrictionManager(TrafficArrays):
     def determine_aircraft_mode(self):
         """
         Determine which mode each aircraft is in:
-            - "area" :  in area conflict mode
-            - "asas" :  in aircraft conflict mode
-            - "lnav" :  in route following mode
+            - SteeringMode.AREA :  in area conflict mode
+            - SteeringMode.ASAS :  in aircraft conflict mode
+            - SteeringMode.LNAV :  in route following mode
         """
 
         self.control_mode_curr = [None] * self.num_traf
         for ac_idx in range(self.num_traf):
             if self.is_in_conflict[:, ac_idx].any() or self.is_in_area_reso[ac_idx]:
-                self.control_mode_curr[ac_idx] = "area"
+                self.control_mode_curr[ac_idx] = SteeringMode.AREA
             elif bs.traf.asas.active[ac_idx]:
-                self.control_mode_curr[ac_idx] = "asas"
+                self.control_mode_curr[ac_idx] = SteeringMode.ASAS
             else:
-                self.control_mode_curr[ac_idx] = "lnav"
+                self.control_mode_curr[ac_idx] = SteeringMode.LNAV
 
     def apply_mode_based_action(self):
         """
@@ -760,16 +774,16 @@ class AreaRestrictionManager(TrafficArrays):
                 print("{} asas active: {}".format(
                     bs.traf.id[ac_idx], bs.traf.asas.active[ac_idx]))
 
-            if self.control_mode_curr[ac_idx] == "asas":
+            if self.control_mode_curr[ac_idx] == SteeringMode.ASAS:
                 pass
 
-            if self.control_mode_curr[ac_idx] == "lnav":
+            if self.control_mode_curr[ac_idx] == SteeringMode.LNAV:
                 # # NOTE: current implementation is naive, could result in all sorts of turning
                 # # behaviour if the active waypoint is behind the aircraft.
                 #
                 # Waypoint recovery after conflict: Find the next active waypoint
                 # and send the aircraft to that waypoint.
-                if self.control_mode_prev[ac_idx] == "area":
+                if self.control_mode_prev[ac_idx] == SteeringMode.AREA:
                     iwpid = bs.traf.ap.route[ac_idx].findact(ac_idx)
                     if iwpid == -1:  # To avoid problems if there are no waypoints
                         continue
@@ -786,13 +800,13 @@ class AreaRestrictionManager(TrafficArrays):
                               .format(bs.traf.id[ac_idx],
                                       bs.traf.ap.route[ac_idx].wpname[iwpid]))
 
-            # "asas" and "lnav" modes can be overridden by geovectors
-            # if present, but "area" mode should always be followed even
-            # if it conflicts with a geovector.
+            # SteeringMode.ASAS and SteeringMode.LNAV modes can be overridden by
+            # geovectors if present, but SteeringMode.AREA mode should always be
+            # followed even if it conflicts with a geovector.
             if gv.geovecs:
                 gv.applygeovec()
 
-            if self.control_mode_curr[ac_idx] == "area":
+            if self.control_mode_curr[ac_idx] == SteeringMode.AREA:
                 if not self.is_in_area_reso[ac_idx]:
                     # Initiate new manoeuvre
                     self.perform_manoeuver(ac_idx)
