@@ -538,7 +538,7 @@ class ScenarioGenerator():
             scnfile.write(zero_time + f"RAACONF {AREA_LOOKAHEAD_TIME}")
 
             for idx, area in enumerate(self.airspace_restrictions):
-                scnfile.write(zero_time + f"RAA RAA{idx + 1},ON,{0},{0},"
+                scnfile.write(zero_time + f"RAA RAA{idx + 1},ON,"
                               + f"{area['coord_str']}")
                 scnfile.write(zero_time + f"COLOR RAA{idx + 1},164,0,0")
                 scnfile.write(zero_time + f"DEFWPT RAA_{idx + 1},"

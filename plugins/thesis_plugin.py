@@ -33,8 +33,8 @@ def init_plugin():
 
     stackfunctions = {
         "RAA": [
-            "RAA name, ON/OFF, gsnorth, gseast, [lat1,lon1,lat2,lon2,...]",
-            "txt,onoff,spd,spd,[latlon,...]",
+            "RAA name, ON/OFF, [lat1,lon1,lat2,lon2,...]",
+            "txt,onoff,[latlon,...]",
             areas.create_area,
             "Create restricted airspace areas that are to be avoided by all traffic."],
         "DELRAA": [

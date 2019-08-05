@@ -96,10 +96,6 @@ class AreaRestrictionManager(TrafficArrays):
             # N-dimensional parameters where each column is an aircraft
             # and each row is an area
             # =========================================================
-            # Relative ground speed and its components in [m/s]
-            self.rel_gs = np.array([[]])
-            self.rel_gseast = np.array([[]])
-            self.rel_gsnorth = np.array([[]])
             # Bearings from ac tangent to each area in [deg] on [-180..180]
             self.brg_left_tangent = np.array([[]])
             self.brg_right_tangent = np.array([[]])
@@ -136,9 +132,9 @@ class AreaRestrictionManager(TrafficArrays):
             self.closest_conflicting_area_idx = []
             self.current_position = []  # Shapely Point (lon, lat)
 
-            # Aircraft track relative to each area. For n aircraft and m areas
-            # this will be filled with n lists each with m LineString elements
-            self.relative_track = []  # LineString [(lon, lat), (lon, lat)]
+            # Extrapolated paths from current position to position after
+            # area lookahead time. Will contain one element for each aircraft.
+            self.predicted_path = []  # LineString [(lon, lat), (lon, lat)]
 
             # Aircraft control mode during current and previous time step
             self.control_mode_curr = []
@@ -321,11 +317,7 @@ class AreaRestrictionManager(TrafficArrays):
             self._parent._children.remove(self)
 
     def preupdate(self):
-        """ Update the area positions before traf is updated. """
-
-        # NOTE: Not sure if this should be part of preupdate() or update()
-        for area in self.areas:
-            area.update_pos(1.0)
+        pass
 
     def update(self):
         """ Do area avoidance calculations after traf has been updated. """
@@ -369,7 +361,7 @@ class AreaRestrictionManager(TrafficArrays):
         self.calculate_courses_to_waypoints()
 
         # Identify all aircraft-area conflicts
-        self.calculate_positions_and_relative_tracks()
+        self.calculate_positions_and_predicted_paths()
         for area_idx, area in enumerate(self.areas):
             self.find_bearings_tangent_to_area(area_idx, area)
             self.find_ac_inside_and_inconflict(area_idx, area)
@@ -382,7 +374,7 @@ class AreaRestrictionManager(TrafficArrays):
         self.determine_aircraft_mode()
         self.apply_mode_based_action()
 
-    def create_area(self, area_id, area_status, gsnorth, gseast, *coords):
+    def create_area(self, area_id, area_status, *coords):
         """ Create a new restricted airspace area """
 
         if area_id in self.area_ids:
@@ -392,8 +384,6 @@ class AreaRestrictionManager(TrafficArrays):
         # Create new RestrictedAirspaceArea instance and add to internal lists
         new_area = RestrictedAirspaceArea(area_id,
                                           area_status,
-                                          gseast,
-                                          gsnorth,
                                           list(coords))
 
         self.areas.append(new_area)
@@ -512,50 +502,31 @@ class AreaRestrictionManager(TrafficArrays):
                                     nextwp_lat, nextwp_lon)
         self.crs_to_next_wp = tg.ned2crs(qdr_to_next_wp)
 
-    def calculate_positions_and_relative_tracks(self):
+    def calculate_positions_and_predicted_paths(self):
         """
-        Calculate the relevant position parameters used in aircraft-area
-        conflict detection.
+        Calculate the future aircraft positions and path to that position
+        based on a linear state extrapolation. Results will be used for
+        aircraft-area conflict detection.
         """
 
         # Represent each aircraft position as shapely point
-        self.current_position = [spgeom.Point(lon, lat)
-                                 for (lon, lat) in zip(bs.traf.lon, bs.traf.lat)]
+        self.current_position = [spgeom.Point(lon, lat) for (lon, lat)
+                                 in zip(bs.traf.lon, bs.traf.lat)]
 
-        # NOTE: we need to build this list of lists iteratively, otherwise each
-        # sub-element is a pointer to the same list, and relative_track[idx].append()
-        # will append to ALL sub lists...
-        relative_track = [[] for i in range(self.num_traf)]
+        # Calculate position of each aircraft after lookahead time
+        future_lon, future_lat = tg.calc_future_pos(self.t_lookahead,
+                                                    bs.traf.lon,
+                                                    bs.traf.lat,
+                                                    bs.traf.gseast,
+                                                    bs.traf.gsnorth)
 
-        # NOTE: Could this be vectorized instead of looped over all
-        # aircraft-area combinations?
-        for area_idx, area in enumerate(self.areas):
-            self.rel_gseast[area_idx, :] = bs.traf.gseast - area.gseast
-            self.rel_gsnorth[area_idx, :] = bs.traf.gsnorth - area.gsnorth
+        # Create shapely points for future relative position
+        future_position = [spgeom.Point(lon, lat) for (lon, lat)
+                           in zip(future_lon, future_lat)]
 
-            # Calculate position of each aircraft relative to the area after
-            # lookahead time
-            future_relative_lon, future_relative_lat \
-                = tg.calc_future_pos(self.t_lookahead,
-                                     bs.traf.lon,
-                                     bs.traf.lat,
-                                     self.rel_gseast[area_idx, :],
-                                     self.rel_gsnorth[area_idx, :])
-
-            # Create shapely points for future relative position
-            future_relative_position \
-                = [spgeom.Point(lon, lat) for (lon, lat)
-                   in zip(future_relative_lon, future_relative_lat)]
-
-            # Use current and future relative position to calculate relative track
-            for ac_idx, (curr, fut) in enumerate(zip(self.current_position,
-                                                     future_relative_position)):
-                relative_track[ac_idx].append(spgeom.LineString([curr, fut]))
-
-        self.relative_track = relative_track
-
-        # Magnitude of relative velocities
-        self.rel_gs = np.sqrt(self.rel_gseast ** 2 + self.rel_gsnorth ** 2)
+        # Use current and future position to calculate path between positions
+        self.predicted_path = [spgeom.LineString([curr, fut]) for (curr, fut)
+                               in zip(self.current_position, future_position)]
 
     def find_bearings_tangent_to_area(self, area_idx, area):
         """ For each aircraft find the tangent bearings to the current area ."""
@@ -578,7 +549,7 @@ class AreaRestrictionManager(TrafficArrays):
                 self.current_position[ac_idx].within(area.poly)
 
             self.is_in_conflict[area_idx, ac_idx] = \
-                area.ring.intersects(self.relative_track[ac_idx][area_idx])
+                area.ring.intersects(self.predicted_path[ac_idx])
 
     def calculate_time_to_intrusion(self, area_idx, area):
         """
@@ -599,7 +570,7 @@ class AreaRestrictionManager(TrafficArrays):
                 # intersection. (We cannot use shapely distance functions because
                 # vertex definitions are in degrees).
                 intr_points = area.ring.intersection(
-                    self.relative_track[ac_idx][area_idx])
+                    self.predicted_path[ac_idx])
                 intr_closest = spops.nearest_points(
                     self.current_position[ac_idx], intr_points)[1]
                 intr_closest_lat, intr_closest_lon \
@@ -667,45 +638,24 @@ class AreaRestrictionManager(TrafficArrays):
         aircraft in conflict with a given area.
         """
 
-        area = self.areas[area_idx]
         ac_gs = bs.traf.gs[ac_indices]
 
-        # Components of unit vectors along left and right VO edges
+        # Components of unit vectors along left and right collision cone edges
         u_l_east = np.sin(np.radians(self.brg_left_tangent[area_idx, ac_indices]))
         u_l_north = np.cos(np.radians(self.brg_left_tangent[area_idx, ac_indices]))
         u_r_east = np.sin(np.radians(self.brg_right_tangent[area_idx, ac_indices]))
         u_r_north = np.cos(np.radians(self.brg_right_tangent[area_idx, ac_indices]))
 
-        # For heading-change-only resolution maneuvers, the resolution vector lies
-        # on the edge of the Velocity Obstacle (or Collision Cone if area is
-        # non-moving). The vector magnitudes are the same as the current aircraft
-        # ground speeds (assuming zero wind).
-        if area.gs:
-            # Find angles between -vrel and left- and right edges of VO using dot
-            # product of -vrel and the unit vectors along the VO edges
-            beta_l_rad = np.arccos(-1 * (u_l_east * area.gseast +
-                                         u_l_north * area.gsnorth) / (area.gs ** 2))
-            beta_r_rad = np.arccos(-1 * (u_r_east * area.gseast +
-                                         u_r_north * area.gsnorth) / (area.gs ** 2))
-
-            # Calculate relative resolution velocity component along the VO edges
-            v_ul = ac_gs * np.cos(beta_l_rad) + ac_gs \
-                * np.cos(np.arcsin(ac_gs * np.sin(beta_l_rad) / ac_gs))
-            v_ur = ac_gs * np.cos(beta_r_rad) + ac_gs \
-                * np.cos(np.arcsin(ac_gs * np.sin(beta_r_rad) / ac_gs))
-        else:
-            # Resolution velocity magnitudes on left- and right edges of CC
-            v_ul = ac_gs
-            v_ur = ac_gs
+        # Resolution velocity magnitudes on left- and right edges of CC
+        v_ul = ac_gs
+        v_ur = ac_gs
 
         # Calculate north and east components of left- and right resolution
-        # absolute velocities (For a non moving area, area.gseast and area.gsnorth
-        # are simply 0, but for a moving area these terms are required to get the
-        # absolute resolution velocity of each aircraft.)
-        vres_l_east = u_l_east * v_ul - area.gseast
-        vres_l_north = u_l_north * v_ul - area.gsnorth
-        vres_r_east = u_r_east * v_ur - area.gseast
-        vres_r_north = u_r_north * v_ur - area.gsnorth
+        # absolute velocities
+        vres_l_east = u_l_east * v_ul
+        vres_l_north = u_l_north * v_ul
+        vres_r_east = u_r_east * v_ur
+        vres_r_north = u_r_north * v_ur
 
         # Calculate magnetic tracks of left- and right resolution vectors
         vres_l_crs = (np.degrees(np.arctan2(vres_l_east, vres_l_north))

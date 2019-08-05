@@ -20,14 +20,11 @@ from . import geo as tg
 class RestrictedAirspaceArea():
     """ Class that represents a single Restricted Airspace Area. """
 
-    def __init__(self, area_id, status, gseast, gsnorth, coords):
+    def __init__(self, area_id, status, coords):
 
         # Store input parameters as attributes
         self.area_id = area_id
         self.status = status
-        self.gsnorth = gsnorth
-        self.gseast = gseast
-        self.gs = np.sqrt(gsnorth ** 2 + gseast ** 2)
 
         # Enforce that the coordinate list defines a valid ring
         coords = self._check_poly(coords)
@@ -44,41 +41,7 @@ class RestrictedAirspaceArea():
         self.poly = spgeom.Polygon(self.verts)
         self.coords = coords
 
-        # Numpy array with ground speed vector of each vertex
-        self.gs_verts = np.full(np.shape(self.verts), [self.gseast, self.gsnorth])
-
         # Draw polygon on BlueSky RadarWidget canvas
-        self._draw()
-
-    def update_pos(self, dt):
-        """
-        Update the position of the area (only if its groundspeed is
-        nonzero). Recalculates the coordinates and updates the polygon
-        position drawn in the BlueSky RadarWidget.
-        """
-
-        if not (self.gsnorth or self.gseast):
-            return
-
-        # Calculate new vertex positions after timestep dt
-        curr_lon = self.verts[:, 0]
-        curr_lat = self.verts[:, 1]
-        newlon, newlat = tg.calc_future_pos(dt,
-                                            curr_lon,
-                                            curr_lat,
-                                            self.gseast,
-                                            self.gsnorth)
-
-        # Update vertex representations in all formats
-        self.verts = np.array([newlon, newlat]).T
-        self.ring = spgeom.LinearRing(self.verts)
-        self.poly = spgeom.Polygon(self.verts)
-        self.coords = self._verts2coords(self.verts)
-
-        # Remove current drawing and redraw new position on the BlueSky
-        # RadarWidget canvas
-        # NOTE: Can probably be improved by a lot!
-        self._undraw()
         self._draw()
 
     def delete(self):
