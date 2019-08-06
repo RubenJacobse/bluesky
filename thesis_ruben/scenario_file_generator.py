@@ -547,7 +547,6 @@ class ScenarioGenerator():
             # Geovectors (skip if no geovectors are defined)
             if self.geovectors:
                 scnfile.write("\n\n# Create GEOVECTOR area(s)")
-                scnfile.write(zero_time + "PLUGINS LOAD GEOVECTOR")
             for geovector in self.geovectors:
                 coords = geovector["coords"]
                 coord_str = ",".join(str(f"{x:.6f}") for x in coords)
