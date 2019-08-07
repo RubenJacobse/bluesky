@@ -11,7 +11,7 @@ Geovector is defined as:
  """
 import numpy as np
 
-from bluesky import traf  #, settings, navdb, traf, sim, scr, tools
+import bluesky as bs
 from bluesky.tools import areafilter
 from bluesky.tools.aero import vtas2cas,ft
 from bluesky.tools.misc import degto180
@@ -101,65 +101,65 @@ def applygeovec():
     # Apply each geovector
     for areaname, vec in geovecs.items():
         if areafilter.hasArea(areaname):
-            swinside  = areafilter.checkInside(areaname, traf.lat, traf.lon, traf.alt)
+            swinside  = areafilter.checkInside(areaname, bs.traf.lat, bs.traf.lon, bs.traf.alt)
 
-            insids = set(np.array(traf.id)[swinside])
+            insids = set(np.array(bs.traf.id)[swinside])
             newids = insids - vec.previnside
             delids = vec.previnside - insids
             # Store LNAV/VNAV status of new aircraft
             for acid in newids:
-                idx = traf.id2idx(acid)
-                vec.prevstatus[acid] = [traf.swlnav[idx], traf.swvnav[idx]]
+                idx = bs.traf.id2idx(acid)
+                vec.prevstatus[acid] = [bs.traf.swlnav[idx], bs.traf.swvnav[idx]]
 
             # Revert aircraft who have exited the geovectored area to their original status
             for acid in delids:
-                idx = traf.id2idx(acid)
+                idx = bs.traf.id2idx(acid)
                 if idx >= 0:
-                    traf.swlnav[idx], traf.swvnav[idx] = vec.prevstatus.pop(acid)
-            
+                    bs.traf.swlnav[idx], bs.traf.swvnav[idx] = vec.prevstatus.pop(acid)
+
             vec.previnside = insids
             # -----Ground speed limiting
             # For now assume no wind:  so use tas as gs
             if vec.gsmin is not None:
-                casmin = vtas2cas(np.ones(traf.ntraf) * vec.gsmin, traf.alt)
-                usemin = traf.selspd < casmin
-                traf.selspd[swinside & usemin] = casmin[swinside & usemin]
-                traf.swvnav[swinside & usemin] = False
+                casmin = vtas2cas(np.ones(bs.traf.ntraf) * vec.gsmin, bs.traf.alt)
+                usemin = vtas2cas(bs.traf.pilot.tas, bs.traf.alt) < casmin
+                bs.traf.pilot.tas[swinside & usemin] = casmin[swinside & usemin]
+                bs.traf.swvnav[swinside & usemin] = False
 
             if vec.gsmax is not None:
-                casmax = vtas2cas(np.ones(traf.ntraf) * vec.gsmax, traf.alt)
-                usemax = traf.selspd > casmax
-                traf.selspd[swinside & usemax] = casmax[swinside & usemax]
-                traf.swvnav[swinside & usemax] = False
+                casmax = vtas2cas(np.ones(bs.traf.ntraf) * vec.gsmax, bs.traf.alt)
+                usemax = vtas2cas(bs.traf.pilot.tas, bs.traf.alt) > casmax
+                bs.traf.pilot.tas[swinside & usemax] = casmax[swinside & usemax]
+                bs.traf.swvnav[swinside & usemax] = False
 
             #------ Limit Track(so hdg)
             # Max track interval is 180 degrees to avoid ambiguity of what is inside the interval
 
             if None not in [vec.trkmin, vec.trkmax]:
                 # Use degto180 to avodi problems for e.g interval [350,30]
-                usemin = swinside & (degto180(traf.trk - vec.trkmin) < 0) # Left of minimum
-                usemax = swinside & (degto180(traf.trk - vec.trkmax) > 0) # Right of maximum
+                usemin = swinside & (degto180(bs.traf.pilot.hdg - vec.trkmin) < 0) # Left of minimum
+                usemax = swinside & (degto180(bs.traf.pilot.hdg - vec.trkmax) > 0) # Right of maximum
 
                 #print(usemin,usemax)
-                traf.swlnav[swinside & (usemin | usemax)] = False
+                bs.traf.swlnav[swinside & (usemin | usemax)] = False
 
-                traf.ap.trk[swinside & usemin] = vec.trkmin
-                traf.ap.trk[swinside & usemax] = vec.trkmax
+                bs.traf.pilot.hdg[swinside & usemin] = vec.trkmin
+                bs.traf.pilot.hdg[swinside & usemax] = vec.trkmax
 
             # -----Ground speed limiting
             # For now assume no wind:  so use tas as gs
             if vec.vsmin is not None:
-                traf.selvs[swinside & (traf.vs < vec.vsmin)] = vec.vsmin
-                traf.swvnav[swinside & (traf.vs < vec.vsmin)] = False
+                bs.traf.selvs[swinside & (bs.traf.vs < vec.vsmin)] = vec.vsmin
+                bs.traf.swvnav[swinside & (bs.traf.vs < vec.vsmin)] = False
                 # Activate V/S mode by using a slightly higher altitude than current values
-                traf.selalt[swinside & (traf.vs < vec.vsmin)] = traf.alt[swinside & (traf.vs < vec.vsmin)] + \
+                bs.traf.selalt[swinside & (bs.traf.vs < vec.vsmin)] = bs.traf.alt[swinside & (bs.traf.vs < vec.vsmin)] + \
                                                             np.sign(vec.vsmin)*200.*ft
 
             if vec.vsmax is not None:
-                traf.selvs[swinside & (traf.vs > vec.vsmax)] = vec.vsmax
-                traf.swvnav[swinside & (traf.vs < vec.vsmax)] = False
+                bs.traf.selvs[swinside & (bs.traf.vs > vec.vsmax)] = vec.vsmax
+                bs.traf.swvnav[swinside & (bs.traf.vs < vec.vsmax)] = False
                 # Activate V/S mode by using a slightly higher altitude than current values
-                traf.selalt[swinside & (traf.vs > vec.vsmax)] = traf.alt[swinside & (traf.vs > vec.vsmax)] + \
+                bs.traf.selalt[swinside & (bs.traf.vs > vec.vsmax)] = bs.traf.alt[swinside & (bs.traf.vs > vec.vsmax)] + \
                                                             np.sign(vec.vsmax)*200.*ft
 
     return

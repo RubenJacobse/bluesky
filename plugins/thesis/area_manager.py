@@ -24,7 +24,7 @@ import bluesky as bs
 from bluesky.tools import datalog
 from bluesky.tools.geo import qdrdist
 from bluesky.tools.trafficarrays import TrafficArrays, RegisterElementParameters
-import plugins.geovector as gv
+from plugins import geovector as gv
 
 # Local imports
 from . import RestrictedAirspaceArea
@@ -316,10 +316,10 @@ class AreaRestrictionManager(TrafficArrays):
         if self._parent:
             self._parent._children.remove(self)
 
-    def preupdate(self):
+    def update(self):
         pass
 
-    def update(self):
+    def preupdate(self):
         """ Do area avoidance calculations after traf has been updated. """
 
         # If the current scenario name is not the same as the scenario
@@ -336,6 +336,10 @@ class AreaRestrictionManager(TrafficArrays):
             return
 
         self.ac_id = bs.traf.id[:]  # Purely for debugging purposes only
+
+        # Moved this call here from inside Traffic.update() method to try and
+        # make asas manoeuvres limited by geovector constraints
+        bs.traf.asas.update()
 
         # Log each conflict pair only once
         for (ac1, ac2), dist, tcpa, tlos in zip(bs.traf.asas.confpairs,
@@ -690,6 +694,7 @@ class AreaRestrictionManager(TrafficArrays):
         for ac_idx in range(self.num_traf):
             if self.is_in_conflict[:, ac_idx].any() or self.is_in_area_reso[ac_idx]:
                 self.control_mode_curr[ac_idx] = SteeringMode.AREA
+                bs.traf.asas.active[ac_idx] = False
             elif bs.traf.asas.active[ac_idx]:
                 self.control_mode_curr[ac_idx] = SteeringMode.ASAS
             else:
@@ -749,12 +754,6 @@ class AreaRestrictionManager(TrafficArrays):
                         print("{} heading direct to {}"
                               .format(bs.traf.id[ac_idx],
                                       bs.traf.ap.route[ac_idx].wpname[iwpid]))
-
-            # SteeringMode.ASAS and SteeringMode.LNAV modes can be overridden by
-            # geovectors if present, but SteeringMode.AREA mode should always be
-            # followed even if it conflicts with a geovector.
-            if gv.geovecs:
-                gv.applygeovec()
 
             if self.control_mode_curr[ac_idx] == SteeringMode.AREA:
                 if not self.is_in_area_reso[ac_idx]:

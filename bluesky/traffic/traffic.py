@@ -390,7 +390,10 @@ class Traffic(TrafficArrays):
 
         #---------- Fly the Aircraft --------------------------
         self.ap.update() # Autopilot logic
-        self.asas.update() # Airborne Separation Assurance
+        # NOTE: Moved asas to inside area_manager plugin so that we can
+        # decide whether or not to set swasas per aircraft using
+        # conditions in plugin.
+        # self.asas.update() # Airborne Separation Assurance
         self.pilot.APorASAS() # Decide autopilot or ASAS
 
         #---------- Performance Update ------------------------
