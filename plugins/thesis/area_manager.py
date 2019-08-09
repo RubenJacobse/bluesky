@@ -11,7 +11,7 @@ Current implementation is heavily work-in-progress and unstable.
 """
 
 # General imports
-from enum import Enum
+from enum import IntEnum
 from collections.abc import Collection
 
 # Third-party imports
@@ -66,7 +66,7 @@ ASASLOG_HEADER = ("simt [s], "
 bs.settings.set_variable_defaults(log_path="thesis_ruben/output")
 
 
-class SteeringMode(Enum):
+class SteeringMode(IntEnum):
     """
     Object used to signal which steering mode is to be used
     by an aircraft.
@@ -719,7 +719,7 @@ class AreaRestrictionManager(TrafficArrays):
         for ac_idx in range(self.num_traf):
             # do_printdebug = ((bs.traf.id[ac_idx] in debugprintlist)
             #                  and bs.sim.simt >= debugprinttime)
-            do_printdebug = True
+            do_printdebug = False
 
             # if do_printdebug:
             #     print("{} current control mode: {}".format(
