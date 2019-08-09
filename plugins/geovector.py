@@ -106,20 +106,19 @@ def applygeovec():
     # Apply each geovector
     for areaname, vec in geovecs.items():
         if areafilter.hasArea(areaname):
-            swinside  = areafilter.checkInside(areaname,
+            inarea  = areafilter.checkInside(areaname,
                                                bs.traf.lat,
                                                bs.traf.lon,
                                                bs.traf.alt)
             # Check if aircraft is in area resolution
-            areareso = np.array([x == 2 for x
+            inareareso = np.array([x == 2 for x
                                  in bs.traf._children[-1].control_mode_curr],
                                 dtype=bool)
             # Array with boolean; True if inside geovector area and not in 
             # area resolution
-            q = np.logical_and(swinside, np.logical_not(areareso))
+            swinside = np.logical_and(inarea, np.logical_not(inareareso))
+            insids = set(np.array(bs.traf.id)[swinside])
 
-            insids = set(np.array(bs.traf.id)[q])
-            # print(f"t={bs.sim.simt}: {insids}")
             newids = insids - vec.previnside
             delids = vec.previnside - insids
             # Store LNAV/VNAV status of new aircraft

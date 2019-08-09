@@ -24,6 +24,7 @@ from bluesky.tools.misc import latlon2txt
 from bluesky.tools.aero import fpm, kts, ft, g0, Rearth, nm, tas2cas,\
                          vatmos,  vtas2cas, vtas2mach, vcasormach
 from bluesky.tools.trafficarrays import TrafficArrays, RegisterElementParameters
+from plugins import geovector
 
 # Local imports
 from .adsbmodel import ADSB
@@ -396,6 +397,10 @@ class Traffic(TrafficArrays):
         # self.asas.update() # Airborne Separation Assurance
         self.pilot.APorASAS() # Decide autopilot or ASAS
 
+        # Apply geovector if necessary by limiting trk, tas, and vs
+        if geovector.geovecs:
+            geovector.applygeovec()
+        
         #---------- Performance Update ------------------------
         self.perf.update()
 

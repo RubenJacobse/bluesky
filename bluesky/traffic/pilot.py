@@ -1,10 +1,11 @@
 """ Pilot logic."""
+
 import numpy as np
 import bluesky as bs
 from bluesky.tools.aero import vtas2eas, vcas2tas, vcas2mach, vtas2cas
 from bluesky.tools.trafficarrays import TrafficArrays, RegisterElementParameters
 from bluesky import settings
-from plugins import geovector
+
 
 class Pilot(TrafficArrays):
     def __init__(self):
@@ -61,10 +62,6 @@ class Pilot(TrafficArrays):
             self.hdg = (self.trk + np.degrees(steer)) % 360.
         else:
             self.hdg = self.trk % 360.
-
-        # Apply geovector if necessary by limiting trk, tas, and vs
-        if geovector.geovecs:
-            geovector.applygeovec()
 
     def applylimits(self):
         # check for the flight envelope
