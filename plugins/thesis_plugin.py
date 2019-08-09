@@ -11,7 +11,7 @@ Current implementation is heavily work-in-progress and unstable.
 
 # Local imports
 import plugins.geovector as gv
-from plugins.thesis import AreaRestrictionManager
+from plugins.thesis.area_manager import AreaRestrictionManager
 
 
 def init_plugin():

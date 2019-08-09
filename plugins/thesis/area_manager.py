@@ -27,8 +27,8 @@ from bluesky.tools.trafficarrays import TrafficArrays, RegisterElementParameters
 from plugins import geovector as gv
 
 # Local imports
-from . import RestrictedAirspaceArea
-from . import geo as tg
+from plugins.thesis.area import RestrictedAirspaceArea
+import plugins.thesis.geo as tg
 
 # Default settings
 DEFAULT_AREA_T_LOOKAHEAD = 120  # [s] Area conflict detection threshold
@@ -719,15 +719,15 @@ class AreaRestrictionManager(TrafficArrays):
         for ac_idx in range(self.num_traf):
             # do_printdebug = ((bs.traf.id[ac_idx] in debugprintlist)
             #                  and bs.sim.simt >= debugprinttime)
-            do_printdebug = False
+            do_printdebug = True
 
-            if do_printdebug:
-                print("{} current control mode: {}".format(
-                    bs.traf.id[ac_idx], self.control_mode_curr[ac_idx]))
-                print("{} swlnav: {}".format(
-                    bs.traf.id[ac_idx], bs.traf.swlnav[ac_idx]))
-                print("{} asas active: {}".format(
-                    bs.traf.id[ac_idx], bs.traf.asas.active[ac_idx]))
+            # if do_printdebug:
+            #     print("{} current control mode: {}".format(
+            #         bs.traf.id[ac_idx], self.control_mode_curr[ac_idx]))
+            #     print("{} swlnav: {}".format(
+            #         bs.traf.id[ac_idx], bs.traf.swlnav[ac_idx]))
+            #     print("{} asas active: {}".format(
+            #         bs.traf.id[ac_idx], bs.traf.asas.active[ac_idx]))
 
             if self.control_mode_curr[ac_idx] == SteeringMode.ASAS:
                 pass
@@ -756,6 +756,7 @@ class AreaRestrictionManager(TrafficArrays):
                                       bs.traf.ap.route[ac_idx].wpname[iwpid]))
 
             if self.control_mode_curr[ac_idx] == SteeringMode.AREA:
+                print(f"t={bs.sim.simt}, {ac_idx} in AREA mode")
                 if not self.is_in_area_reso[ac_idx]:
                     # Initiate new manoeuvre
                     self.perform_manoeuver(ac_idx)

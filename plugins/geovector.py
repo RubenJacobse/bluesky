@@ -1,4 +1,6 @@
-""" Geovectoring: for an area define an allowed interval for each component of the 3D speed vector (gs,trk,vs):
+"""
+Geovectoring: for an area define an allowed interval for each
+component of the 3D speed vector (gs,trk,vs):
 
 first argument is the are on whuch the geovector shoudl apply
 
@@ -6,16 +8,19 @@ Geovector is defined as:
  (  [ gsmin,gsmax ]  ) [kts]
  (  [trkmin,trkmax]  ) [deg]
  (  [ vsmin,vsmax ]  ) [fpm]
+"""
 
-
- """
+# Third party imports
 import numpy as np
 
+# BlueSky imports
 import bluesky as bs
 from bluesky.tools import areafilter
 from bluesky.tools.aero import vtas2cas,ft
 from bluesky.tools.misc import degto180
 
+# import plugins.thesis.area_manager
+# from plugins.thesis.area_manager import SteeringMode
 
 # A dictionary of areas with a geovector specification
 geovecs = dict()
@@ -101,21 +106,42 @@ def applygeovec():
     # Apply each geovector
     for areaname, vec in geovecs.items():
         if areafilter.hasArea(areaname):
-            swinside  = areafilter.checkInside(areaname, bs.traf.lat, bs.traf.lon, bs.traf.alt)
+            swinside  = areafilter.checkInside(areaname,
+                                               bs.traf.lat,
+                                               bs.traf.lon,
+                                               bs.traf.alt)
+            # Check if aircraft is in area resolution
+            areareso = np.array([x == 2 for x
+                                 in bs.traf._children[-1].control_mode_curr],
+                                dtype=bool)
+            # Array with boolean; True if inside geovector area and not in 
+            # area resolution
+            q = np.logical_and(swinside, np.logical_not(areareso))
 
-            insids = set(np.array(bs.traf.id)[swinside])
+            insids = set(np.array(bs.traf.id)[q])
+            # print(f"t={bs.sim.simt}: {insids}")
             newids = insids - vec.previnside
             delids = vec.previnside - insids
             # Store LNAV/VNAV status of new aircraft
             for acid in newids:
                 idx = bs.traf.id2idx(acid)
                 vec.prevstatus[acid] = [bs.traf.swlnav[idx], bs.traf.swvnav[idx]]
+                print(f"{acid}, LNAV {bs.traf.swlnav[idx]}; geovector on")
 
             # Revert aircraft who have exited the geovectored area to their original status
             for acid in delids:
                 idx = bs.traf.id2idx(acid)
                 if idx >= 0:
                     bs.traf.swlnav[idx], bs.traf.swvnav[idx] = vec.prevstatus.pop(acid)
+
+                    # # TODO: Figure out why this does not work...
+                    # # Fly direct to next waypoint on exiting geovector area
+                    # bs.traf.swlnav[idx] = True  # Override LNAV on/off selector
+                    # iwpid = bs.traf.ap.route[idx].findact(idx)
+                    # wpname = bs.traf.ap.route[idx].wpname[iwpid]
+                    # bs.traf.ap.route[idx].direct(idx,
+                    #                              bs.traf.ap.route[idx].wpname[iwpid])
+                    # print(f"{acid}, LNAV {bs.traf.swlnav[idx]} - next: {wpname}")
 
             vec.previnside = insids
             # -----Ground speed limiting
