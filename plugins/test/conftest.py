@@ -1,12 +1,44 @@
 """ Pytest configuration for area restriction plugin tests. """
 
-import pytest
+# Python imports
+from collections.abc import Collection
+
+# Third-party imports
 import numpy as np
+import pytest
+
+# BlueSky imports
 import bluesky as bs
 from bluesky import stack
-from collections.abc import Collection
-from bluesky.tools import areafilter, TrafficArrays, RegisterElementParameters
-from area_restriction import AreaRestrictionManager
+from bluesky.tools import areafilter, datalog, TrafficArrays, RegisterElementParameters
+from plugins.thesis.area_manager import AreaRestrictionManager
+
+
+def mockfun(*args):
+    """ Take any number of arguments and do nothing """
+    pass
+
+
+def mock_defineArea(area_id, area_type, area_coords):
+    """ Mock areafilter.defineArea and ensure that input is formatted
+        correctly. """
+
+    assert isinstance(area_id, str)
+    assert area_type == "POLY"
+    assert all(isinstance(x, (int, float)) for x in area_coords)
+
+
+def mock_deleteArea(area_id):
+    """ Mock areafilter.deleteArea and ensure that input is formatted
+        correctly. """
+
+    assert isinstance(area_id, str)
+
+
+def mock_crelog(*args):
+    """ Create an fake instance of the CSVLogger class """
+    return MockCSVLogger()
+
 
 class MockTraf(TrafficArrays):
     """ Mock class that emulates part of the BlueSky traffic object. """
@@ -18,6 +50,8 @@ class MockTraf(TrafficArrays):
         TrafficArrays.set_class_root(self)
 
         self.ntraf = 0
+
+        self.asas = MockAsas()
 
         # Register some variables to be updated when adding and
         # deleting aircraft
@@ -81,45 +115,98 @@ class MockTraf(TrafficArrays):
         self.alt = np.array([6100, 6100, 6100, 6100])
         self.actwp = MockWaypoint()
 
+
+class MockAsas():
+    """
+    Mock object that is used to replace all calls to bs.traf.asas
+    """
+
+    def update(self):
+        pass
+
+
 class MockWaypoint():
     def __init__(self):
         self.lat = np.array([4, 0, 4, 0])
         self.lon = np.array([0, 4, 0, -4])
 
 
-def mockfun(*args):
-    """ Take any number of arguments and do nothing """
-    pass
+class MockSim():
+    """
+    Mock object that is used to replace all calls to bs.sim
+    """
 
-def mock_defineArea(area_id, area_type, area_coords):
-    """ Mock areafilter.defineArea and ensure that input is formatted
-        correctly. """
 
-    assert isinstance(area_id, str)
-    assert area_type == "POLY"
-    assert all(isinstance(x, (int, float)) for x in area_coords)
+    def __init__(self):
+        self.simt = 0
 
-def mock_deleteArea(area_id):
-    """ Mock areafilter.deleteArea and ensure that input is formatted
-        correctly. """
 
-    assert isinstance(area_id, str)
+class MockCSVLogger():
+    """
+    Mock object that is used to replace the CSVLogger class
+    """
+
+    scenname = ""
+
+    def __init__(self):
+        pass
+
+    def start(self):
+        pass
+
 
 @pytest.fixture
 def areafilter_(monkeypatch):
-    """ Fixture for all test functions naming AirspaceRestrictionManager_
-        in their parameter lists. """
+    """
+    Fixture for all test functions naming AirspaceRestrictionManager_
+    in their parameter lists.
+    """
 
-    # Replace subsequent calls to areafilter functions 'defineArea' and 'deleteArea'
-    # with calls to 'mockfun'. (These functions are called in RestricedAirspaceArea
-    # methods but require the screen object bs.scr to be initialized, which we will
-    # avoid for now)
     monkeypatch.setattr(areafilter, "defineArea", mock_defineArea)
     monkeypatch.setattr(areafilter, "deleteArea", mock_deleteArea)
 
+
+@pytest.fixture
+def crelog_(monkeypatch):
+    monkeypatch.setattr(datalog, "crelog", mock_crelog)
+
+
+@pytest.fixture
+def AreaRestrictionManager_(crelog_, areafilter_, mocktraf_):
+    """ Fixture that yields an instance of the AreaRestrictionManager
+        class that carries state between test functions. """
+
+    yield AreaRestrictionManager()
+
+
+@pytest.fixture
+def MockTraf_():
+    yield MockTraf()
+
+
+@pytest.fixture
+def MockSim_():
+    yield MockSim()
+
+
+@pytest.fixture
+def MockAsas_():
+    yield MockAsas
+
+
+@pytest.fixture
+def mocksim_(monkeypatch, MockSim_):
+    """ Fixture for all test functions naming bs.sim in their parameter lists. """
+
+    # Replace calls to bs.sim with calls to the MockSim class
+    monkeypatch.setattr(bs, "sim", MockSim_)
+
+
 @pytest.fixture
 def mocktraf_(monkeypatch, MockTraf_):
-    """ Fixture for all test functions naming bs.traf in their parameter lists. """
+    """
+    Fixture for all test functions naming bs.traf in their parameter lists.
+    """
 
     # Replace subsequent calls to bs.traf with calls to the MockTraf class
     monkeypatch.setattr(bs, "traf", MockTraf_)
@@ -127,16 +214,21 @@ def mocktraf_(monkeypatch, MockTraf_):
     # Replace subsequent calls to bs.stack with calls to mockfun
     monkeypatch.setattr(stack, "stack", mockfun)
 
-@pytest.fixture(scope = 'module')
-def AreaRestrictionManager_():
-    """ Fixture that yields an instance of the AreaRestrictionManager
-        class that carries state between test functions. """
 
-    yield AreaRestrictionManager()
+@pytest.fixture
+def mockbs_(monkeypatch, MockTraf_, MockSim_):
+    """
+    Fixture for all test functions naming bs.traf in their parameter lists.
+    """
 
-@pytest.fixture(scope = 'module')
-def MockTraf_():
-    """ Fixture that yields an instance of the MockTraf
-        class that carries state between test functions. """
+    # Replace subsequent calls to bs.traf with calls to the MockTraf class
+    monkeypatch.setattr(bs, "traf", MockTraf_)
 
-    yield MockTraf()
+    # Replace subsequent calls to bs.sim with calls to the MockSim class
+    monkeypatch.setattr(bs, "sim", MockSim_)
+
+    # Replace subsequent calls to bs.asas with calls to the MockAsas class
+    monkeypatch.setattr(bs, "asas", MockAsas_)
+
+    # Replace subsequent calls to bs.stack with calls to mockfun
+    monkeypatch.setattr(stack, "stack", mockfun)
