@@ -11,7 +11,6 @@ Current implementation is heavily work-in-progress and unstable.
 """
 
 # General imports
-from enum import IntEnum
 from collections.abc import Collection
 
 # Third-party imports
@@ -27,8 +26,9 @@ from bluesky.tools.trafficarrays import TrafficArrays, RegisterElementParameters
 from plugins import geovector as gv
 
 # Local imports
-from plugins.thesis.area import RestrictedAirspaceArea
 import plugins.thesis.geo as tg
+from plugins.thesis.area import RestrictedAirspaceArea
+from plugins.thesis.mode_manager import SteeringMode
 
 # Default settings
 DEFAULT_AREA_T_LOOKAHEAD = 120  # [s] Area conflict detection threshold
@@ -64,18 +64,6 @@ ASASLOG_HEADER = ("simt [s], "
 
 # Ensure log files are saved in separate directory
 bs.settings.set_variable_defaults(log_path="thesis_ruben/output")
-
-
-class SteeringMode(IntEnum):
-    """
-    Object used to signal which steering mode is to be used
-    by an aircraft.
-    Valid modes that can be used: ASAS, AREA, and LNAV
-    """
-
-    ASAS = 1
-    AREA = 2
-    LNAV = 3
 
 
 class AreaRestrictionManager(TrafficArrays):
@@ -756,7 +744,8 @@ class AreaRestrictionManager(TrafficArrays):
                                       bs.traf.ap.route[ac_idx].wpname[iwpid]))
 
             if self.control_mode_curr[ac_idx] == SteeringMode.AREA:
-                print(f"t={bs.sim.simt}, {ac_idx} in AREA mode")
+                if do_printdebug:
+                    print(f"t={bs.sim.simt}, {ac_idx} in AREA mode")
                 if not self.is_in_area_reso[ac_idx]:
                     # Initiate new manoeuvre
                     self.perform_manoeuver(ac_idx)

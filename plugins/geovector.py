@@ -19,8 +19,8 @@ from bluesky.tools import areafilter
 from bluesky.tools.aero import vtas2cas,ft
 from bluesky.tools.misc import degto180
 
-# import plugins.thesis.area_manager
-# from plugins.thesis.area_manager import SteeringMode
+# Thesis related import
+from plugins.thesis.mode_manager import SteeringMode
 
 # A dictionary of areas with a geovector specification
 geovecs = dict()
@@ -111,7 +111,7 @@ def applygeovec():
                                                bs.traf.lon,
                                                bs.traf.alt)
             # Check if aircraft is in area resolution
-            inareareso = np.array([x == 2 for x
+            inareareso = np.array([x == SteeringMode.AREA for x
                                  in bs.traf._children[-1].control_mode_curr],
                                 dtype=bool)
             # Array with boolean; True if inside geovector area and not in 
