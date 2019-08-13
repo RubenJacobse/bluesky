@@ -24,6 +24,9 @@ sys.path.append(os.path.abspath(os.path.join('../plugins')))
 import bluesky.tools.geo as bsgeo
 import plugins.thesis.geo as tg
 
+# Local imports
+import scenario_config
+
 # BlueSky simulator settings
 SIM_TIME_STEP = 0.1  # [s] Simulation time step
 SIM_PAUSE_HOUR = 5  # [h] Pause simulation after this number of hours
@@ -692,32 +695,23 @@ def calc_line_ring_intersection(ring_center_lat,
 
 
 if __name__ == "__main__":
-    # Passing these as arguments to create() when called as __main__
-    SEED = 1
-    TRAFFIC_LEVEL = "HIGH"
-    CORRIDOR_LENGTH = 40  # [NM]
-    CORRIDOR_WIDTH = 25  # [NM]
-    ARC_ANGLE = 90  # [deg]
+    # Set the time stamp and save directory
+    timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    output_dir = "scengen_test"
 
-    # When running as main, generate a file for each relevant resolution
-    # method using the default values of the other parameters.
-    current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    test_folder = "scengen_test"
+    # Get the settings combinations from the "test" section of the config file
+    combination_list = scenario_config.parse("test")
 
-    for reso_method in ["OFF",
-                        "MVP",
-                        "LF",
-                        "SWARM-V2",
-                        "GV_CORRIDOR_SPD",
-                        "GV_CIRCLE_SPD",
-                        "GV_WEDGE_SPD",
-                        "GV_CORWEDGE_SPD"]:
-        ScenarioGenerator(test_folder,
-                          current_time,
-                          SEED,
-                          TRAFFIC_LEVEL,
+    # Create a scenario file for each combination of variables
+    for (random_seed, traffic_level, reso_method, corridor_length,
+         corridor_width, arc_angle) in combination_list:
+
+        ScenarioGenerator(output_dir,
+                          timestamp,
+                          random_seed,
+                          traffic_level,
                           reso_method,
-                          CORRIDOR_LENGTH,
-                          CORRIDOR_WIDTH,
-                          ARC_ANGLE,
+                          corridor_length,
+                          corridor_width,
+                          arc_angle,
                           is_edge_angle=False)

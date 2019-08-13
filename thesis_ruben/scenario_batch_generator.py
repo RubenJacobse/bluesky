@@ -6,10 +6,10 @@ combinations of input variables.
 # Python imports
 import os
 import shutil
-import itertools
 import datetime
 
 # Local imports
+import scenario_config
 from scenario_file_generator import ScenarioGenerator
 
 
@@ -31,19 +31,8 @@ def main():
     if not os.path.exists(os.path.dirname(output_dir)):
         os.mkdir(os.path.dirname(output_dir))
 
-    # Input variables and the list of all combinations
-    random_seed = [x for x in range(1, 2)]
-    traffic_level = ["LOW", "MID", "HIGH"]
-    asas_reso_method = ["OFF"]
-    corridor_length = [40]
-    corridor_width = [25]
-    ac_creation_arc_angle = [100]
-    combination_lst = list(itertools.product(random_seed,
-                                             traffic_level,
-                                             asas_reso_method,
-                                             corridor_length,
-                                             corridor_width,
-                                             ac_creation_arc_angle))
+    # Get the list of all settings combinations from the config file
+    combination_lst = scenario_config.parse("batch")
 
     # Create a scenario file for each combination of variables
     for (seed, level, reso_method, length, width, angle) in combination_lst:
