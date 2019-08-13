@@ -288,13 +288,13 @@ class ScenarioGenerator():
                             for x in (lat, lon)]
 
         # Set the geo vector coordinates
-        if "_CORRIDOR_" in self.resolution_method:
+        if "CORRIDOR" in self.resolution_method:
             geovector["coords"] = corridor_coords
-        elif "_CIRCLE_" in self.resolution_method:
+        elif "CIRCLE" in self.resolution_method:
             geovector["coords"] = ring_coords
-        elif "_WEDGE_" in self.resolution_method:
+        elif "WEDGE" in self.resolution_method:
             geovector["coords"] = wedge_coords
-        elif "_CORWEDGE" in self.resolution_method:
+        elif "CORWEDGE" in self.resolution_method:
             geovector["coords"] = cor_wedge_coords
 
         # A two dimensional geovector can restrict either:
