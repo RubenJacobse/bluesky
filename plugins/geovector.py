@@ -16,7 +16,7 @@ import numpy as np
 # BlueSky imports
 import bluesky as bs
 from bluesky.tools import areafilter
-from bluesky.tools.aero import vtas2cas,ft
+from bluesky.tools.aero import ft
 from bluesky.tools.misc import degto180
 
 # Thesis related import
@@ -106,85 +106,84 @@ def applygeovec():
     # Apply each geovector
     for areaname, vec in geovecs.items():
         if areafilter.hasArea(areaname):
-            inarea  = areafilter.checkInside(areaname,
-                                               bs.traf.lat,
-                                               bs.traf.lon,
-                                               bs.traf.alt)
-            # Check if aircraft is in area resolution
-            inareareso = np.array([x == SteeringMode.AREA for x
-                                 in bs.traf._children[-1].control_mode_curr],
-                                dtype=bool)
-            # Array with boolean; True if inside geovector area and not in 
-            # area resolution
-            swinside = np.logical_and(inarea, np.logical_not(inareareso))
-            insids = set(np.array(bs.traf.id)[swinside])
+            # Check if aircraft are inside the geovectoring area
+            in_geovec  = areafilter.checkInside(areaname,
+                                                bs.traf.lat,
+                                                bs.traf.lon,
+                                                bs.traf.alt)
+            # Check if aircraft are resolving a restricted airspace conflict
+            in_areareso = np.array([x == SteeringMode.AREA for x
+                                    in bs.traf._children[-1].control_mode_curr],
+                                   dtype=bool)
 
+            # Boolean arrays that determine whether each limit type shall
+            # be applied. For aircraft inside the geovectoring area the speed
+            # limits are always applied, but the track limits are only applied
+            # if the aircraft is not resolving a restricted airspace conflict.
+            limit_tas = in_geovec
+            limit_trk = np.logical_and(in_geovec, np.logical_not(in_areareso))
+            limit_vs = in_geovec
+
+            # Keep track of ids of aircraft that are entering and leaving
+            # the geovector area
+            insids = set(np.array(bs.traf.id)[in_geovec])
             newids = insids - vec.previnside
             delids = vec.previnside - insids
-            # Store LNAV/VNAV status of new aircraft
+            vec.previnside = insids
+
+            # Store LNAV/VNAV status of aircraft entering the geovector area
             for acid in newids:
                 idx = bs.traf.id2idx(acid)
-                vec.prevstatus[acid] = [bs.traf.swlnav[idx], bs.traf.swvnav[idx]]
-                print(f"{acid}, LNAV {bs.traf.swlnav[idx]}; geovector on")
+                vec.prevstatus[acid] = [bs.traf.swlnav[idx],
+                                        bs.traf.swvnav[idx]]
 
-            # Revert aircraft who have exited the geovectored area to their original status
+            # Revert aircraft who have exited the geovectoring area to their
+            # original status
             for acid in delids:
                 idx = bs.traf.id2idx(acid)
                 if idx >= 0:
-                    bs.traf.swlnav[idx], bs.traf.swvnav[idx] = vec.prevstatus.pop(acid)
+                    bs.traf.swlnav[idx], bs.traf.swvnav[idx] \
+                        = vec.prevstatus.pop(acid)
 
-                    # # TODO: Figure out why this does not work...
-                    # # Fly direct to next waypoint on exiting geovector area
-                    # bs.traf.swlnav[idx] = True  # Override LNAV on/off selector
-                    # iwpid = bs.traf.ap.route[idx].findact(idx)
-                    # wpname = bs.traf.ap.route[idx].wpname[iwpid]
-                    # bs.traf.ap.route[idx].direct(idx,
-                    #                              bs.traf.ap.route[idx].wpname[iwpid])
-                    # print(f"{acid}, LNAV {bs.traf.swlnav[idx]} - next: {wpname}")
-
-            vec.previnside = insids
             # -----Ground speed limiting
             # For now assume no wind:  so use tas as gs
             if vec.gsmin is not None:
-                casmin = vtas2cas(np.ones(bs.traf.ntraf) * vec.gsmin, bs.traf.alt)
-                usemin = vtas2cas(bs.traf.pilot.tas, bs.traf.alt) < casmin
-                bs.traf.pilot.tas[swinside & usemin] = casmin[swinside & usemin]
-                bs.traf.swvnav[swinside & usemin] = False
+                tasmin = np.ones(bs.traf.ntraf) * vec.gsmin
+                usemin = bs.traf.pilot.tas < tasmin
+                bs.traf.pilot.tas[limit_tas & usemin] = tasmin[limit_tas & usemin]
+                bs.traf.swvnav[limit_tas & usemin] = False
 
             if vec.gsmax is not None:
-                casmax = vtas2cas(np.ones(bs.traf.ntraf) * vec.gsmax, bs.traf.alt)
-                usemax = vtas2cas(bs.traf.pilot.tas, bs.traf.alt) > casmax
-                bs.traf.pilot.tas[swinside & usemax] = casmax[swinside & usemax]
-                bs.traf.swvnav[swinside & usemax] = False
+                tasmax = np.ones(bs.traf.ntraf) * vec.gsmax
+                usemax = bs.traf.pilot.tas > tasmax
+                bs.traf.pilot.tas[limit_tas & usemax] = tasmax[limit_tas & usemax]
+                bs.traf.swvnav[limit_tas & usemax] = False
 
             #------ Limit Track(so hdg)
-            # Max track interval is 180 degrees to avoid ambiguity of what is inside the interval
-
+            # Max track interval is 180 degrees to avoid ambiguity of what is
+            # inside the interval
             if None not in [vec.trkmin, vec.trkmax]:
-                # Use degto180 to avodi problems for e.g interval [350,30]
-                usemin = swinside & (degto180(bs.traf.pilot.hdg - vec.trkmin) < 0) # Left of minimum
-                usemax = swinside & (degto180(bs.traf.pilot.hdg - vec.trkmax) > 0) # Right of maximum
+                # Use degto180 to avoid problems for e.g interval [350,30]
+                usemin = limit_trk & (degto180(bs.traf.pilot.hdg - vec.trkmin) < 0) # Left of minimum
+                usemax = limit_trk & (degto180(bs.traf.pilot.hdg - vec.trkmax) > 0) # Right of maximum
+                bs.traf.pilot.hdg[limit_trk & usemin] = vec.trkmin
+                bs.traf.pilot.hdg[limit_trk & usemax] = vec.trkmax
+                bs.traf.swlnav[limit_trk & (usemin | usemax)] = False
 
-                #print(usemin,usemax)
-                bs.traf.swlnav[swinside & (usemin | usemax)] = False
-
-                bs.traf.pilot.hdg[swinside & usemin] = vec.trkmin
-                bs.traf.pilot.hdg[swinside & usemax] = vec.trkmax
-
-            # -----Ground speed limiting
+            # -----Vertical speed limiting
             # For now assume no wind:  so use tas as gs
             if vec.vsmin is not None:
-                bs.traf.selvs[swinside & (bs.traf.vs < vec.vsmin)] = vec.vsmin
-                bs.traf.swvnav[swinside & (bs.traf.vs < vec.vsmin)] = False
+                bs.traf.selvs[limit_vs & (bs.traf.vs < vec.vsmin)] = vec.vsmin
+                bs.traf.swvnav[limit_vs & (bs.traf.vs < vec.vsmin)] = False
                 # Activate V/S mode by using a slightly higher altitude than current values
-                bs.traf.selalt[swinside & (bs.traf.vs < vec.vsmin)] = bs.traf.alt[swinside & (bs.traf.vs < vec.vsmin)] + \
+                bs.traf.selalt[limit_vs & (bs.traf.vs < vec.vsmin)] = bs.traf.alt[limit_vs & (bs.traf.vs < vec.vsmin)] + \
                                                             np.sign(vec.vsmin)*200.*ft
 
             if vec.vsmax is not None:
-                bs.traf.selvs[swinside & (bs.traf.vs > vec.vsmax)] = vec.vsmax
-                bs.traf.swvnav[swinside & (bs.traf.vs < vec.vsmax)] = False
+                bs.traf.selvs[limit_vs & (bs.traf.vs > vec.vsmax)] = vec.vsmax
+                bs.traf.swvnav[limit_vs & (bs.traf.vs < vec.vsmax)] = False
                 # Activate V/S mode by using a slightly higher altitude than current values
-                bs.traf.selalt[swinside & (bs.traf.vs > vec.vsmax)] = bs.traf.alt[swinside & (bs.traf.vs > vec.vsmax)] + \
+                bs.traf.selalt[limit_vs & (bs.traf.vs > vec.vsmax)] = bs.traf.alt[limit_vs & (bs.traf.vs > vec.vsmax)] + \
                                                             np.sign(vec.vsmax)*200.*ft
 
     return
@@ -232,9 +231,9 @@ def defgeovec(areaname="", spdmin=None, spdmax=None, trkmin=None, trkmax=None, v
 
         # Add geovector to the dict of geovectors
         geovecs[areaname] = GeoVector(areaname,
-                        gsmin, gsmax,
-                        trkmin,trkmax,
-                        vsmin, vsmax)
+                                      gsmin, gsmax,
+                                      trkmin, trkmax,
+                                      vsmin, vsmax)
 
     return True
 

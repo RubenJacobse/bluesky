@@ -21,6 +21,7 @@ sys.path.append(os.path.abspath(os.path.join('..')))
 sys.path.append(os.path.abspath(os.path.join('../plugins')))
 
 # BlueSky imports
+from bluesky.tools.aero import cas2tas
 import bluesky.tools.geo as bsgeo
 import plugins.thesis.geo as tg
 
@@ -297,12 +298,16 @@ class ScenarioGenerator():
         elif "CORWEDGE" in self.resolution_method:
             geovector["coords"] = cor_wedge_coords
 
-        # A two dimensional geovector can restrict either:
-        # ground speed, course, or both ground speed and course
-        gs_min = 480
-        gs_max = 480
-        crs_min = 360
-        crs_max = 0
+        # A two dimensional geovector can restrict ground speed and/or course
+        gs_min_cas = 260 # [kts]  
+        gs_max_cas = 270 # [kts]
+        crs_min = 359 # [deg]
+        crs_max = 1 # [deg]
+
+        # Convert speed limits from CAS [kts] to TAS [kts] for use in geovector
+        # cas2tas() is entirely in metric, so we need to convert kts and ft
+        gs_min = cas2tas(gs_min_cas * 0.51444, 36000 * 0.3048) / 0.51444
+        gs_max = cas2tas(gs_max_cas * 0.51444, 36000 * 0.3048) / 0.51444
         if "SPD" in self.resolution_method:
             geovector["gs_min"] = gs_min
             geovector["gs_max"] = gs_max
