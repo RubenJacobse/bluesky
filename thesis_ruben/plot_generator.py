@@ -611,7 +611,7 @@ class StripPlotFigureGenerator(ComparisonFigureGeneratorBase):
         Returns a matplotlib Axes object with the strip plot drawn in it
         """
 
-        return sbn.stripplot(**kwargs)
+        return sbn.stripplot(**kwargs, dodge=True, jitter=True)
 
 
 if __name__ == "__main__":
