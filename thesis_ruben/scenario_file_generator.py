@@ -652,9 +652,12 @@ class ScenarioGenerator():
 
         with open(file_path, "w+") as geovectorfile:
             for idx, geovector in enumerate(self.geovectors):
+                gs_min, gs_max = geovector["gs_min"], geovector["gs_max"]
+                crs_min, crs_max = geovector["crs_min"], geovector["crs_max"]
                 coords = geovector["coords"]
                 coord_str = ",".join(str(f"{x:.6f}") for x in coords)
-                geovectorfile.write(f"GV{idx+1},{coord_str}\n")
+                geovectorfile.write(f"GV{idx+1},{gs_min},{gs_max},"
+                                    + f"{crs_min},{crs_max},{coord_str}\n")
 
 
 def calc_line_ring_intersection(ring_center_lat,

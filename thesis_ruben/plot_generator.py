@@ -6,7 +6,6 @@ Generate figures showing conflict locations.
 import os
 import sys
 import csv
-import random
 
 # Third-party imports
 import pandas as pd
@@ -217,6 +216,39 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
 
         return plt
 
+    def make_geovec_figure(self, geo_data, geovec_data):
+        """
+        Plot the experiment area and airspace restrictions defined in
+        'geo_data' together with the geovector areas defined in 'geovec_data'.
+
+        Returns a matplotlib.pyplot object that can then be used by the caller.
+        """
+
+        # Create the base figure with experiment area and airspace restrictions
+        plt = self.make_geo_base_figure(geo_data)
+
+        # Add each geovector area to the figure
+        for row in geovec_data:
+            gv_name = row[0]
+            gv_gsmin = row[1]
+            gv_gsmax = row[2]
+            gv_trkmin = row[3]
+            gv_trkmax = row[4]
+            gv_coords = row[5:]
+
+            gv_latlon = [(float(lon), float(lat)) for (lat, lon)
+                         in zip(gv_coords[0:-1:2], gv_coords[1::2])]
+            gv_polygon = Polygon(gv_latlon)
+
+            plt.fill(*gv_polygon.exterior.xy,
+                     edgecolor="xkcd:boring green",
+                     facecolor="xkcd:light seafoam green",
+                     linewidth=1,
+                     label="_nolegend_",
+                     zorder=0)
+
+        return plt
+
     def make_geo_location_figure(self,
                                  geo_data,
                                  geometry,
@@ -246,8 +278,23 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
                     conflict_locations[0].append(float(ac_lon))
                     conflict_locations[1].append(float(ac_lat))
 
-        # Plot the locations on top of the geometry and save the figure
-        plt = self.make_geo_base_figure(geo_data)
+        # Create the base geometry plot
+        if "GV-" in separation_method:
+            # Load the geovector data for the current geometry
+            geovec_source_file_name = (f"{self.timestamp}_{geometry}_RESO-"
+                                       + f"{separation_method}_geovector.csv")
+            geovec_source_file = os.path.join("scenario",
+                                              self.timestamp,
+                                              geovec_source_file_name)
+            geovec_data = load_csv_data(geovec_source_file)
+
+            # Create plot with restriction and geovector areas
+            plt = self.make_geovec_figure(geo_data, geovec_data)
+        else:
+            # Create plot with only restriction areas
+            plt = self.make_geo_base_figure(geo_data)
+
+        # Add the location markers to the figure
         alpha_plt = 0.01
         marker_plt = "."
         if location_type in ["conflict", "both"]:
