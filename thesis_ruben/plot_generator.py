@@ -515,29 +515,31 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
         """
 
         # Use the min and max of the unfiltered column in the dataframe
-        # to ensure all figures of this type have the same y-axis limits
+        # to ensure all figures using this column have the same y-axis limits
+        ymin = df[column].min()
+        ymax = df[column].max()
         yrange = df[column].max() - df[column].min()
-        ymin = df[column].min() - 0.05 * yrange
-        ymax = df[column].max() + 0.05 * yrange
 
-        plt.figure()
+        plt.figure(figsize=(16, 9))
         ax = self.create_plot(x="resolution method",
                               y=column,
                               data=df,
                               order=["OFF", "MVP", "LF", "SWARM-V2"],
                               hue="traffic level",
                               hue_order=["LOW", "MID", "HIGH"],
+                              linewidth=0.5,
                               palette="Blues")
         plt.ticklabel_format(axis="y", style="sci", scilimits=(0, 2))
         ax.legend(loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.1))
-        ax.set(xticklabels=["OFF", "MVP", "MVP+LF", "MVP+SWARM"])
-        ax.set_ylim(ymin, ymax)
+        yminplot = ymin - 0.05 * yrange
+        ymaxplot = ymax + 0.05 * yrange
+        ax.set_ylim(yminplot, ymaxplot)
         plt_filename = f"{geometry}_{namestr}.png"
         plt_filepath = os.path.join(self.figure_dir, plt_filename)
         plt.savefig(plt_filepath, dpi=600)
         plt.close()
 
-    def create_plot(self, x, y, data, order, hue, hue_order, palette):
+    def create_plot(self, **kwargs):
         raise NotImplementedError
 
 
@@ -556,19 +558,13 @@ class BoxPlotFigureGenerator(ComparisonFigureGeneratorBase):
         if not os.path.isdir(self.figure_dir):
             os.makedirs(self.figure_dir)
 
-    def create_plot(self, x, y, data, order, hue, hue_order, palette):
+    def create_plot(self, **kwargs):
         """
-        Returns a matplotlib Axes object with the box plot drawn in it 
+        Returns a matplotlib Axes object with the box plot drawn in it
         """
-        ax = sbn.boxplot(x=x,
-                         y=y,
-                         data=data,
-                         order=order,
-                         hue=hue,
-                         hue_order=hue_order,
-                         palette=palette,
-                         linewidth=0.5)
-        return ax
+
+        flierprops = dict(marker="+", markersize=5)
+        return sbn.boxplot(**kwargs, flierprops=flierprops)
 
 
 class ViolinPlotFigureGenerator(ComparisonFigureGeneratorBase):
@@ -586,19 +582,13 @@ class ViolinPlotFigureGenerator(ComparisonFigureGeneratorBase):
         if not os.path.isdir(self.figure_dir):
             os.makedirs(self.figure_dir)
 
-    def create_plot(self, x, y, data, order, hue, hue_order, palette):
+    def create_plot(self, **kwargs):
         """
-        Returns a matplotlib Axes object with the violin plot drawn in it 
+        Returns a matplotlib Axes object with the violin plot drawn in it
         """
-        ax = sbn.violinplot(x=x,
-                            y=y,
-                            data=data,
-                            order=order,
-                            hue=hue,
-                            hue_order=hue_order,
-                            palette=palette,
-                            linewidth=0.5)
-        return ax
+
+        flierprops = dict(marker="+", markersize=5)
+        return sbn.violinplot(**kwargs, flierprops=flierprops)
 
 
 class StripPlotFigureGenerator(ComparisonFigureGeneratorBase):
@@ -616,19 +606,12 @@ class StripPlotFigureGenerator(ComparisonFigureGeneratorBase):
         if not os.path.isdir(self.figure_dir):
             os.makedirs(self.figure_dir)
 
-    def create_plot(self, x, y, data, order, hue, hue_order, palette):
+    def create_plot(self, **kwargs):
         """
-        Returns a matplotlib Axes object with the strip plot drawn in it 
+        Returns a matplotlib Axes object with the strip plot drawn in it
         """
-        ax = sbn.stripplot(x=x,
-                           y=y,
-                           data=data,
-                           order=order,
-                           hue=hue,
-                           hue_order=hue_order,
-                           palette=palette,
-                           linewidth=0.5)
-        return ax
+
+        return sbn.stripplot(**kwargs)
 
 
 if __name__ == "__main__":
