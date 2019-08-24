@@ -11,6 +11,8 @@ import csv
 import pandas as pd
 import seaborn as sbn
 import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
+from matplotlib.lines import Line2D
 from shapely.geometry import Polygon
 
 # Enable BlueSky imports by adding the project folder to the path
@@ -18,6 +20,14 @@ sys.path.append(os.path.abspath(os.path.join("..")))
 
 # BlueSky imports
 import bluesky.tools.geo as bsgeo
+
+# Geo plot element colors
+RESTRICTION_FACECOLOR = "xkcd:pale pink"
+RESTRICTION_EDGECOLOR = "xkcd:brick red"
+GEOVECTOR_EDGECOLOR = "xkcd:boring green"
+GEOVECTOR_FACECOLOR = "xkcd:light seafoam green"
+INTRUSION_MARKER_COLOR = "red"
+CONFLICT_MARKER_COLOR = "blue"
 
 
 def make_batch_figures(timestamp):
@@ -141,7 +151,7 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
             geo_plot = self.make_geo_base_figure(geo_data)
             geo_plot_filename = os.path.join(self.figure_dir,
                                              f"{geometry}.png")
-            geo_plot.savefig(geo_plot_filename, dpi=600)
+            geo_plot.savefig(geo_plot_filename, dpi=300, bbox_inches="tight")
             geo_plot.close()
 
             # Create the plots showing the conflict and intrusion locations
@@ -202,8 +212,8 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
         plt.figure()
         for area in [left_res_in_ring, right_res_in_ring]:
             plt.fill(*area.exterior.xy,
-                     facecolor="xkcd:pale pink",
-                     edgecolor="xkcd:brick red",
+                     facecolor=RESTRICTION_FACECOLOR,
+                     edgecolor=RESTRICTION_EDGECOLOR,
                      linewidth=1,
                      label="_nolegend_")
         plt.plot(*ring_polygon.exterior.xy,
@@ -241,8 +251,8 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
             gv_polygon = Polygon(gv_latlon)
 
             plt.fill(*gv_polygon.exterior.xy,
-                     edgecolor="xkcd:boring green",
-                     facecolor="xkcd:light seafoam green",
+                     edgecolor=GEOVECTOR_EDGECOLOR,
+                     facecolor=GEOVECTOR_FACECOLOR,
                      linewidth=1,
                      label="_nolegend_",
                      zorder=0)
@@ -263,6 +273,12 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
         'location_type' and can take the values: "conflict",
         "intrusion", or "both".
         """
+
+        # Create list of elements to display in the figure legend
+        legend_elements = [Patch(facecolor=RESTRICTION_FACECOLOR,
+                                 edgecolor=RESTRICTION_EDGECOLOR,
+                                 linewidth=1,
+                                 label="Restricted area")]
 
         # Store conflict and intrusion locations as list of lists
         # using the format [[lon0, lon1, ...], [lat0, lat1, ...]]
@@ -290,6 +306,12 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
 
             # Create plot with restriction and geovector areas
             plt = self.make_geovec_figure(geo_data, geovec_data)
+
+            # Add geovector to legend
+            legend_elements.append(Patch(edgecolor=GEOVECTOR_EDGECOLOR,
+                                         facecolor=GEOVECTOR_FACECOLOR,
+                                         linewidth=1,
+                                         label="Geovectoring area"))
         else:
             # Create plot with only restriction areas
             plt = self.make_geo_base_figure(geo_data)
@@ -303,22 +325,33 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
                         alpha=alpha_plt,
                         marker=marker_plt,
                         edgecolors="none",
-                        c="blue",
-                        label="Conflict")
+                        c=CONFLICT_MARKER_COLOR,
+                        label="_nolegend_")
+            legend_elements.append(Line2D([0], [0],
+                                          linestyle="",
+                                          marker=marker_plt,
+                                          color=CONFLICT_MARKER_COLOR,
+                                          label="Conflict locations"))
         if location_type in ["intrusion", "both"]:
             plt.scatter(intrusion_locations[0],
                         intrusion_locations[1],
                         alpha=alpha_plt,
                         marker=marker_plt,
                         edgecolors="none",
-                        c="red",
-                        label="Loss of separation")
-        plt.title(f"Separation method: {separation_method}")
-        # plt.legend()
+                        c=INTRUSION_MARKER_COLOR,
+                        label="_nolegend_")
+            legend_elements.append(Line2D([0], [0],
+                                          linestyle="",
+                                          marker=marker_plt,
+                                          color=INTRUSION_MARKER_COLOR,
+                                          label="LoS locations"))
+        # plt.title(f"Separation method: {separation_method}")
+        plt.legend(handles=legend_elements, loc="lower center",
+                   ncol=2, bbox_to_anchor=(0.5, 1))
         plt_filename = (f"{geometry}_{separation_method}_{traffic_level}"
                         + f"_{location_type}.png")
         plt_filepath = os.path.join(self.figure_dir, plt_filename)
-        plt.savefig(plt_filepath, dpi=600)
+        plt.savefig(plt_filepath, dpi=300, bbox_inches="tight")
         plt.close()
 
 
@@ -530,13 +563,13 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
                               linewidth=0.5,
                               palette="Blues")
         plt.ticklabel_format(axis="y", style="sci", scilimits=(0, 2))
-        ax.legend(loc="upper center", ncol=3, bbox_to_anchor=(0.5, 1.1))
+        ax.legend(loc="lower center", ncol=3, bbox_to_anchor=(0.5, 1))
         yminplot = ymin - 0.05 * yrange
         ymaxplot = ymax + 0.05 * yrange
         ax.set_ylim(yminplot, ymaxplot)
         plt_filename = f"{geometry}_{namestr}.png"
         plt_filepath = os.path.join(self.figure_dir, plt_filename)
-        plt.savefig(plt_filepath, dpi=600)
+        plt.savefig(plt_filepath, dpi=300, bbox_inches="tight")
         plt.close()
 
     def create_plot(self, **kwargs):
