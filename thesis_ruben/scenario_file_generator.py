@@ -42,11 +42,9 @@ RMETHH = "BOTH"  # Horizontal resolution method, allow both spd and hdg changes
 AREA_RADIUS = 100  # [NM]
 
 # Aircraft creation settings
-NUM_AIRCRAFT = 25
-# AC_TYPES = ["A320", "B738", "A333", "B744"]
-# AC_TYPES_SPD = [258, 260, 273, 286]
-AC_TYPES = ["B744"]
-AC_TYPES_SPD = [280]
+NUM_AIRCRAFT = 50
+AC_TYPES = ["A320", "B738", "A333", "B744"]
+AC_TYPES_SPD = [258, 260, 273, 284]  # [kts] Cruise speed (CAS) for each type
 SPD_STDDEV = 5  # [kts] Standard deviation of cruise speed distributions
 
 
