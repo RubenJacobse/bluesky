@@ -824,12 +824,6 @@ class AreaRestrictionManager(TrafficArrays):
         self.commanded_crs[ac_idx] = new_crs
         self.commanded_spd[ac_idx] = new_v
 
-        if bs.traf.id[ac_idx] == "AC056":
-            print("{} in conflict with {}, turning to course {:.2f} degrees"
-                  .format(bs.traf.id[ac_idx],
-                          self.area_ids[self.closest_conflicting_area_idx[ac_idx]],
-                          new_crs))
-
     def stack_reso_apply(self, ac_idx, crs, tas):
         """ Apply all resolution vectors via the BlueSky stack. """
 
