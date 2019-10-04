@@ -14,9 +14,9 @@ from . import MVP_alt
 
 
 def start(asas):
-    asas.Rswarm = 7.5 * nm  # [m]
-    asas.dhswarm = 1500 * ft  # [m]
-    asas.Swarmweights = np.array([10, 3, 1])
+    asas.swarm_radius = 7.5 * nm  # [m]
+    asas.swarm_altitude = 1500 * ft  # [m]
+    asas.swarm_weights = np.array([10, 3, 1])
 
 
 def resolve(asas, traf):
@@ -35,7 +35,8 @@ def resolve(asas, traf):
     # Calculate approximate relative distances
     delta_x = dist * np.sin(qdrrad)  # + np.eye(traf.ntraf) * 1e9
     delta_y = dist * np.cos(qdrrad)  # + np.eye(traf.ntraf) * 1e9
-    delta_h = traf.alt.reshape((1, traf.ntraf)) - traf.alt.reshape((1, traf.ntraf)).T
+    delta_h = traf.alt.reshape((1, traf.ntraf)) \
+        - traf.alt.reshape((1, traf.ntraf)).T
 
     # Calculate track differences
     delta_trk = traf.trk.reshape(1, traf.ntraf) - traf.trk.reshape(traf.ntraf, 1)
@@ -43,8 +44,8 @@ def resolve(asas, traf):
 
     # Apply swarming criteria (distance and direction) to find all aircraft
     # combinations for which swarming rules have to be applied
-    ac_are_close = np.logical_and(delta_x**2 + delta_y**2 < asas.Rswarm**2,
-                                  np.abs(delta_h) < asas.dhswarm)
+    ac_are_close = np.logical_and(delta_x**2 + delta_y**2 < asas.swarm_radius**2,
+                                  np.abs(delta_h) < asas.swarm_altitude)
     ac_in_samedirection = np.abs(delta_trk) < 90
     ac_selected = np.logical_and(ac_are_close, ac_in_samedirection)
     ac_own = np.eye(traf.ntraf, dtype='bool')
@@ -57,8 +58,7 @@ def resolve(asas, traf):
     alt_matrix = np.ones((traf.ntraf, traf.ntraf)) * traf.alt
 
     # Calculate Collision Avoidance (CA) parameters
-    ca_trk, ca_tas, ca_vs, ca_gseast, ca_gsnorth, ca_alt \
-        = MVP_alt.resolve(asas, traf)
+    ca_trk, ca_tas, ca_vs, _, _, _ = MVP_alt.resolve(asas, traf)
 
     # Calculate Velocity Alignment (VA) parameters
     va_tas = np.average(tas_matrix, axis=1, weights=Swarming)
@@ -75,31 +75,26 @@ def resolve(asas, traf):
     ttoreach = np.sqrt(dx_to_flock_center**2 + dy_to_flock_center**2) / fc_tas
     fc_vs = np.where(ttoreach == 0, 0, dz_to_flock_center / ttoreach)
 
-    # Find final Swarming directions
-    trks = np.array([ca_trk, va_trk, fc_trk])
-    tass = np.array([ca_tas, va_tas, fc_tas])
-    vss = np.array([ca_vs, va_vs, fc_vs])
-    vxs = tass * np.sin(np.radians(trks))
-    vys = tass * np.cos(np.radians(trks))
+    # Combine parameter vectors into multidimensional arrays
+    trk_arr = np.array([ca_trk, va_trk, fc_trk])
+    tas_arr = np.array([ca_tas, va_tas, fc_tas])
+    vs_arr = np.array([ca_vs, va_vs, fc_vs])
+    vx_arr = tas_arr * np.sin(np.radians(trk_arr))
+    vy_arr = tas_arr * np.cos(np.radians(trk_arr))
 
-    swarm_gseast = np.average(vxs, axis=0, weights=asas.Swarmweights)
-    swarm_gsnorth = np.average(vys, axis=0, weights=asas.Swarmweights)
-    swarm_vs = np.average(vss, axis=0, weights=asas.Swarmweights)
+    # Find final Swarming directions by taking weighted averageov CA, VA and FC
+    swarm_gseast = np.average(vx_arr, axis=0, weights=asas.swarm_weights)
+    swarm_gsnorth = np.average(vy_arr, axis=0, weights=asas.swarm_weights)
+    swarm_vs = np.average(vs_arr, axis=0, weights=asas.swarm_weights)
     swarm_hdg = np.degrees(np.arctan2(swarm_gseast, swarm_gsnorth))
 
     # Cap the velocity
-    swarm_tas = np.average(tass, axis=0, weights=asas.Swarmweights)
-    swarm_tas = np.clip(swarm_tas, asas.vmin, asas.vmax)
+    swarm_tas = np.average(tas_arr, axis=0, weights=asas.swarm_weights)
+    tas_arr = np.clip(swarm_tas, asas.vmin, asas.vmax)
 
-    # NOTE: We currently overwrite ALL aircraft instructions, even if resooff is set
     # Assign Final Swarming directions to traffic
-    # asas.hdg = np.where(asas.swresooff, traf.hdg, swarm_hdg)
-    # asas.tas = np.where(asas.swresooff, traf.tas, swarm_tas)
-
     asas.hdg = swarm_hdg
     asas.tas = swarm_tas
     asas.vs = swarm_vs
     asas.alt = traf.alt
-
-    # Make sure that all aircraft follow these directions
-    # asas.active.fill(True)
+ 
