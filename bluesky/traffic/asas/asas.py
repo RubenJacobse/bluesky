@@ -33,6 +33,7 @@ from . import Swarm
 from . import SSD
 from . import LF
 from . import Swarm_alt
+from . import MVP_PRIO
 
 # Register default settings
 settings.set_variable_defaults(asas_dt=1.0,
@@ -60,7 +61,8 @@ class ASAS(TrafficArrays):
                   "EBY": Eby,
                   "SWARM": Swarm,
                   "SWARM-V2": Swarm_alt,
-                  "LF": LF}
+                  "LF": LF,
+                  "MVP-PRIO": MVP_PRIO}  # MVP + priority - experimental
 
     # The SSD method requires the pyclipper module for its visualizations
     if SSD.loaded_pyclipper():
