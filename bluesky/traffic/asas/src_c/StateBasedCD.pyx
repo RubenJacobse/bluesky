@@ -2,7 +2,7 @@
 
 # Cython imports
 import cython
-from libc.math cimport log, atan2, sqrt, tan, sin, pi, fabs
+from libc.math cimport log, atan2, sqrt, tan, sin, cos, pi, fabs
 import numpy as np
 cimport numpy as np
 
@@ -19,6 +19,7 @@ cdef struct traf:
     DTYPE_t *gs
     DTYPE_t *alt
     DTYPE_t *vs 
+
 ctypedef traf traf_arr
 
 cpdef detect(ownship, intruder, RPZ, HPZ, tlookahead):
