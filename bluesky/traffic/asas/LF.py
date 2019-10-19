@@ -14,6 +14,10 @@ Currently only supports 2-dimensional resolutions.
 # Third-party imports
 import numpy as np
 
+# BlueSky imports
+import bluesky as bs
+from bluesky.tools import geo
+
 # Local imports
 from .MVP import MVP
 
@@ -36,6 +40,7 @@ def resolve(asas, traf):
     asas.asasn = np.zeros(traf.ntraf, dtype=np.float32)
     asas.asase = np.zeros(traf.ntraf, dtype=np.float32)
 
+    print(f"t = {bs.sim.simt}s")
     # For each conflict pair calculate resolution for ac1 if necessary
     for ((ac1, ac2), qdr, dist, tcpa, tLOS) in zip(asas.confpairs,
                                                    asas.qdr,
@@ -65,22 +70,25 @@ def resolve(asas, traf):
         angle = np.arccos(cosine_angle)
 
         # Find the mode and status of ac1 based on the geometry conflict
-        ac1_mode, ac1_status = find_lf_status(asas, traf, angle, tLOS, idx1, idx2)
-        ac2_mode, ac2_status = find_lf_status(asas, traf, angle, tLOS, idx2, idx1)
+        ac1_mode, ac1_status = find_lf_status(traf, angle, tLOS, idx2, idx1)
+        ac2_mode, ac2_status = find_lf_status(traf, angle, tLOS, idx1, idx2)
 
         # Determine whether MVP or follow-through logic has to be used
-        if ac1_mode == "MVP" or ac1_status == ac2_status or tLOS < 240 or dist < asas.R:
+        if ac1_status == "leader" and ac1_mode == "LF":
+            # Leader in "LF" mode takes no action
+            reso_str = "no reso"
+            pass
+        elif ac1_mode == "MVP" or ac1_status == ac2_status or tLOS < 240 or dist < asas.R:
             dv_mvp, _ = MVP(traf, asas, qdr, dist, tcpa, tLOS, idx1, idx2)
             delta_v[idx1] -= dv_mvp
-            # print("using MVP")
+            reso_str = "using MVP"
         elif ac1_status == "follower":
-            dv_lf = LF(traf, asas, qdr, dist, tcpa, tLOS, idx2, idx1)
+            dv_lf = LF(traf, asas, qdr, dist, tcpa, idx2, idx1)
             delta_v[idx1] -= dv_lf
-            # print("using LF")
-        else:
-            # Leader in "LF" mode takes no action
-            # print("no reso")
-            pass
+            reso_str = "using LF"
+
+        print(f"\t{traf.id[idx1]}-{traf.id[idx2]} {ac1_status} {reso_str}" +
+              f" (tlos: {tLOS:.0f} s, dist: {dist/1852:.1f} NM)")
 
     # Add resolution mandated velocity difference to current velocity
     delta_v = np.transpose(delta_v)
@@ -116,20 +124,24 @@ def resolve(asas, traf):
     asas.alt = traf.alt
 
 
-def find_lf_status(asas, traf, delta_crs, tLOS, idx_ownship, idx_intruder):
+def find_lf_status(traf, delta_crs, tLOS, idx_ownship, idx_intruder):
     """
     For a conflict between a given ownship and an intruder, find the mode
     and status of the ownship in the conflict.
     """
 
-    # Calculate ownship velocity vector
-    dx1_r = asas.R * np.cos(traf.hdg[idx_ownship])
-    dx2_r = asas.R * np.sin(traf.hdg[idx_ownship])
+    # Unit vector in direction ownship velocity (x1=east, x2=north)
+    dx1_r = np.sin(np.radians(traf.hdg[idx_ownship]))
+    dx2_r = np.cos(np.radians(traf.hdg[idx_ownship]))
     dxy_r = np.array([dx1_r, dx2_r])
 
+    # Approximate qdr and distance from ownship to intruder
+    qdr, dist = geo.kwikqdrdist(traf.lat[idx_ownship], traf.lon[idx_ownship],
+                                traf.lat[idx_intruder], traf.lon[idx_intruder])
+
     # Calculate intruder relative position and velocity wrt ownship
-    dx1 = traf.lon[idx_intruder] - traf.lon[idx_ownship]
-    dx2 = traf.lat[idx_intruder] - traf.lat[idx_ownship]
+    dx1 = dist * np.sin(np.radians(qdr))
+    dx2 = dist * np.cos(np.radians(qdr))
     dvx1 = traf.gseast[idx_intruder] - traf.gseast[idx_ownship]
     dvx2 = traf.gsnorth[idx_intruder] - traf.gsnorth[idx_ownship]
 
@@ -145,16 +157,16 @@ def find_lf_status(asas, traf, delta_crs, tLOS, idx_ownship, idx_intruder):
 
     # Determine status and mode of ac1
     if delta_crs >= np.pi/2:
-        ownship_status = "leader"
-        ownship_mode = "MVP"
+        intruder_status = "leader"
+        intruder_mode = "MVP"
     elif cos_phi >= 0:
-        ownship_status = "leader"
-        ownship_mode = "LF"
+        intruder_status = "leader"
+        intruder_mode = "LF"
     elif cos_phi < 0:
-        ownship_status = "follower"
-        ownship_mode = "LF"
+        intruder_status = "follower"
+        intruder_mode = "LF"
 
-    return ownship_mode, ownship_status
+    return intruder_mode, intruder_status
 
 
 def LF(traf, asas, qdr, dist, tcpa, idx_leader, idx_follower):
