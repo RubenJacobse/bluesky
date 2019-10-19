@@ -32,6 +32,7 @@ from . import MVP
 from . import Swarm
 from . import SSD
 from . import LF
+from . import LFFT
 from . import Swarm_alt
 from . import MVP_PRIO
 
@@ -62,6 +63,7 @@ class ASAS(TrafficArrays):
                   "SWARM": Swarm,
                   "SWARM-V2": Swarm_alt,
                   "LF": LF,
+                  "LFFT": LFFT,
                   "MVP-PRIO": MVP_PRIO}  # MVP + priority - experimental
 
     # The SSD method requires the pyclipper module for its visualizations
@@ -579,8 +581,10 @@ class ASAS(TrafficArrays):
             self.qdr, self.dist, self.dcpa, self.tcpa, self.tLOS = \
             self.cd.detect(bs.traf, bs.traf, self.R, self.dh, self.dtlookahead)
 
-        # Conflict resolution if there are conflicts
-        if self.confpairs or self.cr_name == "SWARM-V2":
+        # Conflict resolution only if there are conflicts or if swarming /
+        # leader-following with follow through is used (does not require a
+        # conflict for resolution)
+        if self.confpairs or self.cr_name in ["SWARM-V2", "LFFT"]:
             self.cr.resolve(self, bs.traf)
 
         # Add new conflicts to resopairs and confpairs_all and new losses to lospairs_all
