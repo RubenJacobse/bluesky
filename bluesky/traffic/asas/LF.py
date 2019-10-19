@@ -74,7 +74,7 @@ def resolve(asas, traf):
             dv_lf = LF(traf, asas, qdr, dist, tcpa, idx2, idx1)
             delta_v[idx1] -= dv_lf
             reso_str = "using LF"
-        elif ac1_status == "leader":
+        else:  # ac1_status, ac1_mode now guaranteed to be "leader" and "LF"
             reso_str = "no reso"
             pass
 
