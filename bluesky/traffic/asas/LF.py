@@ -73,12 +73,8 @@ def resolve(asas, traf):
         ac1_mode, ac1_status = find_lf_status(traf, angle, tLOS, idx2, idx1)
         ac2_mode, ac2_status = find_lf_status(traf, angle, tLOS, idx1, idx2)
 
-        # Determine whether MVP or follow-through logic has to be used
-        if ac1_status == "leader" and ac1_mode == "LF":
-            # Leader in "LF" mode takes no action
-            reso_str = "no reso"
-            pass
-        elif ac1_mode == "MVP" or ac1_status == ac2_status or tLOS < 240 or dist < asas.R:
+        # Determine whether to use MVP, act as follower, or act as leader
+        if (ac1_status == ac2_status) or ac1_mode == "MVP" or tLOS < 240 or dist < asas.R:
             dv_mvp, _ = MVP(traf, asas, qdr, dist, tcpa, tLOS, idx1, idx2)
             delta_v[idx1] -= dv_mvp
             reso_str = "using MVP"
@@ -86,6 +82,9 @@ def resolve(asas, traf):
             dv_lf = LF(traf, asas, qdr, dist, tcpa, idx2, idx1)
             delta_v[idx1] -= dv_lf
             reso_str = "using LF"
+        elif ac1_status == "leader":
+            reso_str = "no reso"
+            pass
 
         print(f"\t{traf.id[idx1]}-{traf.id[idx2]} {ac1_status} {reso_str}" +
               f" (tlos: {tLOS:.0f} s, dist: {dist/1852:.1f} NM)")
