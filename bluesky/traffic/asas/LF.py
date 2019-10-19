@@ -2,8 +2,9 @@
 LF
 ==
 
-Implements Leader-Following behaviour method, based on the method described
-in the MSc thesis of Arjen Kieskamp at Delft University of Technology (March 5th, 2009).
+Implements Leader-Following behaviour method, based on the method
+described in the MSc thesis of Arjen Kieskamp at Delft University
+of Technology (March 5th, 2009).
 
 Currently only supports 2-dimensional resolutions.
 
@@ -12,9 +13,6 @@ Currently only supports 2-dimensional resolutions.
 
 # Third-party imports
 import numpy as np
-
-# BlueSky imports
-import bluesky as bs
 
 # Local imports
 from .MVP import MVP
@@ -38,11 +36,12 @@ def resolve(asas, traf):
     asas.asasn = np.zeros(traf.ntraf, dtype=np.float32)
     asas.asase = np.zeros(traf.ntraf, dtype=np.float32)
 
-    # print("\nt = {}".format(bs.sim.simt))
-
     # For each conflict pair calculate resolution for ac1 if necessary
-    for ((ac1, ac2), qdr, dist, tcpa, tLOS) in zip(asas.confpairs, asas.qdr,
-                                                   asas.dist, asas.tcpa, asas.tLOS):
+    for ((ac1, ac2), qdr, dist, tcpa, tLOS) in zip(asas.confpairs,
+                                                   asas.qdr,
+                                                   asas.dist,
+                                                   asas.tcpa,
+                                                   asas.tLOS):
         idx1 = traf.id.index(ac1)
         idx2 = traf.id.index(ac2)
 
@@ -69,9 +68,7 @@ def resolve(asas, traf):
         ac1_mode, ac1_status = find_lf_status(asas, traf, angle, tLOS, idx1, idx2)
         ac2_mode, ac2_status = find_lf_status(asas, traf, angle, tLOS, idx2, idx1)
 
-        # print("{}: {},{} - {}: {},{}".format(traf.id[idx1], ac1_status, ac1_mode,
-        #                                      traf.id[idx2], ac2_status, ac2_mode))
-
+        # Determine whether MVP or follow-through logic has to be used
         if ac1_mode == "MVP" or ac1_status == ac2_status or tLOS < 240 or dist < asas.R:
             dv_mvp, _ = MVP(traf, asas, qdr, dist, tcpa, tLOS, idx1, idx2)
             delta_v[idx1] -= dv_mvp
@@ -160,7 +157,7 @@ def find_lf_status(asas, traf, delta_crs, tLOS, idx_ownship, idx_intruder):
     return ownship_mode, ownship_status
 
 
-def LF(traf, asas, qdr, dist, tcpa, tLOS, idx_leader, idx_follower):
+def LF(traf, asas, qdr, dist, tcpa, idx_leader, idx_follower):
     """ Leader-Following (LF) resolution method """
 
     # Preliminary calculations-------------------------------------------------
