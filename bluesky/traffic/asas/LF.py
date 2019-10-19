@@ -47,8 +47,8 @@ def resolve(asas, traf):
                                                    asas.dist,
                                                    asas.tcpa,
                                                    asas.tLOS):
-        idx1 = traf.id.index(ac1)
-        idx2 = traf.id.index(ac2)
+        idx1 = traf.id2idx(ac1)
+        idx2 = traf.id2idx(ac2)
 
         # Do not resolve if:
         # - the pair contains an aircraft that no longer exists
