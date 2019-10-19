@@ -25,15 +25,13 @@ class MockTraffic:
 
 # Setup the test data for the parametrized test
 testtraf = MockTraffic()
-testdata = [(testtraf, 0.24906, 214.2077, 0, 1, ("LF", "leader")),
-            (testtraf, 0.24906, 214.2077, 1, 0, ("LF", "follower")), ]
+testdata = [(testtraf, 214.2077, 0, 1, ("LF", "leader")),
+            (testtraf, 214.2077, 1, 0, ("LF", "follower")), ]
 
 
-@pytest.mark.parametrize("traf,delta_crs,tLOS,idx_ownship,idx_intruder,expected",
+@pytest.mark.parametrize("traf,tLOS,idx_ownship,idx_intruder,expected",
                          testdata)
-def test_find_lf_status(traf, delta_crs, tLOS,
-                        idx_ownship, idx_intruder, expected):
+def test_find_lf_status(traf, tLOS, idx_ownship, idx_intruder, expected):
 
-    result = LF.find_lf_status(traf, delta_crs, tLOS,
-                               idx_ownship, idx_intruder)
+    result = LF.find_lf_status(traf, tLOS, idx_ownship, idx_intruder)
     assert result == expected

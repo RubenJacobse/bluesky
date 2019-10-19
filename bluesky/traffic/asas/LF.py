@@ -61,17 +61,9 @@ def resolve(asas, traf):
         elif asas.swnoreso and ac2 in asas.noresolst:
             continue
 
-        # Use velocity unit vectors to calculate angle between aircraft velocities
-        velocity_ac1 = np.array([traf.gseast[idx1], traf.gsnorth[idx1]])
-        velocity_ac2 = np.array([traf.gseast[idx2], traf.gsnorth[idx2]])
-        unitvec_ac1 = velocity_ac1 / np.linalg.norm(velocity_ac1)
-        unitvec_ac2 = velocity_ac2 / np.linalg.norm(velocity_ac2)
-        cosine_angle = np.clip(np.dot(unitvec_ac1, unitvec_ac2), -1.0, 1.0)
-        angle = np.arccos(cosine_angle)
-
         # Find the mode and status of ac1 based on the geometry conflict
-        ac1_mode, ac1_status = find_lf_status(traf, angle, tLOS, idx2, idx1)
-        ac2_mode, ac2_status = find_lf_status(traf, angle, tLOS, idx1, idx2)
+        ac1_mode, ac1_status = find_lf_status(traf, tLOS, idx2, idx1)
+        ac2_mode, ac2_status = find_lf_status(traf, tLOS, idx1, idx2)
 
         # Determine whether to use MVP, act as follower, or act as leader
         if (ac1_status == ac2_status) or ac1_mode == "MVP" or tLOS < 240 or dist < asas.R:
@@ -123,11 +115,19 @@ def resolve(asas, traf):
     asas.alt = traf.alt
 
 
-def find_lf_status(traf, delta_crs, tLOS, idx_ownship, idx_intruder):
+def find_lf_status(traf, tLOS, idx_ownship, idx_intruder):
     """
     For a conflict between a given ownship and an intruder, find the mode
     and status of the ownship in the conflict.
     """
+
+    # Use velocity unit vectors to calculate angle between aircraft velocities
+    gs_ac1 = np.array([traf.gseast[idx_ownship], traf.gsnorth[idx_ownship]])
+    gs_ac2 = np.array([traf.gseast[idx_intruder], traf.gsnorth[idx_intruder]])
+    unitgs_ac1 = gs_ac1 / np.linalg.norm(gs_ac1)
+    unitgs_ac2 = gs_ac2 / np.linalg.norm(gs_ac2)
+    cosine_angle = np.clip(np.dot(unitgs_ac1, unitgs_ac2), -1.0, 1.0)
+    delta_crs = np.arccos(cosine_angle)  # in radians
 
     # Unit vector in direction ownship velocity (x1=east, x2=north)
     dx1_r = np.sin(np.radians(traf.hdg[idx_ownship]))
