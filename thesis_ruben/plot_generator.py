@@ -158,16 +158,16 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
             for method in self.combination_dict[geometry]:
                 for level in self.combination_dict[geometry][method]:
                     # Make area conflict figures
-                    self.make_geo_location_figure(geo_data,
-                                                  geometry,
-                                                  method,
-                                                  level,
-                                                  location_type="conflict")
-                    self.make_geo_location_figure(geo_data,
-                                                  geometry,
-                                                  method,
-                                                  level,
-                                                  location_type="intrusion")
+                    # self.make_geo_location_figure(geo_data,
+                    #                               geometry,
+                    #                               method,
+                    #                               level,
+                    #                               location_type="conflict")
+                    # self.make_geo_location_figure(geo_data,
+                    #                               geometry,
+                    #                               method,
+                    #                               level,
+                    #                               location_type="intrusion")
                     self.make_geo_location_figure(geo_data,
                                                   geometry,
                                                   method,
