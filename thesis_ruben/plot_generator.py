@@ -557,13 +557,17 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
         ax = self.create_plot(x="resolution method",
                               y=column,
                               data=df,
-                              order=["OFF", "MVP", "LF", "SWARM-V2"],
+                              order=["OFF", "MVP", "LF", "LFFT", "SWARM-V2",
+                                     "GV-CORRIDOR-SPD", "GV-CORRIDOR-CRS",
+                                     "GV-CORRIDOR-BOTH"],
                               hue="traffic level",
                               hue_order=["LOW", "MID", "HIGH"],
                               linewidth=0.5,
                               palette="Blues")
         plt.ticklabel_format(axis="y", style="sci", scilimits=(0, 2))
         ax.legend(loc="lower center", ncol=3, bbox_to_anchor=(0.5, 1))
+        ax.set(xticklabels=["OFF", "MVP", "LF", "LF+FT", "SWARM",
+                            "GV-SPD", "GV-CRS", "GV-BOTH"])
         yminplot = ymin - 0.05 * yrange
         ymaxplot = ymax + 0.05 * yrange
         ax.set_ylim(yminplot, ymaxplot)
