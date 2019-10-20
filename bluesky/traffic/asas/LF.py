@@ -40,7 +40,7 @@ def resolve(asas, traf):
     asas.asasn = np.zeros(traf.ntraf, dtype=np.float32)
     asas.asase = np.zeros(traf.ntraf, dtype=np.float32)
 
-    print(f"t = {bs.sim.simt}s")
+    # print(f"t = {bs.sim.simt}s")
     # For each conflict pair calculate resolution for ac1 if necessary
     for ((ac1, ac2), qdr, dist, tcpa, tLOS) in zip(asas.confpairs,
                                                    asas.qdr,
@@ -78,8 +78,8 @@ def resolve(asas, traf):
             reso_str = "no reso"
             pass
 
-        print(f"\t{traf.id[idx1]}-{traf.id[idx2]} {ac1_status} {reso_str}" +
-              f" (tlos: {tLOS:.0f} s, dist: {dist/1852:.1f} NM)")
+        # print(f"\t{traf.id[idx1]}-{traf.id[idx2]} {ac1_status} {reso_str}" +
+        #       f" (tlos: {tLOS:.0f} s, dist: {dist/1852:.1f} NM)")
 
     # Add resolution mandated velocity difference to current velocity
     delta_v = np.transpose(delta_v)
