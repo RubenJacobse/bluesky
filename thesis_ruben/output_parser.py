@@ -72,6 +72,17 @@ class LogListParser:
         with open(self.output_file, "a") as output:
             output.write(line + "\n")
 
+    def write_lines_to_output_file(self, linelist):
+        """
+        Write a list of lines containing the relevant parameters of the
+        current logfile to the output file.
+        """
+
+        # Output file already exists, thus we append to it
+        with open(self.output_file, "a") as output:
+            for line in linelist:
+                output.write(line + "\n")
+
     # Virtual methods
     def summarize_stats(self,
                         logfile,
@@ -170,6 +181,8 @@ class AREALogLocationParser(LogListParser):
         write the summary to 'logfile'.
         """
 
+        outputlines = []
+
         # Loop over all rows and create a dictionary with each conflict
         # and its parameters listed once
         for row in log_data:
@@ -182,10 +195,11 @@ class AREALogLocationParser(LogListParser):
             is_int = t_int == 0
 
             # Write lines for ac1 and ac2 at once
-            outputlines = (f"{geometry},{reso_method},{traffic_level},"
-                           + f"{scenario},{ac_lat:0.6f},{ac_lon:0.6f},"
-                           + f"{is_int}")
-            self.write_to_output_file(outputlines)
+            outputlines.append(f"{geometry},{reso_method},{traffic_level},"
+                               + f"{scenario},{ac_lat:0.6f},{ac_lon:0.6f},"
+                               + f"{is_int}")
+
+        self.write_lines_to_output_file(outputlines)
 
     def set_header(self):
         self.header = ("geometry,resolution method,traffic level,scenario,"
@@ -340,6 +354,7 @@ class ASASLogOccurrenceParser(LogListParser):
         """
 
         conf_dict = {}
+        outputlines = []
 
         # Loop over all rows and create a dictionary with each conflict
         # and its parameters listed once
@@ -395,10 +410,11 @@ class ASASLogOccurrenceParser(LogListParser):
                 end = conflict["end_time"]
                 is_los = conflict["is_los"]
 
-                outputline = (f"{geometry},{reso_method},{traffic_level},"
-                              + f"{scenario},{confpair},{duration},{is_los},"
-                              + f"{los_severity:0.3f},{start},{end}")
-                self.write_to_output_file(outputline)
+                outputlines.append(f"{geometry},{reso_method},{traffic_level},"
+                                   + f"{scenario},{confpair},{duration},{is_los},"
+                                   + f"{los_severity:0.3f},{start},{end}")
+
+        self.write_lines_to_output_file(outputlines)
 
     def set_header(self):
         self.header = ("geometry,resolution method,traffic level,scenario,"
@@ -425,6 +441,7 @@ class ASASLogLocationParser(LogListParser):
         write the summary to 'logfile'.
         """
 
+        outputlines = []
         # Loop over all rows and create a dictionary with each conflict
         # and its parameters listed once
         for row in log_data:
@@ -442,13 +459,14 @@ class ASASLogLocationParser(LogListParser):
             is_los = dist <= PZ_RADIUS
 
             # Write lines for ac1 and ac2 at once
-            outputlines = (f"{geometry},{reso_method},{traffic_level},"
-                           + f"{scenario},{ac1_lat:0.6f},{ac1_lon:0.6f},"
-                           + f"{is_los}\n"
-                           + f"{geometry},{reso_method},{traffic_level},"
-                           + f"{scenario},{ac2_lat:0.6f},{ac2_lon:0.6f},"
-                           + f"{is_los}")
-            self.write_to_output_file(outputlines)
+            outputlines.append(f"{geometry},{reso_method},{traffic_level},"
+                               + f"{scenario},{ac1_lat:0.6f},{ac1_lon:0.6f},"
+                               + f"{is_los}\n"
+                               + f"{geometry},{reso_method},{traffic_level},"
+                               + f"{scenario},{ac2_lat:0.6f},{ac2_lon:0.6f},"
+                               + f"{is_los}")
+
+        self.write_lines_to_output_file(outputlines)
 
     def set_header(self):
         self.header = ("geometry,resolution method,traffic level,scenario,"
