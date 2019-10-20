@@ -105,7 +105,7 @@ def resolve(asas, traf):
 
         # Parameters that determine whether to continue follow-through
         delta_crs0_deg = ((traf.trk[idx1] - traf.trk[idx2] + 180) % 360 - 180)
-        delta_crs0 = delta_crs0_deg / 180 * np.pi
+        delta_crs0 = abs(delta_crs0_deg) / 180 * np.pi
         delta_v0 = abs(traf.gs[idx1] - traf.gs[idx2])
         qdr, dist = geo.kwikqdrdist(traf.lat[idx1], traf.lon[idx1],
                                     traf.lat[idx2], traf.lon[idx2])
@@ -113,7 +113,7 @@ def resolve(asas, traf):
 
         # Check if follow-through manveuver should be continued using LF or
         # if it should be switched off.
-        if (abs(delta_crs0 < 0.01 * np.pi) and abs(delta_v0) < 1):
+        if delta_crs0 < 0.01 * np.pi and delta_v0 < 1:
             ft_dict_delkeys.append(ac1)
             # print(
             #     f"\t{ac1} stopped following {ac2} (delta_crs:{delta_crs0:.2f} rad, delta_v0:{delta_v0:.2f} m/s)")
@@ -125,9 +125,9 @@ def resolve(asas, traf):
             # print(f"\t{ac1} stopped following {ac2} (dist:{dist:.1f} NM)")
         else:
             # We exploit the fact that tcpa (and derived values) are
-            # not used inside LF() iff idx1 is in follow-through mode
+            # not used inside LF() iff ac1 is in follow-through mode
             # but are overriden using t_mindist instead.
-            tcpa = 1e9
+            tcpa = 1e9  # this value does not matter
             dv_lf = LF(traf, asas, qdr, dist, tcpa, idx2, idx1)
             delta_v[idx1] -= dv_lf
             # print(f"\t{ac1} following {ac2}")
