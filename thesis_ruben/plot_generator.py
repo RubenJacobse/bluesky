@@ -649,11 +649,3 @@ class StripPlotFigureGenerator(ComparisonFigureGeneratorBase):
         """
 
         return sbn.stripplot(**kwargs, dodge=True, jitter=True)
-
-
-if __name__ == "__main__":
-    # timestamp = "20190712-022110"
-    # timestamp = "20190714-152439"
-    # timestamp = "20190717-015921"
-    timestamp = "20190723-021206"
-    make_batch_figures(timestamp)
