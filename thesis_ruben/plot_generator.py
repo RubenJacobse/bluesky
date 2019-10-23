@@ -35,11 +35,11 @@ def make_batch_figures(timestamp):
     Generate the figures for the batch with given timestamp.
     """
 
-    ASASGeoFigureGenerator(timestamp)
-    AREAGeoFigureGenerator(timestamp)
     BoxPlotFigureGenerator(timestamp)
-    ViolinPlotFigureGenerator(timestamp)
-    StripPlotFigureGenerator(timestamp)
+    AREAGeoFigureGenerator(timestamp)
+    ASASGeoFigureGenerator(timestamp)
+    # ViolinPlotFigureGenerator(timestamp)
+    # StripPlotFigureGenerator(timestamp)
 
 
 def load_csv_data(filename, delimiter=",", comment_token="#"):
