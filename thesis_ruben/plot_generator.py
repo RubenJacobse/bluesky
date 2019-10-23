@@ -547,34 +547,43 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
         for the plot and 'namestr' is the last part of the figure file name.
         """
 
-        # Use the min and max of the unfiltered column in the dataframe
-        # to ensure all figures using this column have the same y-axis limits
-        ymin = df[column].min()
-        ymax = df[column].max()
-        yrange = df[column].max() - df[column].min()
+        try:
+            # Use the min and max of the unfiltered column in the dataframe
+            # to ensure all figures using this column have the same y-axis limits
+            ymin = df[column].min()
+            ymax = df[column].max()
+            yrange = df[column].max() - df[column].min()
 
-        plt.figure(figsize=(16, 9))
-        ax = self.create_plot(x="resolution method",
-                              y=column,
-                              data=df,
-                              order=["OFF", "MVP", "LF", "LFFT", "SWARM-V2",
-                                     "GV-CORRIDOR-SPD", "GV-CORRIDOR-CRS",
-                                     "GV-CORRIDOR-BOTH"],
-                              hue="traffic level",
-                              hue_order=["LOW", "MID", "HIGH"],
-                              linewidth=0.5,
-                              palette="Blues")
-        plt.ticklabel_format(axis="y", style="sci", scilimits=(0, 2))
-        ax.legend(loc="lower center", ncol=3, bbox_to_anchor=(0.5, 1))
-        ax.set(xticklabels=["OFF", "MVP", "LF", "LF+FT", "SWARM",
-                            "GV-SPD", "GV-CRS", "GV-BOTH"])
-        yminplot = ymin - 0.05 * yrange
-        ymaxplot = ymax + 0.05 * yrange
-        ax.set_ylim(yminplot, ymaxplot)
-        plt_filename = f"{geometry}_{namestr}.png"
-        plt_filepath = os.path.join(self.figure_dir, plt_filename)
-        plt.savefig(plt_filepath, dpi=300, bbox_inches="tight")
-        plt.close()
+            plt.figure(figsize=(16, 9))
+            ax = self.create_plot(x="resolution method",
+                                  y=column,
+                                  data=df,
+                                  #   For OFF,MVP only runs
+                                  #   order=["OFF", "MVP"],
+                                  # For full run
+                                  order=["OFF", "MVP", "LF", "LFFT", "SWARM-V2",
+                                         "GV-CORRIDOR-SPD", "GV-CORRIDOR-CRS",
+                                         "GV-CORRIDOR-BOTH"],
+                                  hue="traffic level",
+                                  hue_order=["LOW", "MID", "HIGH"],
+                                  linewidth=0.5,
+                                  palette="Blues")
+            plt.ticklabel_format(axis="y", style="sci", scilimits=(0, 2))
+            ax.legend(loc="lower center", ncol=3, bbox_to_anchor=(0.5, 1))
+            # # For OFF,MVP only runs
+            # ax.set(xticklabels=["OFF", "MVP"])
+            # For full run
+            ax.set(xticklabels=["OFF", "MVP", "LF", "LF+FT", "SWARM",
+                                "GV-SPD", "GV-CRS", "GV-BOTH"])
+            yminplot = ymin - 0.05 * yrange
+            ymaxplot = ymax + 0.05 * yrange
+            ax.set_ylim(yminplot, ymaxplot)
+            plt_filename = f"{geometry}_{namestr}.png"
+            plt_filepath = os.path.join(self.figure_dir, plt_filename)
+            plt.savefig(plt_filepath, dpi=300, bbox_inches="tight")
+            plt.close()
+        except ValueError:
+            print(f"Plot generator failed to create {geometry}_{namestr}.png")
 
     def create_plot(self, **kwargs):
         raise NotImplementedError
