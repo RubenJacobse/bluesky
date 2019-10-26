@@ -5,34 +5,37 @@ import cython
 from libc.math cimport log, atan2, sqrt, tan, sin, cos, pi, fabs
 import numpy as np
 cimport numpy as np
+cimport cgeo
 
 cdef double RAD_TO_DEG = 180 / pi
 cdef double DEG_TO_RAD = pi / 180
+cdef double nm = 1852.0
 
-ctypedef np.float64_t DTYPE_t
+ctypedef np.float32_t DTYPE_t
 
 cdef struct traf:
     int ntraf
-    DTYPE_t *lat
-    DTYPE_t *lon
-    DTYPE_t *trk
-    DTYPE_t *gs
-    DTYPE_t *alt
-    DTYPE_t *vs 
+    double *lat
+    double *lon
+    double *trk
+    double *gs
+    double *alt
+    double *vs
 
 ctypedef traf traf_arr
+
 
 cpdef detect(ownship, intruder, RPZ, HPZ, tlookahead):
     """ Conflict detection between ownship (traf) and intruder (traf/adsb)."""
 
     # Declare C type variables to which Python variables will be cast
     cdef traf_arr ownship_, intruder_
-    cdef DTYPE_t pz_radius, pz_height, t_lookahead
+    cdef double pz_radius, pz_height, t_lookahead
 
-    # Typecast double types
-    pz_radius = <DTYPE_t> RPZ
-    pz_height = <DTYPE_t> HPZ
-    t_lookahead = <DTYPE_t> tlookahead
+    # Ensure typecast to double types
+    pz_radius = <double> RPZ
+    pz_height = <double> HPZ
+    t_lookahead = <double> tlookahead
 
     # Store traffic variables in struct type
     ownship_ = convert_to_struct(ownship)
@@ -40,6 +43,7 @@ cpdef detect(ownship, intruder, RPZ, HPZ, tlookahead):
 
     # Call actual detection function
     detect_all(ownship_, intruder_, pz_radius, pz_height, t_lookahead)
+
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -52,12 +56,12 @@ cdef traf_arr convert_to_struct(traf_obj):
     cdef traf_arr arr
 
     # Convert numpy arrays to memoryviews
-    cdef DTYPE_t[::1] lat = np.ascontiguousarray(traf_obj.lat)
-    cdef DTYPE_t[::1] lon = np.ascontiguousarray(traf_obj.lon)
-    cdef DTYPE_t[::1] trk = np.ascontiguousarray(traf_obj.trk)
-    cdef DTYPE_t[::1] gs = np.ascontiguousarray(traf_obj.gs)
-    cdef DTYPE_t[::1] alt = np.ascontiguousarray(traf_obj.alt)
-    cdef DTYPE_t[::1] vs = np.ascontiguousarray(traf_obj.vs)
+    cdef double[::1] lat = np.ascontiguousarray(traf_obj.lat)
+    cdef double[::1] lon = np.ascontiguousarray(traf_obj.lon)
+    cdef double[::1] trk = np.ascontiguousarray(traf_obj.trk)
+    cdef double[::1] gs = np.ascontiguousarray(traf_obj.gs)
+    cdef double[::1] alt = np.ascontiguousarray(traf_obj.alt)
+    cdef double[::1] vs = np.ascontiguousarray(traf_obj.vs)
 
     # Store data in struct
     arr.ntraf = <int> traf_obj.ntraf
@@ -71,15 +75,16 @@ cdef traf_arr convert_to_struct(traf_obj):
     return arr
 
 
+@cython.cdivision(True)
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cpdef detect_all(traf_arr ownship,
-                 traf_arr intruder,
-                 DTYPE_t pz_radius,
-                 DTYPE_t pz_height,
-                 DTYPE_t t_lookahead):
+cdef detect_all(traf_arr ownship,
+                traf_arr intruder,
+                double pz_radius,
+                double pz_height,
+                double t_lookahead):
 
-    cdef DTYPE_t qdr, dist, dx, dy, owntrkrad, ownu, ownv, inttrkrad, intu, \
+    cdef double qdr, dist, dx, dy, owntrkrad, ownu, ownv, inttrkrad, intu, \
     intv, du, dv, dv2, vrel, tcpa, dpa2, R2, dxinhor, dtinhor, tinhor, dalt, \
     dvs, tcrosslo, tcrosshi, tinver, toutver, tinconf, toutconf
     cdef bint is_hor_conf, is_conf
@@ -92,14 +97,14 @@ cpdef detect_all(traf_arr ownship,
                 continue
 
             # Horizontal conflict ----------------------------------------------
-            qdr = geo.qdr(ownship.lat[ii], 
-                          ownship.lon[ii],
-                          intruder.lat[jj],
-                          intruder.lon[jj])
-            dist = geo.dist(ownship.lat[ii], 
-                            ownship.lon[ii],
-                            intruder.lat[jj],
-                            intruder.lon[jj])
+            qdr = cgeo.cy_qdr(ownship.lat[ii], 
+                           ownship.lon[ii],
+                           intruder.lat[jj],
+                           intruder.lon[jj])
+            dist = cgeo.cy_dist(ownship.lat[ii], 
+                             ownship.lon[ii],
+                             intruder.lat[jj],
+                             intruder.lon[jj])
 
             # Convert distance to nm and qdr to radians
             dist = dist * nm 
