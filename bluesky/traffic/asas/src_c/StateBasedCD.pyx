@@ -42,8 +42,15 @@ cpdef detect(ownship, intruder, RPZ, HPZ, tlookahead):
     intruder_ = convert_to_struct(intruder)
 
     # Call actual detection function
-    detect_all(ownship_, intruder_, pz_radius, pz_height, t_lookahead)
+    (confidxpairs, losidxpairs, inconf, tcpamax, conf_qdr, conf_dist, conf_dcpa,
+     conf_tcpa, conf_tinconf) = detect_all(ownship_, intruder_, pz_radius,
+                                           pz_height, t_lookahead)
 
+    confpairs = [(ownship.id[i], ownship.id[j]) for (i, j) in confidxpairs]
+    lospairs = [(ownship.id[i], ownship.id[j]) for (i, j) in losidxpairs]
+
+    return (confpairs, lospairs, inconf, tcpamax, conf_qdr, conf_dist,
+            conf_dcpa, conf_tcpa, conf_tinconf)
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -85,9 +92,24 @@ cdef detect_all(traf_arr ownship,
                 double t_lookahead):
 
     cdef double qdr, dist, dx, dy, owntrkrad, ownu, ownv, inttrkrad, intu, \
-    intv, du, dv, dv2, vrel, tcpa, dpa2, R2, dxinhor, dtinhor, tinhor, dalt, \
-    dvs, tcrosslo, tcrosshi, tinver, toutver, tinconf, toutconf
-    cdef bint is_hor_conf, is_conf
+    intv, du, dv, dv2, vrel, tcpa, dcpa2, R2, dxinhor, dtinhor, tinhor, \
+    touthor, dalt, dvs, tcrosslo, tcrosshi, tinver, toutver, tinconf, toutconf
+    cdef int is_hor_conf, is_conf, is_los
+
+    # Fixed-size array with one element for each aircraft
+    cdef np.ndarray[int, ndim = 1] inconf = np.zeros((ownship.ntraf), dtype=int)
+    cdef np.ndarray[DTYPE_t, ndim=1] tcpamax = np.zeros((ownship.ntraf), dtype=np.float32)
+
+    # Dynamically sized based on number of pairs in conflict
+    cdef list confpairs = []
+    cdef np.ndarray[DTYPE_t, ndim=1] conf_qdr = np.zeros((0), dtype=np.float32)
+    cdef np.ndarray[DTYPE_t, ndim=1] conf_dist = np.zeros((0), dtype=np.float32)
+    cdef np.ndarray[DTYPE_t, ndim=1] conf_tcpa = np.zeros((0), dtype=np.float32)
+    cdef np.ndarray[DTYPE_t, ndim=1] conf_dcpa = np.zeros((0), dtype=np.float32)
+    cdef np.ndarray[DTYPE_t, ndim=1] conf_tinconf = np.zeros((0), dtype=np.float32)
+
+    # Dynamically sized based on number of pairs with loss of separation
+    cdef list lospairs = []
 
     cdef int ii, jj
     for ii in range(ownship.ntraf):
@@ -98,16 +120,16 @@ cdef detect_all(traf_arr ownship,
 
             # Horizontal conflict ----------------------------------------------
             qdr = cgeo.cy_qdr(ownship.lat[ii], 
-                           ownship.lon[ii],
-                           intruder.lat[jj],
-                           intruder.lon[jj])
+                              ownship.lon[ii],
+                              intruder.lat[jj],
+                              intruder.lon[jj])
             dist = cgeo.cy_dist(ownship.lat[ii], 
-                             ownship.lon[ii],
-                             intruder.lat[jj],
-                             intruder.lon[jj])
+                                ownship.lon[ii],
+                                intruder.lat[jj],
+                                intruder.lon[jj])
 
-            # Convert distance to nm and qdr to radians
-            dist = dist * nm 
+            # Convert distance to m and qdr to radians
+            dist = dist * nm
             qdrrad = qdr * DEG_TO_RAD
 
             # Calculate horizontal closest point of approach (CPA)
@@ -139,7 +161,6 @@ cdef detect_all(traf_arr ownship,
             dxinhor = sqrt(max(0.0, R2 - dcpa2))  # half the distance travelled inzide zone
             dtinhor = dxinhor / vrel
 
-            tinhor, touthor
             if is_hor_conf:
                 tinhor = tcpa - dtinhor
                 touthor = tcpa + dtinhor
@@ -151,7 +172,7 @@ cdef detect_all(traf_arr ownship,
             dalt = ownship.alt[ii] - intruder.alt[jj]
             dvs = ownship.vs[ii] - ownship.vs[jj]
 
-            if abs(dvs) < 1e-6:
+            if fabs(dvs) < 1e-6:
                 dvs = 1e-6
 
             tcrosslo = (dalt - pz_height) / -dvs
@@ -163,106 +184,23 @@ cdef detect_all(traf_arr ownship,
             tinconf = max(tinver, tinhor)
             toutconf = min(toutver, touthor)
 
-            is_conf = is_hor_conf * (tinconf <= toutconf) * (toutconf > 0.0) * (tinconf < t_lookahead)
+            is_conf = is_hor_conf * (tinconf <= toutconf) * (toutconf > 0.0) \
+                        * (tinconf < t_lookahead)
+            is_los = (dist < pz_radius) * (fabs(dalt) < pz_height)
 
+            if is_conf:
+                confpairs.append((ii, jj))
+                inconf[ii] = True
+                if tcpa > tcpamax[ii]:
+                    tcpamax[ii] = tcpa
+                conf_qdr = np.append(conf_qdr, [qdr])
+                conf_dist = np.append(conf_dist, [dist])
+                conf_dcpa = np.append(conf_tcpa, [sqrt(dcpa2)])
+                conf_tcpa = np.append(conf_tcpa, [tcpa])
+                conf_tinconf = np.append(conf_tinconf, [tinconf])
 
-               
+            if is_los:
+                lospairs.append((ii, jj))
 
-# cpdef detect(ownship, intruder, RPZ, HPZ, tlookahead):
-#     """ Conflict detection between ownship (traf) and intruder (traf/adsb)."""
-
-#     # Identity matrix of order ntraf: avoid ownship-ownship detected conflicts
-#     I = np.eye(ownship.ntraf)
-
-#     # Horizontal conflict ------------------------------------------------------
-
-#     # qdlst is for [i,j] qdr from i to j, from perception of ADSB and own coordinates
-#     qdr, dist = geo.kwikqdrdist_matrix(np.mat(ownship.lat), np.mat(ownship.lon),
-#                                        np.mat(intruder.lat), np.mat(intruder.lon))
-
-#     # Convert back to array to allow element-wise array multiplications later on
-#     # Convert to meters and add large value to own/own pairs
-#     qdr = np.array(qdr)
-#     dist = np.array(dist) * nm + 1e9 * I
-
-#     # Calculate horizontal closest point of approach (CPA)
-#     qdrrad = np.radians(qdr)
-#     dx = dist * np.sin(qdrrad)  # is pos j rel to i
-#     dy = dist * np.cos(qdrrad)  # is pos j rel to i
-
-#     # Ownship track angle and speed
-#     owntrkrad = np.radians(ownship.trk)
-#     ownu = ownship.gs * np.sin(owntrkrad).reshape((1, ownship.ntraf))  # m/s
-#     ownv = ownship.gs * np.cos(owntrkrad).reshape((1, ownship.ntraf))  # m/s
- 
-#     # Intruder track angle and speed
-#     inttrkrad = np.radians(intruder.trk)
-#     intu = intruder.gs * np.sin(inttrkrad).reshape((1, ownship.ntraf))  # m/s
-#     intv = intruder.gs * np.cos(inttrkrad).reshape((1, ownship.ntraf))  # m/s
-
-#     du = ownu - intu.T  # Speed du[i,j] is perceived eastern speed of i to j
-#     dv = ownv - intv.T  # Speed dv[i,j] is perceived northern speed of i to j
-
-#     dv2 = du * du + dv * dv
-#     dv2 = np.where(np.abs(dv2) < 1e-6, 1e-6, dv2)  # limit lower absolute value
-#     vrel = np.sqrt(dv2)
-
-#     tcpa = -(du * dx + dv * dy) / dv2 + 1e9 * I
-
-#     # Calculate distance^2 at CPA (minimum distance^2)
-#     dcpa2 = np.abs(dist * dist - tcpa * tcpa * dv2)
-
-#     # Check for horizontal conflict
-#     R2 = RPZ * RPZ
-#     swhorconf = dcpa2 < R2  # conflict or not
-
-#     # Calculate times of entering and leaving horizontal conflict
-#     dxinhor = np.sqrt(np.maximum(0., R2 - dcpa2))  # half the distance travelled inzide zone
-#     dtinhor = dxinhor / vrel
-
-#     tinhor = np.where(swhorconf, tcpa - dtinhor, 1e8)  # Set very large if no conf
-#     touthor = np.where(swhorconf, tcpa + dtinhor, -1e8)  # set very large if no conf
-
-#     # Vertical conflict --------------------------------------------------------
-
-#     # Vertical crossing of disk (-dh,+dh)
-#     dalt = ownship.alt.reshape((1, ownship.ntraf)) - \
-#         intruder.alt.reshape((1, ownship.ntraf)).T  + 1e9 * I
-
-#     dvs = ownship.vs.reshape(1, ownship.ntraf) - \
-#         intruder.vs.reshape(1, ownship.ntraf).T
-#     dvs = np.where(np.abs(dvs) < 1e-6, 1e-6, dvs)  # prevent division by zero
-
-#     # Check for passing through each others zone
-#     tcrosshi = (dalt + HPZ) / -dvs
-#     tcrosslo = (dalt - HPZ) / -dvs
-#     tinver = np.minimum(tcrosshi, tcrosslo)
-#     toutver = np.maximum(tcrosshi, tcrosslo)
-
-#     # Combine vertical and horizontal conflict----------------------------------
-#     tinconf = np.maximum(tinver, tinhor)
-#     toutconf = np.minimum(toutver, touthor)
-
-#     swconfl = np.array(swhorconf * (tinconf <= toutconf) * (toutconf > 0.0) * \
-#         (tinconf < tlookahead) * (1.0 - I), dtype=np.bool)
-
-#     # --------------------------------------------------------------------------
-#     # Update conflict lists
-#     # --------------------------------------------------------------------------
-#     # Ownship conflict flag and max tCPA
-#     inconf = np.any(swconfl, 1)
-#     tcpamax = np.max(tcpa * swconfl, 1)
-
-#     # Select conflicting pairs: each a/c gets their own record
-#     confpairs = [(ownship.id[i], ownship.id[j]) for i, j in zip(*np.where(swconfl))]
-#     swlos = (dist < RPZ) * (np.abs(dalt) < HPZ)
-#     lospairs = [(ownship.id[i], ownship.id[j]) for i, j in zip(*np.where(swlos))]
-
-#     # bearing, dist, tcpa, tinconf, toutconf per conflict
-#     qdr = qdr[swconfl]
-#     dist = dist[swconfl]
-#     tcpa = tcpa[swconfl]
-#     dcpa = np.sqrt(dcpa2[swconfl])
-#     tinconf = tinconf[swconfl]
-
-#     return confpairs, lospairs, inconf, tcpamax, qdr, dist, dcpa, tcpa, tinconf
+    return (confpairs, lospairs, inconf, tcpamax, conf_qdr, conf_dist,
+            conf_dcpa, conf_tcpa, conf_tinconf)
