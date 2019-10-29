@@ -246,7 +246,7 @@ class ASASLogSummaryParser(LogListParser):
         los_dict = {}
 
         for row in log_data:
-            [simt, ac1_id, ac2_id, dist, t_cpa, t_los, _, _, _, _] = row
+            [simt, ac1_id, ac2_id, dist, t_cpa, t_los, _, _] = row
             simt = int(float(simt))
             dist = float(dist)
             t_cpa = float(t_cpa)
@@ -358,7 +358,7 @@ class ASASLogOccurrenceParser(LogListParser):
         # Loop over all rows and create a dictionary with each conflict
         # and its parameters listed once
         for row in log_data:
-            [simt, ac1_id, ac2_id, dist, t_cpa, t_los, _, _, _, _] = row
+            [simt, ac1_id, ac2_id, dist, t_cpa, t_los, _, _] = row
             simt = int(float(simt))
             dist = float(dist)
             t_cpa = float(t_cpa)
@@ -439,22 +439,16 @@ class ASASLogLocationParser(LogListParser):
         # Loop over all rows and create a dictionary with each conflict
         # and its parameters listed once
         for row in log_data:
-            [_, _, _, dist, _, _, ac1_lat, ac1_lon, ac2_lat, ac2_lon] = row
+            [_, _, _, dist, _, _, avg_lat, avg_lon] = row
             dist = float(dist)
-            ac1_lat = float(ac1_lat)
-            ac1_lon = float(ac1_lon)
-            ac2_lat = float(ac2_lat)
-            ac2_lon = float(ac2_lon)
-
+            avg_lat = float(avg_lat)
+            avg_lon = float(avg_lon)
             is_los = dist <= PZ_RADIUS
-
-            avg_lat = (ac1_lat + ac2_lat)/2
-            avg_lon = (ac1_lon + ac2_lon)/2
 
             # Write lines for ac1 and ac2 at once
             outputlines.append(f"{geometry},{reso_method},{traffic_level},"
                                + f"{scenario},{avg_lat:0.4f},{avg_lon:0.4f},"
-                               + f"{is_los}\n")
+                               + f"{is_los}")
 
         self.write_lines_to_output_file(outputlines)
 

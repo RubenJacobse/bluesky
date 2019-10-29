@@ -57,10 +57,8 @@ ASASLOG_HEADER = ("simt [s], "
                   + "dist [m], "
                   + "t_cpa [s], "
                   + "t_los [s], "
-                  + "ac1 lat [deg], "
-                  + "ac1 lon [deg], "
-                  + "ac2 lat [deg], "
-                  + "ac2 lon [deg]")
+                  + "avg lat [deg], "
+                  + "avg lon [deg]")
 
 # Ensure log files are saved in separate directory
 bs.settings.set_variable_defaults(log_path="thesis_ruben/output")
@@ -339,15 +337,14 @@ class AreaRestrictionManager(TrafficArrays):
             if idx1 > idx2:
                 continue
 
+            # Log stats and approximate midpoint between aircraft
             self.asas_conf_logger.log(np.array(bs.traf.id)[[idx1]],
                                       bs.traf.id[idx2],
                                       dist,
                                       tcpa,
                                       tlos,
-                                      bs.traf.lat[idx1],
-                                      bs.traf.lon[idx1],
-                                      bs.traf.lat[idx2],
-                                      bs.traf.lon[idx2])
+                                      (bs.traf.lat[idx1] + bs.traf.lat[idx2]) / 2,
+                                      (bs.traf.lon[idx1] + bs.traf.lon[idx2]) / 2)
 
         # Find courses to active and next waypoint
         self.calculate_courses_to_waypoints()
