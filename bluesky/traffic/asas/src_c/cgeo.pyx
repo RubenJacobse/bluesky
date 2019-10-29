@@ -4,7 +4,7 @@ Geography related functions used in conflict detection.
 
 # Cython imports
 import cython
-from libc.math cimport sin, cos, pi, atan2, sqrt
+from libc.math cimport sin, cos, pi, atan2, sqrt, fabs
 import numpy as np
 cimport numpy as np
 
@@ -43,8 +43,8 @@ cdef double cy_qdr(double lat0, double lon0, double lat1, double lon1):
         a = 6378137.0
         r1 = cy_rwgs84(lat0)
         r2 = cy_rwgs84(lat1)
-        r = (0.5 * (abs(lat0) * (r1 + a) + abs(lat1) * (r2 + a)) /
-             (abs(lat0) + abs(lat1)))
+        r = (0.5 * (fabs(lat0) * (r1 + a) + fabs(lat1) * (r2 + a)) /
+             (fabs(lat0) + fabs(lat1)))
 
     # Convert to radians
     lat0 = lat0 * DEG_TO_RAD
@@ -79,8 +79,8 @@ cdef double cy_dist(double lat0, double lon0, double lat1, double lon1):
         a = 6378137.0
         r1 = cy_rwgs84(lat0)
         r2 = cy_rwgs84(lat1)
-        r = (0.5 * (abs(lat0) * (r1 + a) + abs(lat1) * (r2 + a)) /
-             (abs(lat0) + abs(lat1)))
+        r = (0.5 * (fabs(lat0) * (r1 + a) + fabs(lat1) * (r2 + a)) /
+             (fabs(lat0) + fabs(lat1)))
 
     # Convert to radians
     lat0 = lat0 * DEG_TO_RAD
