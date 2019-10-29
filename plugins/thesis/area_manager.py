@@ -54,9 +54,8 @@ AREALOG_HEADER = ("simt [s], "
 ASASLOG_HEADER = ("simt [s], "
                   + "ac1 [-], "
                   + "ac2 [-], "
+                  + "LoS [-], "
                   + "dist [m], "
-                  + "t_cpa [s], "
-                  + "t_los [s], "
                   + "avg lat [deg], "
                   + "avg lon [deg]")
 
@@ -328,21 +327,20 @@ class AreaRestrictionManager(TrafficArrays):
         bs.traf.asas.update()
 
         # Log each conflict pair only once
-        for (ac1, ac2), dist, tcpa, tlos in zip(bs.traf.asas.confpairs,
-                                                bs.traf.asas.dist,
-                                                bs.traf.asas.tcpa,
-                                                bs.traf.asas.tLOS):
+        for (ac1, ac2), dist in zip(bs.traf.asas.confpairs,
+                                    bs.traf.asas.dist):
             idx1 = bs.traf.id2idx(ac1)
             idx2 = bs.traf.id2idx(ac2)
             if idx1 > idx2:
                 continue
 
+            is_los = int((ac1, ac2) in bs.traf.asas.lospairs)  # Either 0 or 1
+
             # Log stats and approximate midpoint between aircraft
             self.asas_conf_logger.log(np.array(bs.traf.id)[[idx1]],
                                       bs.traf.id[idx2],
-                                      dist,
-                                      tcpa,
-                                      tlos,
+                                      is_los,
+                                      int(dist),
                                       (bs.traf.lat[idx1] + bs.traf.lat[idx2]) / 2,
                                       (bs.traf.lon[idx1] + bs.traf.lon[idx2]) / 2)
 

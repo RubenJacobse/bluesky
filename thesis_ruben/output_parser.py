@@ -246,11 +246,9 @@ class ASASLogSummaryParser(LogListParser):
         los_dict = {}
 
         for row in log_data:
-            [simt, ac1_id, ac2_id, dist, t_cpa, t_los, _, _] = row
+            [simt, ac1_id, ac2_id, is_los, _, _, _] = row
             simt = int(float(simt))
-            dist = float(dist)
-            t_cpa = float(t_cpa)
-            t_los = float(t_los)
+            is_los = int(is_los)
 
             confpair = f"{ac1_id}-{ac2_id}"
 
@@ -266,7 +264,7 @@ class ASASLogSummaryParser(LogListParser):
             conf_dict[confpair].append(simt)
 
             # Continue to next occurence if no loss of separation
-            if dist >= PZ_RADIUS:
+            if not is_los:
                 continue
 
             # Check if los count needs to be incremented
@@ -358,14 +356,12 @@ class ASASLogOccurrenceParser(LogListParser):
         # Loop over all rows and create a dictionary with each conflict
         # and its parameters listed once
         for row in log_data:
-            [simt, ac1_id, ac2_id, dist, t_cpa, t_los, _, _] = row
+            [simt, ac1_id, ac2_id, is_los, dist, _, _] = row
             simt = int(float(simt))
             dist = float(dist)
-            t_cpa = float(t_cpa)
-            t_los = float(t_los)
+            is_los = str(bool(int(is_los)))
 
             confpair = f"{ac1_id}-{ac2_id}"
-            is_los = dist <= PZ_RADIUS
             los_severity = (PZ_RADIUS - dist) / PZ_RADIUS
 
             new_conflict = {"start_time": simt,
@@ -439,11 +435,10 @@ class ASASLogLocationParser(LogListParser):
         # Loop over all rows and create a dictionary with each conflict
         # and its parameters listed once
         for row in log_data:
-            [_, _, _, dist, _, _, avg_lat, avg_lon] = row
-            dist = float(dist)
+            [_, _, _, is_los, _, avg_lat, avg_lon] = row
             avg_lat = float(avg_lat)
             avg_lon = float(avg_lon)
-            is_los = dist <= PZ_RADIUS
+            is_los = str(bool(int(is_los)))
 
             # Write lines for ac1 and ac2 at once
             outputlines.append(f"{geometry},{reso_method},{traffic_level},"
