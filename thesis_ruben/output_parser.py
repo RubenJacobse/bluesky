@@ -4,6 +4,7 @@ and
 """
 
 # Python imports
+import os
 import csv
 
 # Module level constants
@@ -41,6 +42,9 @@ class LogListParser:
         # Read the contents of the file (NOTE: we parse the entire file
         # and store it in a list, this might fail for very large files)
         with open(logfile) as logfile_obj:
+            if not os.path.getsize(logfile):
+                raise ValueError(f"File \"{logfile}\" is empty!")
+
             log_reader = csv.reader(logfile_obj, delimiter=",")
             log_data = [row for row in list(log_reader)
                         if not row[0].startswith("#")]
@@ -140,7 +144,7 @@ class AREALogSummaryParser(LogListParser):
             conflict_dict[confpair].append(simt)
 
             # Intrusions are flagged using t_int = 0
-            if not t_int == 0:
+            if t_int != 0:
                 continue
 
             # Check if intrusion count needs to be incremented
@@ -186,7 +190,7 @@ class AREALogLocationParser(LogListParser):
         # Loop over all rows and create a dictionary with each conflict
         # and its parameters listed once
         for row in log_data:
-            [simt, ac_id, area_id, t_int, ac_lat, ac_lon] = row
+            [simt, _, _, t_int, ac_lat, ac_lon] = row
             simt = int(float(simt))
             t_int = float(t_int)
             ac_lat = float(ac_lat)
@@ -435,12 +439,8 @@ class ASASLogLocationParser(LogListParser):
         # Loop over all rows and create a dictionary with each conflict
         # and its parameters listed once
         for row in log_data:
-            [simt, ac1_id, ac2_id, dist, t_cpa, t_los,
-             ac1_lat, ac1_lon, ac2_lat, ac2_lon] = row
-            simt = int(float(simt))
+            [_, _, _, dist, _, _, ac1_lat, ac1_lon, ac2_lat, ac2_lon] = row
             dist = float(dist)
-            t_cpa = float(t_cpa)
-            t_los = float(t_los)
             ac1_lat = float(ac1_lat)
             ac1_lon = float(ac1_lon)
             ac2_lat = float(ac2_lat)
@@ -448,13 +448,13 @@ class ASASLogLocationParser(LogListParser):
 
             is_los = dist <= PZ_RADIUS
 
+            avg_lat = (ac1_lat + ac2_lat)/2
+            avg_lon = (ac1_lon + ac2_lon)/2
+
             # Write lines for ac1 and ac2 at once
             outputlines.append(f"{geometry},{reso_method},{traffic_level},"
-                               + f"{scenario},{ac1_lat:0.6f},{ac1_lon:0.6f},"
-                               + f"{is_los}\n"
-                               + f"{geometry},{reso_method},{traffic_level},"
-                               + f"{scenario},{ac2_lat:0.6f},{ac2_lon:0.6f},"
-                               + f"{is_los}")
+                               + f"{scenario},{avg_lat:0.4f},{avg_lon:0.4f},"
+                               + f"{is_los}\n")
 
         self.write_lines_to_output_file(outputlines)
 
