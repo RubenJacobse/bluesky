@@ -242,16 +242,11 @@ class ASASLogSummaryParser(LogListParser):
         los_dict = {}
 
         for row in log_data:
-            [simt, ac1_id, ac2_id, dist, t_cpa, t_los,
-             ac1_lat, ac1_lon, ac2_lat, ac2_lon] = row
+            [simt, ac1_id, ac2_id, dist, t_cpa, t_los, _, _, _, _] = row
             simt = int(float(simt))
             dist = float(dist)
             t_cpa = float(t_cpa)
             t_los = float(t_los)
-            ac1_lat = float(ac1_lat)
-            ac1_lon = float(ac1_lon)
-            ac2_lat = float(ac2_lat)
-            ac2_lon = float(ac2_lon)
 
             confpair = f"{ac1_id}-{ac2_id}"
 
@@ -267,7 +262,7 @@ class ASASLogSummaryParser(LogListParser):
             conf_dict[confpair].append(simt)
 
             # Continue to next occurence if no loss of separation
-            if not dist < PZ_RADIUS:
+            if dist >= PZ_RADIUS:
                 continue
 
             # Check if los count needs to be incremented
@@ -359,16 +354,11 @@ class ASASLogOccurrenceParser(LogListParser):
         # Loop over all rows and create a dictionary with each conflict
         # and its parameters listed once
         for row in log_data:
-            [simt, ac1_id, ac2_id, dist, t_cpa, t_los,
-             ac1_lat, ac1_lon, ac2_lat, ac2_lon] = row
+            [simt, ac1_id, ac2_id, dist, t_cpa, t_los, _, _, _, _] = row
             simt = int(float(simt))
             dist = float(dist)
             t_cpa = float(t_cpa)
             t_los = float(t_los)
-            ac1_lat = float(ac1_lat)
-            ac1_lon = float(ac1_lon)
-            ac2_lat = float(ac2_lat)
-            ac2_lon = float(ac2_lon)
 
             confpair = f"{ac1_id}-{ac2_id}"
             is_los = dist <= PZ_RADIUS
