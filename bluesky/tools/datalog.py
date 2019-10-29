@@ -14,7 +14,7 @@ import bluesky as bs
 # Register settings defaults
 settings.set_variable_defaults(log_path='output')
 
-logprecision = '%.8f'
+logprecision = '%.4f'
 
 # Dict to contain the definitions of periodic loggers
 periodicloggers = dict()
@@ -153,7 +153,7 @@ class CSVLogger:
             self.tlog += self.dt
 
             # Make the variable reference list
-            varlist = [bs.sim.simt]
+            varlist = [int(bs.sim.simt)]  # NOTE cast may cause problem at dt<1
             varlist += [v.get() for v in self.selvars]
             varlist += additional_vars
 
