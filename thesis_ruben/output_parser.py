@@ -10,11 +10,15 @@ import csv
 # Module level constants
 PZ_RADIUS = 5.0 * 1852  # Protected zone radius in meters
 
+# Discard all data outside logging interval
+T_LOG_INTERVAL_START = 1800  # [s]
+T_LOG_INTERVAL_END = 16200  # [s]
+
 
 class LogListParser:
     """
     Parse and process the contents of all log files that are
-    in 'input_list'.
+    in 'input_list' and write the processed data to 'output_file'.
     """
 
     def __init__(self, input_list, output_file):
@@ -127,6 +131,9 @@ class AREALogSummaryParser(LogListParser):
         for row in log_data:
             [simt, ac_id, area_id, t_int, ac_lat, ac_lon] = row
             simt = int(float(simt))
+            if simt < T_LOG_INTERVAL_START or simt > T_LOG_INTERVAL_END:
+                continue
+
             t_int = float(t_int)
             ac_lat = float(ac_lat)
             ac_lon = float(ac_lon)
@@ -192,6 +199,9 @@ class AREALogLocationParser(LogListParser):
         for row in log_data:
             [simt, _, _, t_int, ac_lat, ac_lon] = row
             simt = int(float(simt))
+            if simt < T_LOG_INTERVAL_START or simt > T_LOG_INTERVAL_END:
+                continue
+
             t_int = float(t_int)
             ac_lat = float(ac_lat)
             ac_lon = float(ac_lon)
@@ -248,6 +258,9 @@ class ASASLogSummaryParser(LogListParser):
         for row in log_data:
             [simt, ac1_id, ac2_id, is_los, _, _, _] = row
             simt = int(float(simt))
+            if simt < T_LOG_INTERVAL_START or simt > T_LOG_INTERVAL_END:
+                continue
+
             is_los = int(is_los)
 
             confpair = f"{ac1_id}-{ac2_id}"
@@ -358,6 +371,9 @@ class ASASLogOccurrenceParser(LogListParser):
         for row in log_data:
             [simt, ac1_id, ac2_id, is_los, dist, _, _] = row
             simt = int(float(simt))
+            if simt < T_LOG_INTERVAL_START or simt > T_LOG_INTERVAL_END:
+                continue
+
             dist = float(dist)
             is_los = str(bool(int(is_los)))
 
@@ -435,7 +451,11 @@ class ASASLogLocationParser(LogListParser):
         # Loop over all rows and create a dictionary with each conflict
         # and its parameters listed once
         for row in log_data:
-            [_, _, _, is_los, _, avg_lat, avg_lon] = row
+            [simt, _, _, is_los, _, avg_lat, avg_lon] = row
+            simt = float(simt)
+            if simt < T_LOG_INTERVAL_START or simt > T_LOG_INTERVAL_END:
+                continue
+
             avg_lat = float(avg_lat)
             avg_lon = float(avg_lon)
             is_los = str(bool(int(is_los)))
@@ -471,6 +491,12 @@ class FLSTLogOccurrenceParser(LogListParser):
         """
 
         for row in log_data:
+            del_time = float(row[0])
+            spawn_time = float(row[2])
+            if (spawn_time < T_LOG_INTERVAL_START
+                    or del_time > T_LOG_INTERVAL_END):
+                continue
+
             ac_id = row[1]
             nominal_dist = float(row[4])
             actual_dist = float(row[5])
@@ -512,6 +538,12 @@ class FLSTLogSummaryParser(LogListParser):
         num_turnaround = 0
 
         for row in log_data:
+            del_time = float(row[0])
+            spawn_time = float(row[2])
+            if (spawn_time < T_LOG_INTERVAL_START
+                    or del_time > T_LOG_INTERVAL_END):
+                continue
+
             dist_to_last_wp = float(row[8]) / 1852
             lat = float(row[9])
 
