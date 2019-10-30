@@ -30,8 +30,7 @@ import scenario_config
 
 # BlueSky simulator settings
 SIM_TIME_STEP = 0.1  # [s] Simulation time step
-SIM_PAUSE_HOUR = 5  # [h] Pause simulation after this number of hours
-SHOW_AC_TRAILS = True  # Plot trails in the radar window
+SIM_SHOW_TRAILS = True  # Plot trails in the radar window
 
 # Area restriction settings
 CENTER_LAT = 0.0  # [deg]
@@ -42,10 +41,15 @@ RMETHH = "BOTH"  # Horizontal resolution method, allow both spd and hdg changes
 AREA_RADIUS = 100  # [NM]
 
 # Aircraft creation settings
-NUM_AIRCRAFT = 50
 AC_TYPES = ["A320", "B738", "A333", "B744"]
 AC_TYPES_SPD = [258, 260, 273, 284]  # [kts] Cruise speed (CAS) for each type
-SPD_STDDEV = 5  # [kts] Standard deviation of cruise speed distributions
+AC_SPD_STDDEV = 5  # [kts] Standard deviation of cruise speed distributions
+
+# Specify whether a scenario contains a fixed number of aircraft or
+# is defined by a fixed simulation time period.
+SCEN_AC_MODE = "RUNTIME"  # "TOT_AC"
+SCEN_TOT_AC = 50  # Total number of aircraft in the scenario
+SCEN_RUNTIME = 18000  # Scenario run duration in seconds
 
 
 class ScenarioGenerator():
@@ -96,6 +100,7 @@ class ScenarioGenerator():
         self.calculate_creation_arc_angle_range()
         self.aircraft_list = []
         self.create_all_aircraft()
+        self.num_created_ac = len(self.aircraft_list)
 
         # Save the results to file
         self.write_scenfile()
@@ -297,10 +302,10 @@ class ScenarioGenerator():
             geovector["coords"] = cor_wedge_coords
 
         # A two dimensional geovector can restrict ground speed and/or course
-        gs_min_cas = 260 # [kts]  
-        gs_max_cas = 270 # [kts]
-        crs_min = 359 # [deg]
-        crs_max = 1 # [deg]
+        gs_min_cas = 260  # [kts]
+        gs_max_cas = 270  # [kts]
+        crs_min = 359  # [deg]
+        crs_max = 1  # [deg]
 
         # Convert speed limits from CAS [kts] to TAS [kts] for use in geovector
         # cas2tas() is entirely in metric, so we need to convert kts and ft
@@ -393,7 +398,9 @@ class ScenarioGenerator():
         min_dt = min_dist / ac_spd * 3600  # [s]
 
         num_created_ac = 0
-        while num_created_ac < NUM_AIRCRAFT:
+        while ((SCEN_AC_MODE == "TOT_AC" and num_created_ac < SCEN_TOT_AC)
+               or (SCEN_AC_MODE == "RUNTIME")):
+            # while num_created_ac < SCEN_TOT_AC:
             # Will be set True if creation results in a conflict
             in_conflict_at_creation = False
 
@@ -402,10 +409,14 @@ class ScenarioGenerator():
             curr_time = prev_time + random.randint(self.cre_interval_min,
                                                    self.cre_interval_max)
 
+            # Exit the while loop
+            if SCEN_AC_MODE == "RUNTIME" and curr_time >= SCEN_RUNTIME:
+                break
+
             # Select an aircraft type and velocity
             type_idx = random.randint(0, len(AC_TYPES) - 1)
             curr_type = AC_TYPES[type_idx]
-            curr_spd = random.gauss(AC_TYPES_SPD[type_idx], SPD_STDDEV)
+            curr_spd = random.gauss(AC_TYPES_SPD[type_idx], AC_SPD_STDDEV)
 
             # Select random departure and destination waypoint
             curr_dep_angle = random.uniform(180 - angle + 3, 180 + angle - 3)
@@ -495,8 +506,8 @@ class ScenarioGenerator():
              + f"# Experiment area radius: {AREA_RADIUS} NM\n"
              + f"# Aircraft types: {AC_TYPES}\n"
              + f"# Aircraft average speed: {AC_TYPES_SPD} kts\n"
-             + f"# Aircraft speed std dev: {SPD_STDDEV} kts\n"
-             + f"# Number of aircraft created: {NUM_AIRCRAFT}\n"
+             + f"# Aircraft speed std dev: {AC_SPD_STDDEV} kts\n"
+             + f"# Number of aircraft created: {self.num_created_ac}\n"
              + f"# Traffic level: {self.traffic_level}\n"
              + f"# Aircraft creation interval min: {self.cre_interval_min} s\n"
              + f"# Aircraft creation interval max: {self.cre_interval_max} s\n"
@@ -513,7 +524,7 @@ class ScenarioGenerator():
             scnfile.write(zero_time + f"PAN {CENTER_LAT},{CENTER_LON}")
             scnfile.write(zero_time + f"DT {SIM_TIME_STEP}")
             scnfile.write(zero_time + "TRAIL {}"
-                          .format("ON" if SHOW_AC_TRAILS else "OFF"))
+                          .format("ON" if SIM_SHOW_TRAILS else "OFF"))
             scnfile.write(zero_time + "SWRAD SYM")
             scnfile.write(zero_time + "SWRAD LABEL 0")
             scnfile.write(zero_time + "SWRAD WPT")
@@ -575,7 +586,7 @@ class ScenarioGenerator():
                           .format(self.corridor["north_lat"], CENTER_LON))
 
             # Write each aircraft to file
-            scnfile.write("\n\n# Create {} aircraft".format(NUM_AIRCRAFT))
+            scnfile.write(f"\n\n# Create {self.num_created_ac} aircraft")
             for idx, ac in enumerate(self.aircraft_list):
                 # Altitude is the same for all aircraft
                 ac_alt = "36000"
