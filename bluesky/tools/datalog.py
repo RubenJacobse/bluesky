@@ -133,7 +133,7 @@ class CSVLogger:
     def open(self, fname):
         if self.file:
             self.file.close()
-        self.file = open(fname, 'wb')
+        self.file = open(fname, 'wb', buffering=1)
         # Write the header
         for line in self.header:
             self.file.write(bytearray('# ' + line + '\n', 'ascii'))
@@ -166,12 +166,11 @@ class CSVLogger:
             if nrows == 0:
                 return
             # Convert (numeric) arrays to text, leave text arrays untouched
-            txtdata = [
-                txtcol for col in varlist for txtcol in col2txt(col, nrows)]
+            txtdata = ",".join([txtcol[0] for col in varlist
+                                for txtcol in col2txt(col, nrows)]) + "\n"
 
             # log the data to file
-            np.savetxt(self.file, np.vstack(txtdata).T,
-                       delimiter=',', newline='\n', fmt='%s')
+            self.file.write(bytearray(txtdata, "ascii"))
 
     def start(self):
         ''' Start this logger. '''
