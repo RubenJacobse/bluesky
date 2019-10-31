@@ -617,7 +617,9 @@ class ASAS(TrafficArrays):
 
         # Look at all conflicts, also the ones that are solved but CPA is yet to come
         for conflict_pair in self.resopairs:
-            idx1, idx2 = bs.traf.id2idx(conflict_pair)
+            (id1, id2) = conflict_pair
+            idx1 = bs.traf.id2idx(id1)
+            idx2 = bs.traf.id2idx(id2)
 
             # If the ownship aircraft is deleted remove its conflict from the list
             if idx1 < 0:
