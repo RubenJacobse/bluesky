@@ -6,7 +6,7 @@ easy use in BlueSky.
 cimport cython
 import numpy as np
 cimport numpy as np
-from libc.math cimport sin, cos, pi, sqrt, asin, atan2
+from libc.math cimport sin, cos, pi, sqrt, asin, atan2, fabs
 
 # Constants
 cdef double nm = 1852.  # m       1 nautical mile
@@ -18,9 +18,6 @@ DTYPE = np.float32
 ctypedef np.float32_t DTYPE_t
 
 
-@cython.cdivision(True)
-@cython.boundscheck(False)
-@cython.wraparound(False)
 def rwgs84(latd):
     """
     Calculate the earths radius with WGS'84 geoid definition
@@ -35,34 +32,7 @@ def rwgs84(latd):
 
 
 @cython.cdivision(True)
-@cython.boundscheck(False)
-@cython.wraparound(False)
-cpdef DTYPE_t[:] _rwgs84_arr(DTYPE_t[:] latd):
-# cpdef np.ndarray[DTYPE_t, ndim=1] _rwgs84_arr(np.ndarray[DTYPE_t, ndim=1] latd):
-    """
-    Calculate the earths radius with WGS'84 geoid definition
-        In:  lat [deg] (latitude)
-        Out: R   [m]   (earth radius)
-    """
-    cdef Py_ssize_t ntraf = latd.shape[0]
-    cdef np.ndarray[DTYPE_t, ndim=1] r = np.empty(ntraf, DTYPE)
-
-    cdef Py_ssize_t ii
-    for ii in range(ntraf):
-        r[ii] = _rwgs84(latd[ii])
-
-    return r
-
-
-@cython.cdivision(True)
-@cython.boundscheck(False)
-@cython.wraparound(False)
 cdef DTYPE_t _rwgs84(DTYPE_t latd):
-    """
-    Calculate the earths radius with WGS'84 geoid definition
-        In:  lat [deg] (latitude)
-        Out: R   [m]   (earth radius)
-    """
     cdef DTYPE_t lat, coslat, sinlat, an, bn, ad, bd, r
 
     lat = latd * pi / 180
@@ -79,11 +49,26 @@ cdef DTYPE_t _rwgs84(DTYPE_t latd):
     return r
 
 
-@cython.cdivision(True)
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def rwgs84_matrix(DTYPE_t[:,:] latd):
-# def rwgs84_matrix(np.ndarray[DTYPE_t, ndim=2] latd):
+cdef DTYPE_t[:] _rwgs84_arr(DTYPE_t[:] latd):
+    """
+    Calculate earth radius with WGS'84 geoid definition for array
+    type input.
+    """
+    cdef Py_ssize_t ntraf = latd.shape[0]
+    cdef np.ndarray[DTYPE_t, ndim=1] r = np.empty(ntraf, DTYPE)
+
+    cdef Py_ssize_t ii
+    for ii in range(ntraf):
+        r[ii] = _rwgs84(latd[ii])
+
+    return r
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef rwgs84_matrix(DTYPE_t[:,:] latd):
     """ 
     Calculate the earths radius with WGS'84 geoid definition
         In:  lat [deg] (Vector of latitudes)
@@ -97,25 +82,30 @@ def rwgs84_matrix(DTYPE_t[:,:] latd):
     cdef DTYPE_t lat, coslat, sinlat, an, bn, ad, bd
     for ii in range(ntraf1):
         for jj in range(ntraf2):
-            # lat = latd[ii, jj] * pi / 180
-            # coslat = cos(lat)
-            # sinlat = sin(lat)
-
-            # an = a**2 * coslat
-            # bn = b**2 * sinlat
-            # ad = a * coslat
-            # bd = b * sinlat
-
-            # r[ii, jj] = sqrt((an**2 + bn**2) / (ad**2 + bd**2))
-
             r[ii, jj] = _rwgs84(latd[ii, jj])
+
     return np.mat(r)
 
 
+def qdrdist(latd1, lond1, latd2, lond2):
+    """
+    Calculate bearing and distance, using WGS'84
+        In:
+            latd1,lond1 en latd2, lond2 [deg] :positions 1 & 2
+        Out:
+            qdr [deg] = heading from 1 to 2
+            d [nm]    = distance from 1 to 2 in nm
+    """
+
+    if isinstance(np.ndarray, latd1):
+        assert latd1.shape == lond1.shape == latd2.shape == lond2.shape
+        return _qdrdist_arr(latd1, lond1, latd2, lond2)
+    else:
+        return _qdrdist(latd1, lond1, latd2, lond2)
+
+
 @cython.cdivision(True)
-@cython.boundscheck(False)
-@cython.wraparound(False)
-def qdrdist(DTYPE_t latd1, DTYPE_t lond1, DTYPE_t latd2, DTYPE_t lond2):
+cpdef _qdrdist(DTYPE_t latd1, DTYPE_t lond1, DTYPE_t latd2, DTYPE_t lond2):
     """
     Calculate bearing and distance, using WGS'84
         In:
@@ -139,8 +129,8 @@ def qdrdist(DTYPE_t latd1, DTYPE_t lond1, DTYPE_t latd2, DTYPE_t lond2):
         # Different hemispheres
         r1   = _rwgs84(latd1)
         r2   = _rwgs84(latd2)
-        r = 0.5 * (abs(latd1) * (r1 + a) + abs(latd2) * (r2 + a)) / \
-                   (abs(latd1) + abs(latd2))
+        r = 0.5 * (fabs(latd1) * (r1 + a) + fabs(latd2) * (r2 + a)) / \
+                   (fabs(latd1) + fabs(latd2))
 
     # Convert to radians
     lat1 = latd1 / 180 * pi
@@ -164,17 +154,30 @@ def qdrdist(DTYPE_t latd1, DTYPE_t lond1, DTYPE_t latd2, DTYPE_t lond2):
     return qdr, d/nm
 
 
-@cython.cdivision(True)
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def qdrdist_matrix(DTYPE_t[:] lat1, 
-                   DTYPE_t[:] lon1,
-                   DTYPE_t[:] lat2,
-                   DTYPE_t[:] lon2):
-# def qdrdist_matrix(np.ndarray[DTYPE_t, ndim=1] lat1, 
-#                    np.ndarray[DTYPE_t, ndim=1] lon1,
-#                    np.ndarray[DTYPE_t, ndim=1] lat2,
-#                    np.ndarray[DTYPE_t, ndim=1] lon2):
+cdef _qdrdist_arr(DTYPE_t[:] latd1,
+                  DTYPE_t[:] lond1,
+                  DTYPE_t[:] latd2,
+                  DTYPE_t[:] lond2):
+    cdef Py_ssize_t ntraf = latd1.shape[0]
+    cdef np.ndarray[DTYPE_t, ndim=2] qdr = np.empty(ntraf, DTYPE)
+    cdef np.ndarray[DTYPE_t, ndim=2] dist = np.empty(ntraf, DTYPE)
+
+    cdef Py_ssize_t ii
+    for ii in range(ntraf):
+        (qdr[ii], dist[ii]) = _qdrdist(latd1[ii], lond1[ii], 
+                                       latd2[ii], lond2[ii])
+
+    return qdr, dist
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef qdrdist_matrix(DTYPE_t[:] lat1, 
+                     DTYPE_t[:] lon1,
+                     DTYPE_t[:] lat2,
+                     DTYPE_t[:] lon2):
     """
     Calculate bearing and distance vectors, using WGS'84
         In:
@@ -194,17 +197,13 @@ def qdrdist_matrix(DTYPE_t[:] lat1,
     cdef Py_ssize_t ii, jj
     for ii in range(ntraf1):
         for jj in range(ntraf2):
-            (qdr[ii, jj], dist[ii, jj]) = qdrdist(lat1[ii],
-                                                  lon1[ii],
-                                                  lat2[jj],
-                                                  lon2[jj])
+            (qdr[ii, jj], dist[ii, jj]) = _qdrdist(lat1[ii], lon1[ii],
+                                                   lat2[jj], lon2[jj])
 
     return np.mat(qdr), np.mat(dist)
 
 
 @cython.cdivision(True)
-@cython.boundscheck(False)
-@cython.wraparound(False)
 cpdef DTYPE_t latlondist(DTYPE_t latd1,
                          DTYPE_t lond1,
                          DTYPE_t latd2,
@@ -230,8 +229,8 @@ cpdef DTYPE_t latlondist(DTYPE_t latd1,
         # Different hemispheres
         r1   = _rwgs84(latd1)
         r2   = _rwgs84(latd2)
-        r = 0.5 * (abs(latd1) * (r1 + a) + abs(latd2) * (r2 + a)) / \
-                   (abs(latd1) + abs(latd2))
+        r = 0.5 * (fabs(latd1) * (r1 + a) + fabs(latd2) * (r2 + a)) / \
+                   (fabs(latd1) + fabs(latd2))
 
     # Convert to radians
     lat1 = latd1 / 180 * pi
@@ -251,17 +250,12 @@ cpdef DTYPE_t latlondist(DTYPE_t latd1,
     return d
 
 
-@cython.cdivision(True)
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def latlondist_matrix(DTYPE_t[:] lat1,
-                      DTYPE_t[:] lon1,
-                      DTYPE_t[:] lat2,
-                      DTYPE_t[:] lon2):
-# def latlondist_matrix(np.ndarray[DTYPE_t, ndim=1] lat1,
-#                       np.ndarray[DTYPE_t, ndim=1] lon1,
-#                       np.ndarray[DTYPE_t, ndim=1] lat2,
-#                       np.ndarray[DTYPE_t, ndim=1] lon2):
+cpdef latlondist_matrix(DTYPE_t[:] lat1,
+                        DTYPE_t[:] lon1,
+                        DTYPE_t[:] lat2,
+                        DTYPE_t[:] lon2):
     """
     Calculates distance using haversine formulae and avaerage r from wgs'84
         Input:
@@ -269,7 +263,7 @@ def latlondist_matrix(DTYPE_t[:] lat1,
         Out:
               distance vector in meters !!!!
     """
-    
+
     assert lat1.shape == lon1.shape and lat2.shape == lon2.shape
 
     cdef Py_ssize_t ntraf1 = lat1.shape[0]
@@ -285,9 +279,7 @@ def latlondist_matrix(DTYPE_t[:] lat1,
 
 
 @cython.cdivision(True)
-@cython.boundscheck(False)
-@cython.wraparound(False)
-def wgsg(DTYPE_t latd):
+cpdef DTYPE_t wgsg(DTYPE_t latd):
     """
     Gravity acceleration at a given latitude according to WGS'84
     """
@@ -299,15 +291,12 @@ def wgsg(DTYPE_t latd):
     k  = 0.001932  # derived from flattening f, 1/f = 298.257223563
  
     sinlat = sin(latd * pi / 180)
-    g = geq * (1.0 + k*sinlat*sinlat) / sqrt(1.0 - e2*sinlat*sinlat)
+    g = geq * (1.0 + k*sinlat**2) / sqrt(1.0 - e2*sinlat**2)
 
     return g
 
 
-@cython.cdivision(True)
-@cython.boundscheck(False)
-@cython.wraparound(False)
-def qdrpos(DTYPE_t latd1, DTYPE_t lond1, DTYPE_t qdr, DTYPE_t dist):
+def qdrpos(latd1, lond1, qdr, dist):
     """ 
     Calculate vector with positions from vectors of reference position,
     bearing and distance.
@@ -319,6 +308,19 @@ def qdrpos(DTYPE_t latd1, DTYPE_t lond1, DTYPE_t qdr, DTYPE_t dist):
              latd2,lond2 (IN DEGREES!)
     Ref for qdrpos: http://www.movable-type.co.uk/scripts/latlong.html
     """
+
+    if isinstance(np.ndarray, latd1):
+        assert latd1.shape == lond1.shape == qdr.shape == dist.shape
+        return _qdrpos_arr(latd1, lond1, qdr, dist)
+    else:
+        return _qdrpos(latd1, lond1, qdr, dist)
+       
+
+@cython.cdivision(True)
+cdef _qdrpos(DTYPE_t latd1,
+             DTYPE_t lond1,
+             DTYPE_t qdr,
+             DTYPE_t dist):
     cdef DTYPE_t r, lat1, lon1, lat2, lon2, lat2_deg, lon2_deg, qdr_rad
 
     # Unit conversion
@@ -328,7 +330,7 @@ def qdrpos(DTYPE_t latd1, DTYPE_t lond1, DTYPE_t qdr, DTYPE_t dist):
     qdr_rad = qdr * pi / 180
 
     # Calculate new position
-    lat2 = asin(sin(lat1) * cos(dist/r) 
+    lat2 = asin(sin(lat1) * cos(dist/r)
                 + cos(lat1) * sin(dist/r) * cos(qdr_rad))
     lon2 = lon1 + atan2(sin(qdr_rad) * sin(dist/r) * cos(lat1),
                         cos(dist/r) - sin(lat1) * sin(lat2))
@@ -339,7 +341,25 @@ def qdrpos(DTYPE_t latd1, DTYPE_t lond1, DTYPE_t qdr, DTYPE_t dist):
     return lat2_deg, lon2_deg
 
 
-def kwikdist(lata, lona, latb, lonb):
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cpdef _qdrpos_arr(DTYPE_t[:] latd1,
+                  DTYPE_t[:] lond1,
+                  DTYPE_t[:] qdr,
+                  DTYPE_t[:] dist):
+    cdef Py_ssize_t ntraf = latd1.shape[0]
+    cdef np.ndarray[DTYPE_t, ndim=1] lat2_deg = np.empty(ntraf, DTYPE)
+    cdef np.ndarray[DTYPE_t, ndim=1] lon2_deg = np.empty(ntraf, DTYPE)
+
+    cdef Py_ssize_t ii
+    for ii in range(ntraf):
+        (lat2_deg[ii], lon2_deg[ii]) = _qdrpos(latd1[ii], lond1[ii],
+                                               qdr[ii], dist[ii])
+
+    return lat2_deg, lon2_deg
+
+
+cpdef kwikdist(lata, lona, latb, lonb):
     """
     Quick and dirty dist [nm]
     In:
