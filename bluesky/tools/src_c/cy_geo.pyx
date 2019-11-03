@@ -6,7 +6,7 @@ easy use in BlueSky.
 cimport cython
 import numpy as np
 cimport numpy as np
-from libc.math cimport sin, cos, pi, sqrt, asin, atan2, fabs
+from libc.math cimport sin, cos, sqrt, asin, atan2, fabs
 
 # Constants
 cdef double nm = 1852.  # m       1 nautical mile
@@ -16,7 +16,6 @@ cdef double b = 6356752.314245  # [m] Minor semi-axis WGS-84
 # Typedef the floating point type used in numpy arrays
 DTYPE = np.double
 ctypedef np.double_t DTYPE_t
-
 
 def rwgs84(latd):
     """
@@ -35,7 +34,7 @@ def rwgs84(latd):
 cdef DTYPE_t _rwgs84(DTYPE_t latd):
     cdef DTYPE_t lat, coslat, sinlat, an, bn, ad, bd, r
 
-    lat = latd * pi / 180
+    lat = np.radians(latd)
     coslat = cos(lat)
     sinlat = sin(lat)
 
@@ -133,10 +132,10 @@ cpdef _qdrdist(DTYPE_t latd1, DTYPE_t lond1, DTYPE_t latd2, DTYPE_t lond2):
                    (fabs(latd1) + fabs(latd2))
 
     # Convert to radians
-    lat1 = latd1 / 180 * pi
-    lon1 = lond1 / 180 * pi
-    lat2 = latd2 / 180 * pi
-    lon2 = lond2 / 180 * pi
+    lat1 = np.radians(latd1)
+    lon1 = np.radians(lond1)
+    lat2 = np.radians(latd2)
+    lon2 = np.radians(lond2)
 
     sin1 = sin(0.5 * (lat2 - lat1))
     sin2 = sin(0.5 * (lon2 - lon1))
@@ -233,10 +232,10 @@ cpdef DTYPE_t latlondist(DTYPE_t latd1,
                    (fabs(latd1) + fabs(latd2))
 
     # Convert to radians
-    lat1 = latd1 / 180 * pi
-    lon1 = lond1 / 180 * pi
-    lat2 = latd2 / 180 * pi
-    lon2 = lond2 / 180 * pi
+    lat1 = np.radians(latd1)
+    lon1 = np.radians(lond1)
+    lat2 = np.radians(latd2)
+    lon2 = np.radians(lond2)
 
     sin1 = sin(0.5 * (lat2 - lat1))
     sin2 = sin(0.5 * (lon2 - lon1))
@@ -290,7 +289,7 @@ cpdef DTYPE_t wgsg(DTYPE_t latd):
     e2 = 6.694e-3  # eccentricity
     k  = 0.001932  # derived from flattening f, 1/f = 298.257223563
  
-    sinlat = sin(latd * pi / 180)
+    sinlat = sin(np.radians(latd))
     g = geq * (1.0 + k*sinlat**2) / sqrt(1.0 - e2*sinlat**2)
 
     return g
@@ -325,9 +324,9 @@ cdef _qdrpos(DTYPE_t latd1,
 
     # Unit conversion
     r = _rwgs84(latd1) / nm
-    lat1 = latd1 * pi / 180
-    lon1 = lond1 * pi / 180
-    qdr_rad = qdr * pi / 180
+    lat1 = np.radians(latd1)
+    lon1 = np.radians(lond1)
+    qdr_rad = np.radians(qdr)
 
     # Calculate new position
     lat2 = asin(sin(lat1) * cos(dist/r)
@@ -335,8 +334,8 @@ cdef _qdrpos(DTYPE_t latd1,
     lon2 = lon1 + atan2(sin(qdr_rad) * sin(dist/r) * cos(lat1),
                         cos(dist/r) - sin(lat1) * sin(lat2))
 
-    lat2_deg = lat2 * 180 / pi
-    lon2_deg = lon2 * 180 / pi 
+    lat2_deg = np.radians(lat2)
+    lon2_deg = np.radians(lon2) 
 
     return lat2_deg, lon2_deg
 
