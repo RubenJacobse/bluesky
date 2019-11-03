@@ -14,8 +14,8 @@ cdef double a = 6378137.0       # [m] Major semi-axis WGS-84
 cdef double b = 6356752.314245  # [m] Minor semi-axis WGS-84
 
 # Typedef the floating point type used in numpy arrays
-DTYPE = np.float32
-ctypedef np.float32_t DTYPE_t
+DTYPE = np.double
+ctypedef np.double_t DTYPE_t
 
 
 def rwgs84(latd):
@@ -25,7 +25,7 @@ def rwgs84(latd):
         Out: R   [m]   (earth radius)
     """
 
-    if isinstance(np.ndarray, latd):
+    if isinstance(latd, np.ndarray):
         return _rwgs84_arr(latd)
     else:
         return _rwgs84(latd)
@@ -97,7 +97,7 @@ def qdrdist(latd1, lond1, latd2, lond2):
             d [nm]    = distance from 1 to 2 in nm
     """
 
-    if isinstance(np.ndarray, latd1):
+    if isinstance(latd1, np.ndarray):
         assert latd1.shape == lond1.shape == latd2.shape == lond2.shape
         return _qdrdist_arr(latd1, lond1, latd2, lond2)
     else:
@@ -161,8 +161,8 @@ cdef _qdrdist_arr(DTYPE_t[:] latd1,
                   DTYPE_t[:] latd2,
                   DTYPE_t[:] lond2):
     cdef Py_ssize_t ntraf = latd1.shape[0]
-    cdef np.ndarray[DTYPE_t, ndim=2] qdr = np.empty(ntraf, DTYPE)
-    cdef np.ndarray[DTYPE_t, ndim=2] dist = np.empty(ntraf, DTYPE)
+    cdef np.ndarray[DTYPE_t, ndim=1] qdr = np.empty(ntraf, DTYPE)
+    cdef np.ndarray[DTYPE_t, ndim=1] dist = np.empty(ntraf, DTYPE)
 
     cdef Py_ssize_t ii
     for ii in range(ntraf):
@@ -309,12 +309,12 @@ def qdrpos(latd1, lond1, qdr, dist):
     Ref for qdrpos: http://www.movable-type.co.uk/scripts/latlong.html
     """
 
-    if isinstance(np.ndarray, latd1):
+    if isinstance(latd1, np.ndarray):
         assert latd1.shape == lond1.shape == qdr.shape == dist.shape
         return _qdrpos_arr(latd1, lond1, qdr, dist)
     else:
         return _qdrpos(latd1, lond1, qdr, dist)
-       
+
 
 @cython.cdivision(True)
 cdef _qdrpos(DTYPE_t latd1,
