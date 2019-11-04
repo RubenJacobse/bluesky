@@ -177,14 +177,17 @@ def MVP(traf, asas, qdr, dist, tcpa, tLOS, id1, id2):
         dcpa[0] = drel[1] / dist * dabsH
         dcpa[1] = -drel[0] / dist * dabsH
 
-    # If intruder is outside the ownship PZ, then apply extra factor
-    # to make sure that resolution does not graze IPZ
-    if asas.Rm < dist and dabsH < dist:
         # Compute the resolution velocity vector in horizontal direction
         # abs(tcpa) because it becomes negative during intrusion
+    if asas.Rm < dist and dabsH < dist:
+        # If intruder is outside the ownship PZ, then apply extra factor
+        # to make sure that resolution does not graze PZ
         erratum = np.cos(np.arcsin(asas.Rm/dist) - np.arcsin(dabsH/dist))
         dv1 = ((asas.Rm / erratum - dabsH) * dcpa[0]) / (abs(tcpa) * dabsH)
         dv2 = ((asas.Rm / erratum - dabsH) * dcpa[1]) / (abs(tcpa) * dabsH)
+    else:
+        dv1 = (iH * dcpa[0]) / (abs(tcpa) * dabsH)
+        dv2 = (iH * dcpa[1]) / (abs(tcpa) * dabsH)
 
     # Vertical resolution------------------------------------------------------
 
