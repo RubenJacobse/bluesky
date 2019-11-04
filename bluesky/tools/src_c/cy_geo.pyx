@@ -46,12 +46,12 @@ cdef DTYPE_t _rwgs84(DTYPE_t latd):
     coslat = cos(lat)
     sinlat = sin(lat)
 
-    an = a**2 * coslat
-    bn = b**2 * sinlat
+    an = a*a * coslat
+    bn = b*b * sinlat
     ad = a * coslat
     bd = b * sinlat
 
-    r = sqrt((an**2 + bn**2) / (ad**2 + bd**2))
+    r = sqrt((an*an + bn*bn) / (ad*ad + bd*bd))
 
     return r
 
@@ -148,7 +148,7 @@ cpdef _qdrdist(DTYPE_t latd1, DTYPE_t lond1, DTYPE_t latd2, DTYPE_t lond2):
     coslat1 = cos(lat1)
     coslat2 = cos(lat2)
 
-    root = sin1**2 + coslat1 * coslat2 * sin2**2
+    root = sin1*sin1 + coslat1 * coslat2 * sin2*sin2
     d    =  2.0 * r * atan2(sqrt(root) , sqrt(1.0 - root))
     #    d =2.*r*np.arcsin(np.sqrt(sin1*sin1 + coslat1*coslat2*sin2*sin2))
 
@@ -248,7 +248,7 @@ cpdef DTYPE_t latlondist(DTYPE_t latd1,
     coslat1 = cos(lat1)
     coslat2 = cos(lat2)
 
-    root = sin1**2 + coslat1 * coslat2 * sin2**2
+    root = sin1*sin1 + coslat1 * coslat2 * sin2*sin2
     d    =  2.0 * r * atan2(sqrt(root) , sqrt(1.0 - root))
     #    d =2.*r*np.arcsin(np.sqrt(sin1*sin1 + coslat1*coslat2*sin2*sin2))
 
@@ -296,7 +296,7 @@ cpdef DTYPE_t wgsg(DTYPE_t latd):
     k  = 0.001932  # derived from flattening f, 1/f = 298.257223563
  
     sinlat = sin(np.radians(latd))
-    g = geq * (1.0 + k*sinlat**2) / sqrt(1.0 - e2*sinlat**2)
+    g = geq * (1.0 + k*sinlat*sinlat) / sqrt(1.0 - e2*sinlat*sinlat)
 
     return g
 
