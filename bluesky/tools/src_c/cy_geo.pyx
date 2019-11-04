@@ -6,7 +6,7 @@ easy use in BlueSky.
 cimport cython
 import numpy as np
 cimport numpy as np
-from libc.math cimport sin, cos, sqrt, asin, atan2, fabs
+from libc.math cimport sin, cos, sqrt, asin, atan2, fabs, pi
 
 # Constants
 cdef double nm = 1852.  # m       1 nautical mile
@@ -18,6 +18,7 @@ DTYPE = np.double
 ctypedef np.double_t DTYPE_t
 
 
+@cython.nonecheck(False)
 @cython.embedsignature(True)
 def rwgs84(latd):
     """
@@ -32,6 +33,7 @@ def rwgs84(latd):
         return _rwgs84(latd)
 
 
+@cython.nonecheck(False)
 @cython.cdivision(True)
 cdef DTYPE_t _rwgs84(DTYPE_t latd):
     cdef DTYPE_t lat, coslat, sinlat, an, bn, ad, bd, r
@@ -41,7 +43,7 @@ cdef DTYPE_t _rwgs84(DTYPE_t latd):
     # function result is NOT exactly the same as that of the native python
     # rwgs84 function (which does use np.radians) for all values of latd.
     # lat = np.radians(latd)
-    lat = latd * pi / 180
+    lat = (latd * pi) / 180
 
     coslat = cos(lat)
     sinlat = sin(lat)
@@ -56,6 +58,7 @@ cdef DTYPE_t _rwgs84(DTYPE_t latd):
     return r
 
 
+@cython.nonecheck(False)
 @cython.cdivision(True)
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -70,10 +73,11 @@ cdef np.ndarray[DTYPE_t, ndim=1] _rwgs84_arr(np.ndarray[DTYPE_t, ndim=1] latd):
     return r
 
 
+@cython.nonecheck(False)
 @cython.cdivision(True)
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cpdef rwgs84_matrix(DTYPE_t[:,:] latd):
+cpdef rwgs84_matrix(np.ndarray[DTYPE_t, ndim=2] latd):
     """ 
     Calculate the earths radius with WGS'84 geoid definition
         In:  lat [deg] (Vector of latitudes)
@@ -92,6 +96,11 @@ cpdef rwgs84_matrix(DTYPE_t[:,:] latd):
     return np.mat(r)
 
 
+## Cythonized and checked until this point
+
+
+@cython.nonecheck(False)
+@cython.embedsignature(True)
 def qdrdist(latd1, lond1, latd2, lond2):
     """
     Calculate bearing and distance, using WGS'84
@@ -111,15 +120,6 @@ def qdrdist(latd1, lond1, latd2, lond2):
 
 @cython.cdivision(True)
 cpdef _qdrdist(DTYPE_t latd1, DTYPE_t lond1, DTYPE_t latd2, DTYPE_t lond2):
-    """
-    Calculate bearing and distance, using WGS'84
-        In:
-            latd1,lond1 en latd2, lond2 [deg] :positions 1 & 2
-        Out:
-            qdr [deg] = heading from 1 to 2
-            d [nm]    = distance from 1 to 2 in nm
-    """
-
     cdef DTYPE_t r, r1, r2
     cdef DTYPE_t lat1, lon1, lat2, lon2, sin1, sin2, coslat1, coslat2, root, d
     cdef DTYPE_t qdr_rad, qdr
