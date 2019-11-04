@@ -17,6 +17,8 @@ cdef double b = 6356752.314245  # [m] Minor semi-axis WGS-84
 DTYPE = np.double
 ctypedef np.double_t DTYPE_t
 
+
+@cython.embedsignature(True)
 def rwgs84(latd):
     """
     Calculate the earths radius with WGS'84 geoid definition
@@ -34,7 +36,13 @@ def rwgs84(latd):
 cdef DTYPE_t _rwgs84(DTYPE_t latd):
     cdef DTYPE_t lat, coslat, sinlat, an, bn, ad, bd, r
 
-    lat = np.radians(latd)
+    # Using np.radians(latd) results in a python call (slow) each time
+    # the function is used. Using "latd * pi / 180" is faster, but the
+    # function result is NOT exactly the same as that of the native python
+    # rwgs84 function (which does use np.radians) for all values of latd.
+    # lat = np.radians(latd)
+    lat = latd * pi / 180
+
     coslat = cos(lat)
     sinlat = sin(lat)
 
@@ -48,13 +56,10 @@ cdef DTYPE_t _rwgs84(DTYPE_t latd):
     return r
 
 
+@cython.cdivision(True)
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef DTYPE_t[:] _rwgs84_arr(DTYPE_t[:] latd):
-    """
-    Calculate earth radius with WGS'84 geoid definition for array
-    type input.
-    """
+cdef np.ndarray[DTYPE_t, ndim=1] _rwgs84_arr(np.ndarray[DTYPE_t, ndim=1] latd):
     cdef Py_ssize_t ntraf = latd.shape[0]
     cdef np.ndarray[DTYPE_t, ndim=1] r = np.empty(ntraf, DTYPE)
 
@@ -65,6 +70,7 @@ cdef DTYPE_t[:] _rwgs84_arr(DTYPE_t[:] latd):
     return r
 
 
+@cython.cdivision(True)
 @cython.boundscheck(False)
 @cython.wraparound(False)
 cpdef rwgs84_matrix(DTYPE_t[:,:] latd):
