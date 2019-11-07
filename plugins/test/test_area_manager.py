@@ -12,7 +12,7 @@ import shapely.geometry as spgeom
 # BlueSky imports
 from plugins.thesis import area_manager as ar
 from plugins.thesis.area_manager import AreaRestrictionManager
-from plugins.thesis.area import RestrictedAirspaceArea
+from plugins.thesis.area import AreaRestriction
 
 # Error tolerances for floating point comparisons
 DIFF_DEG = 0.01 # [deg] Error tolerance for angle comparison

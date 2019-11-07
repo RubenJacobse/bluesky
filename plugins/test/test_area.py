@@ -10,7 +10,7 @@ import numpy as np
 import shapely.geometry as spgeom
 
 # Thesis imports
-from plugins.thesis.area import RestrictedAirspaceArea
+from plugins.thesis.area import AreaRestriction
 
 # Error tolerances for floating point comparisons
 DIFF_DEG = 0.01 # [deg] Error tolerance for angle comparison
@@ -32,7 +32,7 @@ def test_raa_init(areafilter_):
     # Vertices in ccw order (lon,lat): (-1,-1), (1,-1), (1,1), (-1,1), (-1,-1)
     test_coords = [-1, -1, -1, 1, 1, 1, 1, -1, -1, -1]
 
-    raa = RestrictedAirspaceArea(test_id, test_status, test_coords)
+    raa = AreaRestriction(test_id, test_status, test_coords)
 
     assert raa.area_id == test_id
     assert raa.status == test_status
@@ -55,10 +55,10 @@ def test_raa_is_ccw(areafilter_):
     coords4 = [-1, -1, -1, 1, 1, 1, 1, -1, -1, -1]  # ccw
 
     # Create areas
-    raa1 = RestrictedAirspaceArea("RAA1", True, coords1)
-    raa2 = RestrictedAirspaceArea("RAA2", True, coords2)
-    raa3 = RestrictedAirspaceArea("RAA3", True, coords3)
-    raa4 = RestrictedAirspaceArea("RAA4", True, coords4)
+    raa1 = AreaRestriction("RAA1", True, coords1)
+    raa2 = AreaRestriction("RAA2", True, coords2)
+    raa3 = AreaRestriction("RAA3", True, coords3)
+    raa4 = AreaRestriction("RAA4", True, coords4)
 
     # Verify both are processed correctly
     assert raa1.ring.is_ccw
@@ -88,7 +88,7 @@ def test_raa_check_poly(areafilter_):
         counterclockwise closed ring. """
 
     # Create an area
-    raa = RestrictedAirspaceArea("RAA", True, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
+    raa = AreaRestriction("RAA", True, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
 
     # Test some coordinate lists
     coords0_in = [0, 0, 1, 0, 1, 1, 0, 1]  # Not a closed ring, not ccw
@@ -112,7 +112,7 @@ def test_raa_delete(areafilter_):
     """ Test the delete function. """
 
     # Create an area
-    raa = RestrictedAirspaceArea("RAA", True, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
+    raa = AreaRestriction("RAA", True, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
 
     raa.delete()
 
@@ -122,7 +122,7 @@ def test_raa_coords2verts(areafilter_):
         lon,lat order into a list of coordinates in lat, lon order. """
 
     # Create an area
-    raa = RestrictedAirspaceArea("RAA", True, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
+    raa = AreaRestriction("RAA", True, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
 
     coords = [1.1, 2.0, 1.0, -2.2, -1.5, 2.2]
     verts = np.array([[2.0, 1.1], [-2.2, 1.0], [2.2, -1.5]])
@@ -135,7 +135,7 @@ def test_raa_verts2coords(areafilter_):
         lat,lon order to an array of vertices in lon,lat order. """
 
     # Create an area
-    raa = RestrictedAirspaceArea("RAA", True, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
+    raa = AreaRestriction("RAA", True, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
 
     verts = np.array([[2.0, 1.1], [-2.2, 1.0], [2.2, -1.5]])
     coords = [1.1, 2.0, 1.0, -2.2, -1.5, 2.2]
@@ -149,7 +149,7 @@ def test_raa_calc_tangents_four_aircraft(areafilter_):
         area. """
 
     # Create area with vertices at (lon,lat): {(-1, -1), (1, -1), (1, 1), (-1, 1)}
-    raa = RestrictedAirspaceArea(
+    raa = AreaRestriction(
         "RAA", True, [-1, -1, -1, 1, 1, 1, 1, -1, -1, -1])
     assert raa.ring.is_ccw
 
@@ -178,7 +178,7 @@ def test_raa_calc_tangents_two_aircraft(areafilter_):
         area. """
 
     # Create area with vertices at (lon,lat): {(-3, 1), (-0.5, 1), (-0.5, -1), (-3, -1)}
-    raa = RestrictedAirspaceArea("RAA", True,
+    raa = AreaRestriction("RAA", True,
                                  [1.0, -3.0, 1.0, -0.5, -1.0, -0.5, -1.0, -3.0, 1.0, -3.0])
 
     # Create two aircraft at (lon,lat): {(0,2),(2,0),(0, -2),(-2, 0)}
@@ -204,7 +204,7 @@ def test_raa_calc_tangents_single_aircraft(areafilter_):
         area. """
 
     # Create area with vertices at (lon,lat): {(-3, 1), (-0.5, 1), (-0.5, -1), (-3, -1)}
-    raa = RestrictedAirspaceArea("RAA", True,
+    raa = AreaRestriction("RAA", True,
                                  [1.0, -3.0, 1.0, -0.5, -1.0, -0.5, -1.0, -3.0, 1.0, -3.0])
 
     # Create two aircraft at (lon,lat): {(-1.5,-1.5),(1.5,-1.5)}
@@ -363,7 +363,7 @@ def test_raa_is_left_of_line_on_line(areafilter_):
     """ Test the correctness of the function that determines whether a point lies
         to the left of a given linepiece. """
 
-    raa = RestrictedAirspaceArea("RAA", True, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
+    raa = AreaRestriction("RAA", True, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
 
     # Test result when the point lies on line
     assert raa.is_left_of_line([0, 0], [1, 1], [2, 2]) == 0
@@ -377,7 +377,7 @@ def test_raa_is_left_of_line_false(areafilter_):
     """ Test the correctness of the function that determines whether a point lies
         to the left of a given linepiece. """
 
-    raa = RestrictedAirspaceArea("RAA", True, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
+    raa = AreaRestriction("RAA", True, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
 
     # Test result when the point lies to the right of the line
     assert raa.is_left_of_line([0, 0], [1, 1], [1, 0]) < 0
@@ -391,7 +391,7 @@ def test_raa_is_left_of_line_true(areafilter_):
     """ Test the correctness of the function that determines whether a point lies
         to the left of a given linepiece. """
 
-    raa = RestrictedAirspaceArea("RAA", True, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
+    raa = AreaRestriction("RAA", True, [0, 0, 1, 0, 1, 1, 0, 1, 0, 0])
 
     # Test result when the point lies to the left of the line
     assert raa.is_left_of_line([0, 0], [1, 1], [0, 1]) > 0

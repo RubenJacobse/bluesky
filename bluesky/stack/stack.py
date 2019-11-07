@@ -32,6 +32,9 @@ from bluesky.tools.calculator import calculator
 from bluesky.tools.position import txt2pos, islat
 from bluesky import settings
 
+# Area restriction imports
+from plugins import geovector as gv
+
 # Temporary fix for synthetic
 from . import synthetic as syn
 # Register settings defaults
@@ -835,7 +838,33 @@ def init(startup_scnfile):
             bs.scr.zoom(0.7071067811865475) if a == "OUT" else \
             bs.scr.zoom(a, True),
             "Zoom display in/out, you can also use +++ or -----"
-        ]
+        ],
+        # Stack functions for area avoidance
+        "RAA": [
+            "RAA name, ON/OFF, [lat1,lon1,lat2,lon2,...]",
+            "txt,onoff,[latlon,...]",
+            bs.traf.restrictions.create_area,
+            "Create restricted airspace areas that are to be avoided by all traffic."],
+        "DELRAA": [
+            "DELRAA name",
+            "txt",
+            bs.traf.restrictions.delete_area,
+            "Delete a given restricted airspace area."],
+        "RAACONF": [
+            "RAACONF t_lookahead",
+            "int",
+            bs.traf.restrictions.set_t_lookahead,
+            "Set the lookahead time used for area avoidance in seconds."],
+        'GEOVECTOR': [
+            'GEOVECTOR area,[gsmin,gsmax,trkmin,trkmax,vsmin,vsmax]',
+            'txt,[spd,spd,hdg,hdg,vspd,vspd]',
+            gv.defgeovec,
+            'Define a geovector for an area defined with the BOX,POLY(ALT) area commands'],
+        'DELGEOVECTOR': [
+            'DELGEOVECTOR area',
+            'txt',
+            gv.delgeovec,
+            'Remove geovector from the area ']
     }
 
     append_commands(commands)

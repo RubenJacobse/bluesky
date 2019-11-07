@@ -142,14 +142,14 @@ def applygeovec():
             # For now assume no wind:  so use tas as gs
             if vec.gsmin is not None:
                 tasmin = np.ones(bs.traf.ntraf) * vec.gsmin
-                usemin = bs.traf.pilot.tas < tasmin
-                bs.traf.pilot.tas[limit_tas & usemin] = tasmin[limit_tas & usemin]
+                usemin = bs.traf.ap.tas < tasmin
+                bs.traf.ap.tas[limit_tas & usemin] = tasmin[limit_tas & usemin]
                 bs.traf.swvnav[limit_tas & usemin] = False
 
             if vec.gsmax is not None:
                 tasmax = np.ones(bs.traf.ntraf) * vec.gsmax
-                usemax = bs.traf.pilot.tas > tasmax
-                bs.traf.pilot.tas[limit_tas & usemax] = tasmax[limit_tas & usemax]
+                usemax = bs.traf.ap.tas > tasmax
+                bs.traf.ap.tas[limit_tas & usemax] = tasmax[limit_tas & usemax]
                 bs.traf.swvnav[limit_tas & usemax] = False
 
             #------ Limit Track(so hdg)
@@ -157,10 +157,10 @@ def applygeovec():
             # inside the interval
             if None not in [vec.trkmin, vec.trkmax]:
                 # Use degto180 to avoid problems for e.g interval [350,30]
-                usemin = limit_trk & (degto180(bs.traf.pilot.hdg - vec.trkmin) < 0) # Left of minimum
-                usemax = limit_trk & (degto180(bs.traf.pilot.hdg - vec.trkmax) > 0) # Right of maximum
-                bs.traf.pilot.hdg[limit_trk & usemin] = vec.trkmin
-                bs.traf.pilot.hdg[limit_trk & usemax] = vec.trkmax
+                usemin = limit_trk & (degto180(bs.traf.ap.trk - vec.trkmin) < 0) # Left of minimum
+                usemax = limit_trk & (degto180(bs.traf.ap.trk - vec.trkmax) > 0) # Right of maximum
+                bs.traf.ap.trk[limit_trk & usemin] = vec.trkmin
+                bs.traf.ap.trk[limit_trk & usemax] = vec.trkmax
                 bs.traf.swlnav[limit_trk & (usemin | usemax)] = False
 
             # -----Vertical speed limiting

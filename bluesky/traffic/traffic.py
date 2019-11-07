@@ -25,6 +25,7 @@ from bluesky.tools.aero import fpm, kts, ft, g0, Rearth, nm, tas2cas,\
                          vatmos,  vtas2cas, vtas2mach, vcasormach
 from bluesky.tools.trafficarrays import TrafficArrays, RegisterElementParameters
 from plugins import geovector
+from plugins.thesis.restriction_manager import AreaRestrictionManager
 
 # Local imports
 from .adsbmodel import ADSB
@@ -128,6 +129,7 @@ class Traffic(TrafficArrays):
             self.trails = Trails()
             self.actwp  = ActiveWaypoint()
             self.perf   = Perf()
+            self.restrictions = AreaRestrictionManager()
 
             # Group Logic
             self.groups = TrafficGroups()
@@ -378,7 +380,7 @@ class Traffic(TrafficArrays):
 
     def update(self, simt, simdt):
         """ Update the traffic state. """
-        
+
         # Update only if there is traffic ---------------------
         if self.ntraf == 0:
             return
@@ -391,16 +393,21 @@ class Traffic(TrafficArrays):
 
         #---------- Fly the Aircraft --------------------------
         self.ap.update() # Autopilot logic
-        # NOTE: Moved asas to inside area_manager plugin so that we can
-        # decide whether or not to set swasas per aircraft using
-        # conditions in plugin.
-        # self.asas.update() # Airborne Separation Assurance
-        self.pilot.APorASAS() # Decide autopilot or ASAS
+        self.asas.update() # Airborne Separation Assurance
 
-        # Apply geovector if necessary by limiting trk, tas, and vs
+        # Apply geovector if necessary by overriding the values
+        # of trk, tas, and, vs that were set in self.ap.update()
+        # but do NOT override asas
         if geovector.geovecs:
             geovector.applygeovec()
-        
+
+        self.pilot.APorASAS() # Decide autopilot or ASAS
+
+        # Apply area-avoidance maneuver that can override the values of
+        # self.tas, self.trk, self.vs and, self.alt set in APorASAS()
+        if self.restrictions.areas:
+            self.restrictions.apply_restrictions()
+
         #---------- Performance Update ------------------------
         self.perf.update()
 

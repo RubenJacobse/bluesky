@@ -1,27 +1,31 @@
 """
-Module that defines the RestrictedAirspaceArea class in which the
+Module that defines the AreaRestriction class in which the
 
 
 © Ruben Jacobse, 2019
 """
 
-# Python imports
-import math
+# Cython imports
+import cython
+import numpy as np
+cimport numpy as np
+from libc.math cimport sin, cos, pi, atan2
 
 # Third-party imports
-import numpy as np
 import shapely.geometry as spgeom
 
 # BlueSky imports
 from bluesky.tools import areafilter
-from bluesky.tools.geo import qdrdist
 
-# Local imports
-from . import geo as tg
+# Typedefs for numpy array 
+DTYPE = np.double
+ctypedef np.double_t DTYPE_t
 
 
-class RestrictedAirspaceArea():
+cdef class AreaRestriction:
     """ Class that represents a single Restricted Airspace Area. """
+
+    cdef public object area_id, status, verts, ring, poly, coords, vertex
 
     def __init__(self, area_id, status, coords):
 
@@ -43,6 +47,7 @@ class RestrictedAirspaceArea():
         self.ring = spgeom.LinearRing(self.verts)
         self.poly = spgeom.Polygon(self.verts)
         self.coords = coords
+        self.vertex = np.array(self.ring.coords.xy).T
 
         # Draw polygon on BlueSky RadarWidget canvas
         self._draw()
@@ -123,8 +128,13 @@ class RestrictedAirspaceArea():
 
         areafilter.deleteArea(self.area_id)
 
-    # NOTE: Can this be vectorized further?
-    def calc_tangents(self, num_traf, ac_lon, ac_lat):
+    @cython.cdivision(True)
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    cpdef calc_tangents(self,
+                        Py_ssize_t num_traf,
+                        DTYPE_t[:] ac_lon,
+                        DTYPE_t[:] ac_lat):
         """
         For a given aircraft position find left- and rightmost courses
         that are tangent to a given polygon as well as the distance to
@@ -132,16 +142,19 @@ class RestrictedAirspaceArea():
         """
 
         # Initialize arrays to store qdrs and distances
-        qdr_left = np.zeros(num_traf, dtype=float)
-        qdr_right = np.zeros(num_traf, dtype=float)
+        cdef np.ndarray[DTYPE_t, ndim=1] qdr_left = np.empty(num_traf, dtype=DTYPE)
+        cdef np.ndarray[DTYPE_t, ndim=1] qdr_right = np.empty(num_traf, dtype=DTYPE)
 
         # Create array containing [lon, lat] for each vertex
-        vertex = np.array(self.ring.coords.xy).T
+        cdef np.ndarray[DTYPE_t, ndim=2] vertex = self.vertex
+
+        # Declare variables used inside loop body
+        cdef DTYPE_t edge_prev, edge_next, avg_lat, cos_avg_lat, delta_lat, delta_lon
+        cdef Py_ssize_t idx_left_vert, idx_right_vert
 
         # Calculate qdrs for each aircraft
+        cdef Py_ssize_t ii, jj # loop variables
         for ii in range(num_traf):
-            ac_pos = [ac_lon[ii], ac_lat[ii]]
-
             # Start by assuming both tangents touch at vertex with index 0
             idx_left_vert = 0
             idx_right_vert = 0
@@ -151,33 +164,45 @@ class RestrictedAirspaceArea():
             # tangents touch the polygon
             #
             # Algorithm from: http://geomalgorithms.com/a15-_tangents.html
-            for jj in range(1, len(vertex) - 1):
-                edge_prev = self.is_left_of_line(vertex[jj - 1],
-                                                 vertex[jj],
-                                                 ac_pos)
-                edge_next = self.is_left_of_line(vertex[jj],
-                                                 vertex[jj + 1],
-                                                 ac_pos)
+            for jj in range(1, vertex.shape[0] - 1):
+                edge_prev = is_left_of_line(vertex[jj - 1, 1],
+                                            vertex[jj - 1, 0],
+                                            vertex[jj, 1],
+                                            vertex[jj, 0],
+                                            ac_lon[ii],
+                                            ac_lat[ii])
+                edge_next = is_left_of_line(vertex[jj, 1],
+                                            vertex[jj, 0],
+                                            vertex[jj + 1, 1],
+                                            vertex[jj + 1, 0],
+                                            ac_lon[ii],
+                                            ac_lat[ii])
 
                 if edge_prev <= 0 and edge_next > 0:
-                    if not self.is_left_of_line(ac_pos,
-                                                vertex[jj],
-                                                vertex[idx_right_vert]) < 0:
+                    if not is_left_of_line(ac_lon[ii],
+                                           ac_lat[ii],
+                                           vertex[jj, 1],
+                                           vertex[jj, 0],
+                                           vertex[idx_right_vert, 1],
+                                           vertex[idx_right_vert, 0]) < 0:
                         idx_right_vert = jj
                 elif edge_prev > 0 and edge_next <= 0:
-                    if not self.is_left_of_line(ac_pos,
-                                                vertex[jj],
-                                                vertex[idx_left_vert]) > 0:
+                    if not is_left_of_line(ac_lon[ii],
+                                           ac_lat[ii],
+                                           vertex[jj, 1],
+                                           vertex[jj, 0],
+                                           vertex[idx_left_vert, 1],
+                                           vertex[idx_left_vert, 0]) > 0:
                         idx_left_vert = jj
 
-            # Calculate approximate tangents from aircraft to left- and#
+            # Calculate approximate tangents from aircraft to left- and
             # rightmost vertices using equirectangular earth approximation
-            avg_lat = np.radians((vertex[idx_left_vert][1] + ac_pos[1]) / 2)
-            cos_avg_lat = np.cos(avg_lat)
-            delta_lat = (vertex[idx_left_vert][1] - ac_pos[1]) * cos_avg_lat
-            delta_lon = (vertex[idx_left_vert][0] - ac_pos[0])
-            qdr_left[ii] = math.atan2(delta_lon, delta_lat)
-            qdr_right[ii] = math.atan2(delta_lon, delta_lat)
+            avg_lat = ((vertex[idx_left_vert, 1] + ac_lat[ii]) / 2) * 180 / pi
+            cos_avg_lat = cos(avg_lat)
+            delta_lat = (vertex[idx_left_vert, 1] - ac_lat[ii]) * cos_avg_lat
+            delta_lon = (vertex[idx_left_vert, 0] - ac_lon[ii])
+            qdr_left[ii] = atan2(delta_lon, delta_lat)
+            qdr_right[ii] = atan2(delta_lon, delta_lat)
 
             # # Calculate tangents from aircraft to left- and rightmost vertices
             # # using spherical earth approximation
@@ -207,17 +232,20 @@ class RestrictedAirspaceArea():
 
         return False if dir_sum > 0 else True
 
-    @staticmethod
-    def is_left_of_line(line_start, line_end, point):
-        """
-        Check if point lies to the left of the line through line_start
-        to line_end.
 
-        Returns:
-            > 0 if point lies on the left side of the line
-            = 0 if point lies exactly on the line
-            < 0 if point lies on the right side of the line
-        """
-
-        return (line_end[0] - line_start[0]) * (point[1] - line_start[1]) \
-            - (point[0] - line_start[0]) * (line_end[1] - line_start[1])
+cdef DTYPE_t is_left_of_line(DTYPE_t line_start_x,
+                             DTYPE_t line_start_y, 
+                             DTYPE_t line_end_x,
+                             DTYPE_t line_end_y, 
+                             DTYPE_t point_x,
+                             DTYPE_t point_y):
+    """
+    Check if point lies to the left of the line through line_start
+    to line_end.
+    Returns:
+        > 0 if point lies on the left side of the line
+        = 0 if point lies exactly on the line
+        < 0 if point lies on the right side of the line
+    """
+    return ((line_end_x - line_start_x) * (point_y - line_start_y) 
+            - (point_x - line_start_x) * (line_end_y - line_start_y))

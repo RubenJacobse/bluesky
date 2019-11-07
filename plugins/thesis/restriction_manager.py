@@ -27,12 +27,11 @@ from plugins import geovector as gv
 
 # Local imports
 import plugins.thesis.geo as tg
-from plugins.thesis.area import RestrictedAirspaceArea
-from plugins.thesis.mode_manager import SteeringMode
+from plugins.thesis.restriction import AreaRestriction
 
 # Default settings
 DEFAULT_AREA_T_LOOKAHEAD = 120  # [s] Area conflict detection threshold
-AREA_AVOIDANCE_CRS_MARGIN = 1  # [deg] Avoid restriction by <x> degree margin
+AREA_AVOIDANCE_CRS_MARGIN = 5  # [deg] Avoid restriction by <x> degree margin
 COMMANDED_CRS_MARGIN = 0.2  # [deg] Verify if commanded heading has been reached
 NM_TO_M = 1852.  # Conversion factor nautical miles to metres
 
@@ -81,9 +80,6 @@ class AreaRestrictionManager(TrafficArrays):
             # N-dimensional parameters where each column is an aircraft
             # and each row is an area
             # =========================================================
-            # Bearings from ac tangent to each area in [deg] on [-180..180]
-            self.brg_left_tangent = np.array([[]])
-            self.brg_right_tangent = np.array([[]])
             # Compass courses from ac tangent to each area in [deg]
             self.crs_left_tangent = np.array([[]])
             self.crs_right_tangent = np.array([[]])
@@ -101,15 +97,6 @@ class AreaRestrictionManager(TrafficArrays):
             # Compass courses to waypoints on route in [deg]
             self.crs_to_active_wp = np.array([])
             self.crs_to_next_wp = np.array([])
-            # Resolution flags
-            self.is_in_area_reso = np.array([], dtype=bool)
-            self.is_in_aircraft_reso = np.array([], dtype=bool)
-            # Resolution-required velocity change components in [m/s]
-            self.reso_dv_east = np.array([])
-            self.reso_dv_north = np.array([])
-            # New course and speed commanded by resolution method
-            self.commanded_crs = np.array([])  # [deg]
-            self.commanded_spd = np.array([])  # [m/s]
 
             # =======================
             # Traffic parameter lists
@@ -120,10 +107,6 @@ class AreaRestrictionManager(TrafficArrays):
             # Extrapolated paths from current position to position after
             # area lookahead time. Will contain one element for each aircraft.
             self.predicted_path = []  # LineString [(lon, lat), (lon, lat)]
-
-            # Aircraft control mode during current and previous time step
-            self.control_mode_curr = []
-            self.control_mode_prev = []
 
         # Keep track of all restricted areas in list and by ID (same order)
         self.areas = []
@@ -301,10 +284,7 @@ class AreaRestrictionManager(TrafficArrays):
         if self._parent:
             self._parent._children.remove(self)
 
-    def update(self):
-        pass
-
-    def preupdate(self):
+    def apply_restrictions(self):
         """ Do area avoidance calculations after traf has been updated. """
 
         # If the current scenario name is not the same as the scenario
@@ -321,10 +301,6 @@ class AreaRestrictionManager(TrafficArrays):
             return
 
         self.ac_id = bs.traf.id[:]  # Purely for debugging purposes only
-
-        # Moved this call here from inside Traffic.update() method to try and
-        # make asas manoeuvres limited by geovector constraints
-        bs.traf.asas.update()
 
         # Log each conflict pair only once
         for (ac1, ac2), dist in zip(bs.traf.asas.confpairs,
@@ -350,16 +326,12 @@ class AreaRestrictionManager(TrafficArrays):
         # Identify all aircraft-area conflicts
         self.calculate_positions_and_predicted_paths()
         for area_idx, area in enumerate(self.areas):
-            self.find_bearings_tangent_to_area(area_idx, area)
+            self.find_courses_tangent_to_area(area_idx, area)
             self.find_ac_inside_and_inconflict(area_idx, area)
             self.calculate_time_to_intrusion(area_idx, area)
 
         # Calculate resolution vectors for each aircraft's closest area conflict
         self.calculate_area_resolution_vectors()
-
-        # Determine which state each aircraft is in and take appropriate action
-        self.determine_aircraft_mode()
-        self.apply_mode_based_action()
 
     def create_area(self, area_id, area_status, *coords):
         """ Create a new restricted airspace area """
@@ -368,11 +340,8 @@ class AreaRestrictionManager(TrafficArrays):
             return False, "Error: Airspace restriction {} already exists" \
                 .format(area_id)
 
-        # Create new RestrictedAirspaceArea instance and add to internal lists
-        new_area = RestrictedAirspaceArea(area_id,
-                                          area_status,
-                                          list(coords))
-
+        # Create new AreaRestriction instance and add to internal lists
+        new_area = AreaRestriction(area_id, area_status, list(coords))
         self.areas.append(new_area)
         self.area_ids.append(area_id)
 
@@ -425,23 +394,23 @@ class AreaRestrictionManager(TrafficArrays):
 
         if area_id not in self.area_ids:
             return False, f"Error: Airspace restriction {area_id} does not exist"
-        else:
-            # Find index of area
-            idx = self.area_ids.index(area_id)
+        
+        # Find index of area
+        idx = self.area_ids.index(area_id)
 
-            # Call object delete method before deleting the object
-            self.areas[idx].delete()
+        # Call object delete method before deleting the object
+        self.areas[idx].delete()
 
-            # Delete from all lists and arrays
-            del self.areas[idx]
-            del self.area_ids[idx]
-            self.num_areas -= 1
+        # Delete from all lists and arrays
+        del self.areas[idx]
+        del self.area_ids[idx]
+        self.num_areas -= 1
 
-            # Delete row corresponding to area from all numpy arrays
-            for var in self._ndArrVars:
-                self._Vars[var] = np.delete(self._Vars[var], idx, 0)
+        # Delete row corresponding to area from all numpy arrays
+        for var in self._ndArrVars:
+            self._Vars[var] = np.delete(self._Vars[var], idx, 0)
 
-            return True, f"Sucessfully deleted airspace restriction {area_id}"
+        return True, f"Sucessfully deleted airspace restriction {area_id}"
 
     def set_t_lookahead(self, new_t_lookahead):
         """
@@ -515,18 +484,17 @@ class AreaRestrictionManager(TrafficArrays):
         self.predicted_path = [spgeom.LineString([curr, fut]) for (curr, fut)
                                in zip(self.current_position, future_position)]
 
-    def find_bearings_tangent_to_area(self, area_idx, area):
+    def find_courses_tangent_to_area(self, area_idx, area):
         """ For each aircraft find the tangent bearings to the current area ."""
 
         # Calculate left- and right tangent bearings
-        self.brg_left_tangent[area_idx, :], self.brg_right_tangent[area_idx, :] \
+        # (on interval [-180..180] degrees)
+        (brg_left_tangent, brg_right_tangent) \
             = area.calc_tangents(bs.traf.ntraf, bs.traf.lon, bs.traf.lat)
 
-        # Convert to course on [0..360] degrees
-        self.crs_left_tangent[area_idx, :] \
-            = self.brg_left_tangent[area_idx, :] % 360
-        self.crs_right_tangent[area_idx, :] \
-            = self.brg_right_tangent[area_idx, :] % 360
+        # Convert to course on interval [0..360] degrees
+        self.crs_left_tangent[area_idx, :] = brg_left_tangent % 360
+        self.crs_right_tangent[area_idx, :] = brg_right_tangent % 360
 
     def find_ac_inside_and_inconflict(self, area_idx, area):
         """ Check whether each aircraft is inside the area. """
@@ -590,9 +558,6 @@ class AreaRestrictionManager(TrafficArrays):
         """
 
         # Ensure delta v vectors are reset each time step
-        self.reso_dv_east = np.zeros(np.shape(bs.traf.id))
-        self.reso_dv_north = np.zeros(np.shape(bs.traf.id))
-
         self.closest_conflicting_area_idx = [None] * self.num_traf
 
         # Loop over all aircraft-area combinations and for each aircraft
@@ -625,207 +590,15 @@ class AreaRestrictionManager(TrafficArrays):
         aircraft in conflict with a given area.
         """
 
-        ac_gs = bs.traf.gs[ac_indices]
+        # Tangent courses
+        crs_left = (self.crs_left_tangent[area_idx, ac_indices] - AREA_AVOIDANCE_CRS_MARGIN) % 360
+        crs_right = (self.crs_right_tangent[area_idx, ac_indices] + AREA_AVOIDANCE_CRS_MARGIN) % 360
 
-        # Components of unit vectors along left and right collision cone edges
-        u_l_east = np.sin(np.radians(self.brg_left_tangent[area_idx, ac_indices]))
-        u_l_north = np.cos(np.radians(self.brg_left_tangent[area_idx, ac_indices]))
-        u_r_east = np.sin(np.radians(self.brg_right_tangent[area_idx, ac_indices]))
-        u_r_north = np.cos(np.radians(self.brg_right_tangent[area_idx, ac_indices]))
-
-        # Resolution velocity magnitudes on left- and right edges of CC
-        v_ul = ac_gs
-        v_ur = ac_gs
-
-        # Calculate north and east components of left- and right resolution
-        # absolute velocities
-        vres_l_east = u_l_east * v_ul
-        vres_l_north = u_l_north * v_ul
-        vres_r_east = u_r_east * v_ur
-        vres_r_north = u_r_north * v_ur
-
-        # Calculate magnetic tracks of left- and right resolution vectors
-        vres_l_crs = (np.degrees(np.arctan2(vres_l_east, vres_l_north))
-                      - AREA_AVOIDANCE_CRS_MARGIN) % 360
-        vres_r_crs = (np.degrees(np.arctan2(vres_r_east, vres_r_north))
-                      + AREA_AVOIDANCE_CRS_MARGIN) % 360
-
-        # Determine which of the two resolution vectors should be used based on
-        # the course to the current active waypoint. We choose the course with the
-        # smallest angle difference
+        # Determine which of the two courses should be used based on the course
+        # to the current active waypoint. We choose the course with the smallest
+        # angle difference
         wp_crs = self.crs_to_active_wp[ac_indices]
-        new_crs = tg.crs_closest(bs.traf.hdg[ac_indices], vres_l_crs, vres_r_crs)
+        new_crs = tg.crs_closest(wp_crs, crs_left, crs_right)
 
-        # Calculate new velocities (currently easiest method to calculate delta v)
-        new_v = ac_gs
-        new_v_east = np.sin(np.radians(new_crs)) * new_v
-        new_v_north = np.cos(np.radians(new_crs)) * new_v
-
-        # Calculate velocity changes
-        self.reso_dv_east[ac_indices] = new_v_east - bs.traf.gseast[ac_indices]
-        self.reso_dv_north[ac_indices] = new_v_north - bs.traf.gsnorth[ac_indices]
-
-    def determine_aircraft_mode(self):
-        """
-        Determine which mode each aircraft is in:
-            - SteeringMode.AREA :  in area conflict mode
-            - SteeringMode.ASAS :  in aircraft conflict mode
-            - SteeringMode.LNAV :  in route following mode
-        """
-
-        self.control_mode_curr = [None] * self.num_traf
-        for ac_idx in range(self.num_traf):
-            if self.is_in_conflict[:, ac_idx].any() or self.is_in_area_reso[ac_idx]:
-                self.control_mode_curr[ac_idx] = SteeringMode.AREA
-                bs.traf.asas.active[ac_idx] = False
-            elif bs.traf.asas.active[ac_idx]:
-                self.control_mode_curr[ac_idx] = SteeringMode.ASAS
-            else:
-                self.control_mode_curr[ac_idx] = SteeringMode.LNAV
-
-    def apply_mode_based_action(self):
-        """
-        Apply the new velocities for all aircraft that need to perform
-        a resolution manoeuver.
-        """
-
-        # For debugging purposes
-        debugprintlist = ("AC002", "AC003")
-        debugprinttime = 0
-
-        # if bs.sim.simt > debugprinttime:
-        #     print("\nt={}s".format(bs.sim.simt))
-
-        current_crs = tg.ned2crs(bs.traf.trk)
-        # NOTE: Some of the branches of the if-statements inside this loop are
-        # redundant, but are still explicitly included to improve readability.
-        for ac_idx in range(self.num_traf):
-            # do_printdebug = ((bs.traf.id[ac_idx] in debugprintlist)
-            #                  and bs.sim.simt >= debugprinttime)
-            do_printdebug = False
-
-            # if do_printdebug:
-            #     print("{} current control mode: {}".format(
-            #         bs.traf.id[ac_idx], self.control_mode_curr[ac_idx]))
-            #     print("{} swlnav: {}".format(
-            #         bs.traf.id[ac_idx], bs.traf.swlnav[ac_idx]))
-            #     print("{} asas active: {}".format(
-            #         bs.traf.id[ac_idx], bs.traf.asas.active[ac_idx]))
-
-            if self.control_mode_curr[ac_idx] == SteeringMode.ASAS:
-                pass
-
-            if self.control_mode_curr[ac_idx] == SteeringMode.LNAV:
-                # # NOTE: current implementation is naive, could result in all sorts of turning
-                # # behaviour if the active waypoint is behind the aircraft.
-                #
-                # Waypoint recovery after conflict: Find the next active waypoint
-                # and send the aircraft to that waypoint.
-                if self.control_mode_prev[ac_idx] == SteeringMode.AREA:
-                    iwpid = bs.traf.ap.route[ac_idx].findact(ac_idx)
-                    if iwpid == -1:  # To avoid problems if there are no waypoints
-                        continue
-                    bs.traf.ap.route[ac_idx].direct(ac_idx,
-                                                    bs.traf.ap.route[ac_idx].wpname[iwpid])
-                    if (bs.traf.ap.route[ac_idx].wpname[iwpid] == "COR201"
-                            and bs.traf.lat[ac_idx] > 0.332736):
-                        print("t={}s: {} area avoidance -> direct to {}".format(bs.sim.simt,
-                                                                                bs.traf.id[ac_idx],
-                                                                                bs.traf.ap.route[ac_idx].wpname[iwpid]))
-
-                    if do_printdebug:
-                        print("{} heading direct to {}"
-                              .format(bs.traf.id[ac_idx],
-                                      bs.traf.ap.route[ac_idx].wpname[iwpid]))
-
-            if self.control_mode_curr[ac_idx] == SteeringMode.AREA:
-                if do_printdebug:
-                    print(f"t={bs.sim.simt}, {ac_idx} in AREA mode")
-                if not self.is_in_area_reso[ac_idx]:
-                    # Initiate new manoeuvre
-                    self.perform_manoeuver(ac_idx)
-
-                    # Ignore traffic conflicts and route following
-                    bs.stack.stack("RESOOFF {}".format(bs.traf.id[ac_idx]))
-                    bs.stack.stack("LNAV {},OFF".format(bs.traf.id[ac_idx]))
-
-                    if do_printdebug:
-                        print("{} starting resolution manoeuver!"
-                              .format(bs.traf.id[ac_idx]))
-                else:
-                    # Check if resolution manoeuver has been completed
-                    if (abs(current_crs[ac_idx] - self.commanded_crs[ac_idx])
-                            < COMMANDED_CRS_MARGIN):
-                        if self.is_in_conflict[:, ac_idx].any():
-                            # Current course within margin of commanded course,
-                            # but still in conflict, perform new manoeuver.
-                            self.perform_manoeuver(ac_idx)
-
-                            if do_printdebug:
-                                print("{} additional resolution manoeuver!"
-                                      .format(bs.traf.id[ac_idx]))
-                        else:
-                            # Course is within margin of commanded course,
-                            # reset resolution variables
-                            self.is_in_area_reso[ac_idx] = False
-                            self.commanded_crs[ac_idx] = 0.0
-                            self.commanded_spd[ac_idx] = 0.0
-
-                            # When no longer in area resolution, stop ignoring traffic
-                            # conflicts and continue following LNAV
-                            bs.stack.stack("RESOOFF {}".format(bs.traf.id[ac_idx]))
-                            bs.stack.stack("LNAV {},ON".format(bs.traf.id[ac_idx]))
-
-                            if do_printdebug:
-                                print("{} resolution manoeuver completed!"
-                                      .format(bs.traf.id[ac_idx]))
-                    else:
-                        # Course not yet within margin of commanded course, continue manoeuver.
-                        pass
-
-                        if do_printdebug:
-                            print("{} is manoeuvring, hdg: {:.2f}, target: {:.2f}, autopilot: {:.2f}"
-                                  .format(bs.traf.id[ac_idx],
-                                          bs.traf.hdg[ac_idx],
-                                          self.commanded_crs[ac_idx],
-                                          bs.traf.ap.trk[ac_idx]))
-
-        # For debugging purposes only
-        for ac_idx in range(self.num_traf):
-            if (self.control_mode_prev[ac_idx]
-                    and self.control_mode_curr[ac_idx] != self.control_mode_prev[ac_idx]):
-
-                if do_printdebug:
-                    print("{} mode change: {} -> {}".format(bs.traf.id[ac_idx],
-                                                            self.control_mode_prev[ac_idx],
-                                                            self.control_mode_curr[ac_idx]))
-
-        # Remember current control mode for use in next time step
-        self.control_mode_prev = [x for x in self.control_mode_curr]
-
-    def perform_manoeuver(self, ac_idx):
-        """
-        Perform a resolution manoeuver to solve a conflict with a
-        restricted airspace.
-        """
-
-        new_v_east = bs.traf.gseast[ac_idx] + self.reso_dv_east[ac_idx]
-        new_v_north = bs.traf.gsnorth[ac_idx] + self.reso_dv_north[ac_idx]
-        new_v = np.sqrt(new_v_east ** 2 + new_v_north ** 2)
-        new_crs = np.degrees(np.arctan2(new_v_east, new_v_north)) % 360
-
-        self.stack_reso_apply(ac_idx, new_crs, new_v)
-        self.is_in_area_reso[ac_idx] = True
-        self.commanded_crs[ac_idx] = new_crs
-        self.commanded_spd[ac_idx] = new_v
-
-    def stack_reso_apply(self, ac_idx, crs, tas):
-        """ Apply all resolution vectors via the BlueSky stack. """
-
-        ac_id = bs.traf.id[ac_idx]
-        ac_crs = crs
-        ac_alt = bs.traf.alt[ac_idx]
-        ac_cas = bs.tools.aero.vtas2cas(tas, ac_alt)
-
-        hdg_cmd = "HDG {},{:.2f}".format(ac_id, ac_crs)
-        bs.stack.stack(hdg_cmd)
+        # Set new courses in the traffic object
+        bs.traf.pilot.hdg[ac_indices] = new_crs

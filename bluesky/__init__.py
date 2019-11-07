@@ -89,8 +89,8 @@ def init(mode="sim", pygame=False, discovery=False, cfgfile="", scnfile=""):
 
         # Initialize singletons
         global traf, sim, scr
-        traf = Traffic()
         sim = Simulation(is_detached)
+        traf = Traffic()
         scr = Screen()
 
         # Initialize remaining modules
