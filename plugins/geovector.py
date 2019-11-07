@@ -19,9 +19,6 @@ from bluesky.tools import areafilter
 from bluesky.tools.aero import ft
 from bluesky.tools.misc import degto180
 
-# Thesis related import
-from plugins.thesis.mode_manager import SteeringMode
-
 # A dictionary of areas with a geovector specification
 geovecs = dict()
 
@@ -111,28 +108,24 @@ def applygeovec():
                                                 bs.traf.lat,
                                                 bs.traf.lon,
                                                 bs.traf.alt)
-            # Check if aircraft are resolving a restricted airspace conflict
-            in_areareso = np.array([x == SteeringMode.AREA for x
-                                    in bs.traf._children[-1].control_mode_curr],
-                                   dtype=bool)
 
             # Boolean arrays that determine whether each limit type shall
             # be applied. For aircraft inside the geovectoring area the speed
             # limits are always applied, but the track limits are only applied
             # if the aircraft is not resolving a restricted airspace conflict.
             limit_tas = in_geovec
-            limit_trk = np.logical_and(in_geovec, np.logical_not(in_areareso))
+            limit_trk = in_geovec
             limit_vs = in_geovec
 
             # Keep track of ids of aircraft that are entering and leaving
             # the geovector area
             insids = set(np.array(bs.traf.id)[in_geovec])
-            newids = insids - vec.previnside
+            new_ids = insids - vec.previnside
             delids = vec.previnside - insids
             vec.previnside = insids
 
             # Store LNAV/VNAV status of aircraft entering the geovector area
-            for acid in newids:
+            for acid in new_ids:
                 idx = bs.traf.id2idx(acid)
                 vec.prevstatus[acid] = [bs.traf.swlnav[idx],
                                         bs.traf.swvnav[idx]]
