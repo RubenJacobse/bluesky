@@ -131,8 +131,8 @@ class AreaRestriction:
         qdr_left = np.zeros(num_traf, dtype=float)
         qdr_right = np.zeros(num_traf, dtype=float)
 
-        # Create array containing [lon, lat] for each vertex
-        vertex = np.array(self.ring.coords.xy).T
+        # For readability purposes, create a view on self.verts
+        vertex = self.verts
 
         # Calculate qdrs for each aircraft
         for ii in range(num_traf):
