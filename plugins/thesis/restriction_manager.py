@@ -22,6 +22,7 @@ import shapely.ops as spops
 import bluesky as bs
 from bluesky.tools import datalog
 from bluesky.tools.geo import qdrdist
+from bluesky.tools.simtime import timed_function
 from bluesky.tools.trafficarrays import TrafficArrays, RegisterElementParameters
 from plugins import geovector as gv
 
@@ -34,6 +35,7 @@ DEFAULT_AREA_T_LOOKAHEAD = 120  # [s] Area conflict detection threshold
 AREA_AVOIDANCE_CRS_MARGIN = 5  # [deg] Avoid restriction by <x> degree margin
 COMMANDED_CRS_MARGIN = 0.2  # [deg] Verify if commanded heading has been reached
 NM_TO_M = 1852.  # Conversion factor nautical miles to metres
+UPDATE_INTERVAL = 1 # [s] Interval between updates
 
 # Default variable values used to initialize numpy arrays
 VAR_DEFAULTS = {"float": 0.0,
@@ -91,6 +93,11 @@ class AreaRestrictionManager(TrafficArrays):
             # ======================================================
             # Traffic parameters that are 1-dimensional numpy arrays
             # ======================================================
+            # Signal for each aircraft whether area avoidance is active
+            self.active = np.array([], dtype=bool)
+            # Commanded heading
+            self.hdg = np.array([])
+
             # Waypoint indices in aircraft route
             self.idx_active_wp = np.array([], dtype=int)
             self.idx_next_wp = np.array([], dtype=int)
@@ -284,7 +291,8 @@ class AreaRestrictionManager(TrafficArrays):
         if self._parent:
             self._parent._children.remove(self)
 
-    def apply_restrictions(self):
+    @timed_function('restriction', dt=UPDATE_INTERVAL)
+    def apply_restrictions(self, dt):
         """ Do area avoidance calculations after traf has been updated. """
 
         # If the current scenario name is not the same as the scenario
@@ -302,7 +310,7 @@ class AreaRestrictionManager(TrafficArrays):
 
         self.ac_id = bs.traf.id[:]  # Purely for debugging purposes only
 
-        # Log each conflict pair only once
+        # Log each aircraft-aircraft conflict pair only once
         for (ac1, ac2), dist in zip(bs.traf.asas.confpairs,
                                     bs.traf.asas.dist):
             idx1 = bs.traf.id2idx(ac1)
@@ -476,7 +484,7 @@ class AreaRestrictionManager(TrafficArrays):
                                                     bs.traf.gseast,
                                                     bs.traf.gsnorth)
 
-        # Create shapely points for future relative position
+        # Create shapely points for future position
         future_position = [spgeom.Point(lon, lat) for (lon, lat)
                            in zip(future_lon, future_lat)]
 
@@ -557,8 +565,9 @@ class AreaRestrictionManager(TrafficArrays):
         conflict with an area.
         """
 
-        # Ensure delta v vectors are reset each time step
+        # Reset each time step
         self.closest_conflicting_area_idx = [None] * self.num_traf
+        self.active = np.zeros(self.num_traf, dtype=bool)
 
         # Loop over all aircraft-area combinations and for each aircraft
         # store the index of the area where the time to intrusion is the
@@ -574,6 +583,10 @@ class AreaRestrictionManager(TrafficArrays):
         conflict_pairs = [(ac_idx, area_idx) for ac_idx, area_idx
                           in enumerate(self.closest_conflicting_area_idx)
                           if area_idx is not None]
+
+        # Set active flag to true for all aircraft in an area conflict
+        idx_in_conflict = [ac_idx for ac_idx, _ in conflict_pairs]
+        self.active[idx_in_conflict] = True
 
         # Per area, calculate resolution vectors for all aircraft conflicting
         # with that area
@@ -601,4 +614,4 @@ class AreaRestrictionManager(TrafficArrays):
         new_crs = tg.crs_closest(wp_crs, crs_left, crs_right)
 
         # Set new courses in the traffic object
-        bs.traf.pilot.hdg[ac_indices] = new_crs
+        self.hdg[ac_indices] = new_crs

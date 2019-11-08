@@ -408,6 +408,10 @@ class Traffic(TrafficArrays):
         if self.restrictions.areas:
             self.restrictions.apply_restrictions()
 
+        # Decide whether to use the result of pilot.APorASAS() or 
+        # the result of restrictions.apply_restrictions()
+        self.pilot.pilot_or_restriction()
+
         #---------- Performance Update ------------------------
         self.perf.update()
 

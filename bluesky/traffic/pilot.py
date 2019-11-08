@@ -63,6 +63,13 @@ class Pilot(TrafficArrays):
         else:
             self.hdg = self.trk % 360.
 
+    def pilot_or_restriction(self):
+        # Override current selected heading angle with angle dicated by area
+        # avoidance algorithm for aircraft that are in an area conflict.
+        # NOTE: This assumes zero wind!
+        hdg = np.where(bs.traf.restrictions.active, bs.traf.restrictions.hdg, self.hdg)
+        self.hdg = hdg % 360
+
     def applylimits(self):
         # check for the flight envelope
         if settings.performance_model == 'openap':
