@@ -15,7 +15,7 @@ from libc.math cimport sin, cos, pi, atan2
 import shapely.geometry as spgeom
 
 # BlueSky imports
-from bluesky.tools import areafilter
+from bluesky.tools import areafilter, geo
 
 # Typedefs for numpy array 
 DTYPE = np.double
@@ -25,7 +25,7 @@ ctypedef np.double_t DTYPE_t
 cdef class AreaRestriction:
     """ Class that represents a single Restricted Airspace Area. """
 
-    cdef public object area_id, status, verts, ring, poly, coords, vertex
+    cdef public object area_id, status, verts, ring, poly, coords
 
     def __init__(self, area_id, status, coords):
 
@@ -47,7 +47,6 @@ cdef class AreaRestriction:
         self.ring = spgeom.LinearRing(self.verts)
         self.poly = spgeom.Polygon(self.verts)
         self.coords = coords
-        self.vertex = np.array(self.ring.coords.xy).T
 
         # Draw polygon on BlueSky RadarWidget canvas
         self._draw()
@@ -145,8 +144,8 @@ cdef class AreaRestriction:
         cdef np.ndarray[DTYPE_t, ndim=1] qdr_left = np.empty(num_traf, dtype=DTYPE)
         cdef np.ndarray[DTYPE_t, ndim=1] qdr_right = np.empty(num_traf, dtype=DTYPE)
 
-        # Create array containing [lon, lat] for each vertex
-        cdef np.ndarray[DTYPE_t, ndim=2] vertex = self.vertex
+        # Create view containing [lon, lat] for each vertex
+        cdef DTYPE_t[:, :] vertex = self.verts
 
         # Declare variables used inside loop body
         cdef DTYPE_t edge_prev, edge_next, avg_lat, cos_avg_lat, delta_lat, delta_lon
@@ -197,23 +196,14 @@ cdef class AreaRestriction:
 
             # Calculate approximate tangents from aircraft to left- and
             # rightmost vertices using equirectangular earth approximation
-            avg_lat = ((vertex[idx_left_vert, 1] + ac_lat[ii]) / 2) * 180 / pi
-            cos_avg_lat = cos(avg_lat)
-            delta_lat = (vertex[idx_left_vert, 1] - ac_lat[ii]) * cos_avg_lat
-            delta_lon = (vertex[idx_left_vert, 0] - ac_lon[ii])
-            qdr_left[ii] = atan2(delta_lon, delta_lat)
-            qdr_right[ii] = atan2(delta_lon, delta_lat)
-
-            # # Calculate tangents from aircraft to left- and rightmost vertices
-            # # using spherical earth approximation
-            # qdr_left[ii] = tg.rhumb_azimuth(ac_pos[1],
-            #                                 ac_pos[0],
-            #                                 vertex[idx_left_vert][1],
-            #                                 vertex[idx_left_vert][0])
-            # qdr_right[ii] = tg.rhumb_azimuth(ac_pos[1],
-            #                                  ac_pos[0],
-            #                                  vertex[idx_right_vert][1],
-            #                                  vertex[idx_right_vert][0])
+            qdr_left[ii], _ = geo.kwikqdrdist(ac_pos[1],
+                                              ac_pos[0],
+                                              vertex[idx_left_vert][1],
+                                              vertex[idx_left_vert][0])
+            qdr_right[ii], _ = geo.kwikqdrdist(ac_pos[1],
+                                               ac_pos[0],
+                                               vertex[idx_right_vert][1],
+                                               vertex[idx_right_vert][0])
 
         return qdr_left, qdr_right
 
