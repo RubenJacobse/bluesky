@@ -13,7 +13,7 @@ import numpy as np
 import shapely.geometry as spgeom
 
 # BlueSky imports
-from bluesky.tools import areafilter
+from bluesky.tools import areafilter, geo
 
 
 class AreaRestriction:
@@ -168,23 +168,16 @@ class AreaRestriction:
 
             # Calculate approximate tangents from aircraft to left- and#
             # rightmost vertices using equirectangular earth approximation
-            avg_lat = np.radians((vertex[idx_left_vert][1] + ac_pos[1]) / 2)
-            cos_avg_lat = np.cos(avg_lat)
-            delta_lat = (vertex[idx_left_vert][1] - ac_pos[1]) * cos_avg_lat
-            delta_lon = (vertex[idx_left_vert][0] - ac_pos[0])
-            qdr_left[ii] = math.atan2(delta_lon, delta_lat)
-            qdr_right[ii] = math.atan2(delta_lon, delta_lat)
-
-            # # Calculate tangents from aircraft to left- and rightmost vertices
-            # # using spherical earth approximation
-            # qdr_left[ii] = tg.rhumb_azimuth(ac_pos[1],
-            #                                 ac_pos[0],
-            #                                 vertex[idx_left_vert][1],
-            #                                 vertex[idx_left_vert][0])
-            # qdr_right[ii] = tg.rhumb_azimuth(ac_pos[1],
-            #                                  ac_pos[0],
-            #                                  vertex[idx_right_vert][1],
-            #                                  vertex[idx_right_vert][0])
+            # NOTE: geo.kwikqdrdist returns a np.array with 1 element,
+            # we copy only the element and not the whole array structure!
+            qdr_left[ii] = geo.kwikqdrdist(ac_pos[1],
+                                           ac_pos[0], 
+                                           vertex[idx_left_vert][1],
+                                           vertex[idx_left_vert][0])[0]
+            qdr_right[ii] = geo.kwikqdrdist(ac_pos[1],
+                                            ac_pos[0], 
+                                            vertex[idx_right_vert][1],
+                                            vertex[idx_right_vert][0])[0]
 
         return qdr_left, qdr_right
 
