@@ -35,7 +35,7 @@ DEFAULT_AREA_T_LOOKAHEAD = 120  # [s] Area conflict detection threshold
 AREA_AVOIDANCE_CRS_MARGIN = 5  # [deg] Avoid restriction by <x> degree margin
 COMMANDED_CRS_MARGIN = 0.2  # [deg] Verify if commanded heading has been reached
 NM_TO_M = 1852.  # Conversion factor nautical miles to metres
-UPDATE_INTERVAL = 1 # [s] Interval between updates
+UPDATE_INTERVAL = 1 # [s] Interval between updates for this module
 
 # Default variable values used to initialize numpy arrays
 VAR_DEFAULTS = {"float": 0.0,
@@ -85,9 +85,14 @@ class AreaRestrictionManager(TrafficArrays):
             # Compass courses from ac tangent to each area in [deg]
             self.crs_left_tangent = np.array([[]])
             self.crs_right_tangent = np.array([[]])
-            # Conflict and intrusion variables
+
+            # Conflict variables - indicate whether current heading (state)
+            # and pilot commanded heading conflict with each of the areas
+            self.state_in_conflict = np.array([[]], dtype=bool)
+            self.pilot_in_conflict = np.array([[]], dtype=bool)
+
+            # Intrusion variables
             self.is_inside = np.array([[]], dtype=bool)
-            self.is_in_conflict = np.array([[]], dtype=bool)
             self.time_to_intrusion = np.array([[]])  # [s]
 
             # ======================================================
@@ -113,7 +118,8 @@ class AreaRestrictionManager(TrafficArrays):
 
             # Extrapolated paths from current position to position after
             # area lookahead time. Will contain one element for each aircraft.
-            self.predicted_path = []  # LineString [(lon, lat), (lon, lat)]
+            self.state_path = []  # LineString [(lon, lat), (lon, lat)]
+            self.pilot_path = []  # LineString [(lon, lat), (lon, lat)]
 
         # Keep track of all restricted areas in list and by ID (same order)
         self.areas = []
@@ -477,20 +483,36 @@ class AreaRestrictionManager(TrafficArrays):
         self.current_position = [spgeom.Point(lon, lat) for (lon, lat)
                                  in zip(bs.traf.lon, bs.traf.lat)]
 
-        # Calculate position of each aircraft after lookahead time
-        future_lon, future_lat = tg.calc_future_pos(self.t_lookahead,
+        # Calculate east and north components of ground speed
+        pilot_gs_east = bs.traf.pilot.tas * np.sin(np.radians(bs.traf.pilot.hdg))
+        pilot_gs_north = bs.traf.pilot.tas * np.cos(np.radians(bs.traf.pilot.hdg))
+
+        # Calculate position of each aircraft after lookahead time using both
+        # the current state and the current pilot setting
+        state_future_lon, state_future_lat \
+            = tg.calc_future_pos(self.t_lookahead,
                                                     bs.traf.lon,
                                                     bs.traf.lat,
                                                     bs.traf.gseast,
                                                     bs.traf.gsnorth)
+        pilot_future_lon, pilot_future_lat \
+            = tg.calc_future_pos(self.t_lookahead,
+                                 bs.traf.lon,
+                                 bs.traf.lat,
+                                 pilot_gs_east,
+                                 pilot_gs_north)
 
-        # Create shapely points for future position
-        future_position = [spgeom.Point(lon, lat) for (lon, lat)
-                           in zip(future_lon, future_lat)]
+        # Create shapely points for future positions
+        state_future_pos = [spgeom.Point(lon, lat) for (lon, lat)
+                            in zip(state_future_lon, state_future_lat)]
+        pilot_future_pos = [spgeom.Point(lon, lat) for (lon, lat)
+                            in zip(pilot_future_lon, pilot_future_lat)]
 
-        # Use current and future position to calculate path between positions
-        self.predicted_path = [spgeom.LineString([curr, fut]) for (curr, fut)
-                               in zip(self.current_position, future_position)]
+        # Use current and future position to calculate paths between positions
+        self.state_path = [spgeom.LineString([curr, fut]) for (curr, fut)
+                           in zip(self.current_position, state_future_pos)]
+        self.pilot_path = [spgeom.LineString([curr, fut]) for (curr, fut)
+                           in zip(self.current_position, pilot_future_pos)]
 
     def find_courses_tangent_to_area(self, area_idx, area):
         """ For each aircraft find the tangent bearings to the current area ."""
@@ -508,11 +530,16 @@ class AreaRestrictionManager(TrafficArrays):
         """ Check whether each aircraft is inside the area. """
 
         for ac_idx in range(self.num_traf):
+            # Check if currently inside
             self.is_inside[area_idx, ac_idx] = \
                 self.current_position[ac_idx].within(area.poly)
 
-            self.is_in_conflict[area_idx, ac_idx] = \
-                area.ring.intersects(self.predicted_path[ac_idx])
+            # Check if either the extrapolated state or extrapolated
+            # pilot setting are in conflict with the area.
+            self.state_in_conflict[area_idx, ac_idx] = \
+                area.ring.intersects(self.state_path[ac_idx])
+            self.pilot_in_conflict[area_idx, ac_idx] = \
+                area.ring.intersects(self.pilot_path[ac_idx])
 
     def calculate_time_to_intrusion(self, area_idx, area):
         """
@@ -527,13 +554,13 @@ class AreaRestrictionManager(TrafficArrays):
         for ac_idx in range(self.num_traf):
             if self.is_inside[area_idx, ac_idx]:
                 t_int = 0  # If this happens, area avoidance has failed!...
-            elif self.is_in_conflict[area_idx, ac_idx]:
+            elif self.state_in_conflict[area_idx, ac_idx]:
                 # Find intersection points of the relative vector with the area
                 # and use the distance to the closest point to calculate time to
                 # intersection. (We cannot use shapely distance functions because
                 # vertex definitions are in degrees).
                 intr_points = area.ring.intersection(
-                    self.predicted_path[ac_idx])
+                    self.state_path[ac_idx])
                 intr_closest = spops.nearest_points(
                     self.current_position[ac_idx], intr_points)[1]
                 intr_closest_lat, intr_closest_lon \
@@ -583,6 +610,14 @@ class AreaRestrictionManager(TrafficArrays):
         conflict_pairs = [(ac_idx, area_idx) for ac_idx, area_idx
                           in enumerate(self.closest_conflicting_area_idx)
                           if area_idx is not None]
+        pilot_conflict_pairs = [(ac_idx, area_idx) for (area_idx, ac_idx)
+                                in zip(*np.where(self.pilot_in_conflict))]
+        state_conflict_ids = [bs.traf.id[ac_idx] for (ac_idx, _) in conflict_pairs]
+        pilot_conflict_ids = [bs.traf.id[ac_idx] for (ac_idx, _) in pilot_conflict_pairs]
+
+        # Join pilot_conflict_pairs and conflict_pairs
+        conflict_pairs.extend(x for x in pilot_conflict_pairs
+                              if x not in conflict_pairs)
 
         # Set active flag to true for all aircraft in an area conflict
         idx_in_conflict = [ac_idx for ac_idx, _ in conflict_pairs]
