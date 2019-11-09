@@ -592,9 +592,18 @@ class AreaRestrictionManager(TrafficArrays):
         conflict with an area.
         """
 
-        # Reset each time step
-        self.closest_conflicting_area_idx = [None] * self.num_traf
+        # Copy activity setting from previous time step
+        prev_active = self.active[:]
+
+        # Reset for recalculation in current time step
         self.active = np.zeros(self.num_traf, dtype=bool)
+        self.closest_conflicting_area_idx = [None] * self.num_traf
+
+        # Aircraft for which area avoidance was active, but commanded hdg
+        # has not been reached yet will remain active and continue maneuver
+        hdg_close = abs(self.hdg - bs.traf.hdg) > COMMANDED_CRS_MARGIN
+        continue_turn = np.where(np.logical_and(hdg_close, prev_active))
+        self.active[continue_turn] = True
 
         # Loop over all aircraft-area combinations and for each aircraft
         # store the index of the area where the time to intrusion is the
