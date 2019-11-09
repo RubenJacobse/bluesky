@@ -109,6 +109,7 @@ class AreaRestrictionManager(TrafficArrays):
             # Compass courses to waypoints on route in [deg]
             self.crs_to_active_wp = np.array([])
             self.crs_to_next_wp = np.array([])
+            self.crs_to_dest_wp = np.array([])
 
             # =======================
             # Traffic parameter lists
@@ -447,10 +448,24 @@ class AreaRestrictionManager(TrafficArrays):
         For all aircraft calculate the course to the active and next waypoint.
         """
 
+        # Find course to destination waypoint
+        # NOTE: could probably be done more efficienty elsewhere, since 
+        # destination of an aircraft does not change over time.
+        dest_lat = np.zeros(bs.traf.ntraf)
+        dest_lon = np.zeros(bs.traf.ntraf)
+        for ii in range(bs.traf.ntraf):
+            dest_lat[ii] = bs.traf.ap.route[ii].wplat[-1]
+            dest_lon[ii] = bs.traf.ap.route[ii].wplon[-1]
+
+        qdr_to_dest_wp, _ = qdrdist(bs.traf.lat,
+                                    bs.traf.lon,
+                                    dest_lat,
+                                    dest_lon)
+        self.crs_to_dest_wp = tg.ned2crs(qdr_to_dest_wp)
+
         # Find course to active waypoint
         qdr_to_active_wp, _ = qdrdist(bs.traf.lat, bs.traf.lon,
                                       bs.traf.actwp.lat, bs.traf.actwp.lon)
-
         self.crs_to_active_wp = tg.ned2crs(qdr_to_active_wp)
 
         # Finding the course to the next waypoint is more tricky (if it even
@@ -647,15 +662,18 @@ class AreaRestrictionManager(TrafficArrays):
         aircraft in conflict with a given area.
         """
 
-        # Tangent courses
-        crs_left = (self.crs_left_tangent[area_idx, ac_indices] - AREA_AVOIDANCE_CRS_MARGIN) % 360
-        crs_right = (self.crs_right_tangent[area_idx, ac_indices] + AREA_AVOIDANCE_CRS_MARGIN) % 360
+        # Calculate avoidance courses including margin
+        crs_left = (self.crs_left_tangent[area_idx, ac_indices]
+                    - AREA_AVOIDANCE_CRS_MARGIN) % 360
+        crs_right = (self.crs_right_tangent[area_idx, ac_indices]
+                     + AREA_AVOIDANCE_CRS_MARGIN) % 360
 
-        # Determine which of the two courses should be used based on the course
-        # to the current active waypoint. We choose the course with the smallest
-        # angle difference
+        # Determine which of the two courses should be used based on the
+        # course to the current active waypoint. We choose the course with
+        # the smallest angle difference with respect to the waypoint
         wp_crs = self.crs_to_active_wp[ac_indices]
-        new_crs = tg.crs_closest(wp_crs, crs_left, crs_right)
+        wp_dest_crs = self.crs_to_dest_wp[ac_indices]
+        new_crs = tg.crs_closest(wp_dest_crs, crs_left, crs_right)
 
         # Set new courses in the traffic object
         self.hdg[ac_indices] = new_crs
