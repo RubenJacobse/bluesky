@@ -32,7 +32,7 @@ from plugins.thesis.restriction import AreaRestriction
 
 # Default settings
 DEFAULT_AREA_T_LOOKAHEAD = 120  # [s] Area conflict detection threshold
-AREA_AVOIDANCE_CRS_MARGIN = 5  # [deg] Avoid restriction by <x> degree margin
+AREA_AVOIDANCE_CRS_MARGIN = 1  # [deg] Avoid restriction by <x> degree margin
 COMMANDED_CRS_MARGIN = 0.2  # [deg] Verify if commanded heading has been reached
 NM_TO_M = 1852.  # Conversion factor nautical miles to metres
 UPDATE_INTERVAL = 1 # [s] Interval between updates for this module
@@ -506,10 +506,10 @@ class AreaRestrictionManager(TrafficArrays):
         # the current state and the current pilot setting
         state_future_lon, state_future_lat \
             = tg.calc_future_pos(self.t_lookahead,
-                                                    bs.traf.lon,
-                                                    bs.traf.lat,
-                                                    bs.traf.gseast,
-                                                    bs.traf.gsnorth)
+                                 bs.traf.lon,
+                                 bs.traf.lat,
+                                 bs.traf.gseast,
+                                 bs.traf.gsnorth)
         pilot_future_lon, pilot_future_lat \
             = tg.calc_future_pos(self.t_lookahead,
                                  bs.traf.lon,
