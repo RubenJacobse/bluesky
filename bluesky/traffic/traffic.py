@@ -392,8 +392,8 @@ class Traffic(TrafficArrays):
         self.adsb.update(simt)
 
         #---------- Fly the Aircraft --------------------------
-        self.ap.update() # Autopilot logic
         self.asas.update() # Airborne Separation Assurance
+        self.ap.update() # Autopilot logic
 
         # Apply geovector if necessary by overriding the values
         # of trk, tas, and, vs that were set in self.ap.update()
