@@ -517,17 +517,17 @@ class AreaRestrictionManager(TrafficArrays):
                                  pilot_gs_east,
                                  pilot_gs_north)
 
-        # Create shapely points for future positions
-        state_future_pos = [spgeom.Point(lon, lat) for (lon, lat)
-                            in zip(state_future_lon, state_future_lat)]
-        pilot_future_pos = [spgeom.Point(lon, lat) for (lon, lat)
-                            in zip(pilot_future_lon, pilot_future_lat)]
-
         # Use current and future position to calculate paths between positions
-        self.state_path = [spgeom.LineString([curr, fut]) for (curr, fut)
-                           in zip(self.current_position, state_future_pos)]
-        self.pilot_path = [spgeom.LineString([curr, fut]) for (curr, fut)
-                           in zip(self.current_position, pilot_future_pos)]
+        self.state_path = [spgeom.LineString([(curr_lon, curr_lat),
+                                              (state_lon, state_lat)])
+                           for (curr_lon, curr_lat, state_lon, state_lat)
+                           in zip(bs.traf.lon, bs.traf.lat,
+                                  state_future_lon, state_future_lat)]
+        self.pilot_path = [spgeom.LineString([(curr_lon, curr_lat),
+                                              (pilot_lon, pilot_lat)])
+                           for (curr_lon, curr_lat, pilot_lon, pilot_lat)
+                           in zip(bs.traf.lon, bs.traf.lat,
+                                  pilot_future_lon, pilot_future_lat)]
 
     def find_courses_tangent_to_area(self, area_idx, area):
         """ For each aircraft find the tangent bearings to the current area ."""
