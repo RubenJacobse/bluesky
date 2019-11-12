@@ -107,8 +107,6 @@ class AreaRestrictionManager(TrafficArrays):
             self.idx_active_wp = np.array([], dtype=int)
             self.idx_next_wp = np.array([], dtype=int)
             # Compass courses to waypoints on route in [deg]
-            self.crs_to_active_wp = np.array([])
-            self.crs_to_next_wp = np.array([])
             self.crs_to_dest_wp = np.array([])
 
             # =======================
@@ -315,8 +313,6 @@ class AreaRestrictionManager(TrafficArrays):
         if not self.num_traf or not self.num_areas:
             return
 
-        self.ac_id = bs.traf.id[:]  # Purely for debugging purposes only
-
         # Log each aircraft-aircraft conflict pair only once
         for (ac1, ac2), dist in zip(bs.traf.asas.confpairs,
                                     bs.traf.asas.dist):
@@ -335,11 +331,12 @@ class AreaRestrictionManager(TrafficArrays):
                                       (bs.traf.lat[idx1] + bs.traf.lat[idx2]) / 2,
                                       (bs.traf.lon[idx1] + bs.traf.lon[idx2]) / 2)
 
-        # Find courses to active and next waypoint
-        self.calculate_courses_to_waypoints()
+        # Compute values that will be used in later steps
+        # of aircraft-area conflict detection
+        self.calculate_courses_to_destination()
+        self.calculate_positions_and_predicted_paths()
 
         # Identify all aircraft-area conflicts
-        self.calculate_positions_and_predicted_paths()
         for area_idx, area in enumerate(self.areas):
             self.find_courses_tangent_to_area(area_idx, area)
             self.find_ac_inside_and_inconflict(area_idx, area)
@@ -409,7 +406,7 @@ class AreaRestrictionManager(TrafficArrays):
 
         if area_id not in self.area_ids:
             return False, f"Error: Airspace restriction {area_id} does not exist"
-        
+
         # Find index of area
         idx = self.area_ids.index(area_id)
 
@@ -443,14 +440,12 @@ class AreaRestrictionManager(TrafficArrays):
 
         return is_set_to_new, console_str
 
-    def calculate_courses_to_waypoints(self):
+    def calculate_courses_to_destination(self):
         """
         For all aircraft calculate the course to the active and next waypoint.
         """
 
         # Find course to destination waypoint
-        # NOTE: could probably be done more efficienty elsewhere, since 
-        # destination of an aircraft does not change over time.
         dest_lat = np.zeros(bs.traf.ntraf)
         dest_lon = np.zeros(bs.traf.ntraf)
         for ii in range(bs.traf.ntraf):
@@ -462,30 +457,6 @@ class AreaRestrictionManager(TrafficArrays):
                                     dest_lat,
                                     dest_lon)
         self.crs_to_dest_wp = tg.ned2crs(qdr_to_dest_wp)
-
-        # Find course to active waypoint
-        qdr_to_active_wp, _ = qdrdist(bs.traf.lat, bs.traf.lon,
-                                      bs.traf.actwp.lat, bs.traf.actwp.lon)
-        self.crs_to_active_wp = tg.ned2crs(qdr_to_active_wp)
-
-        # Finding the course to the next waypoint is more tricky (if it even
-        # exists, otherwise use the active waypoint which should always exist)
-        nextwp_lat = np.zeros(np.shape(self.crs_to_next_wp))
-        nextwp_lon = np.zeros(np.shape(self.crs_to_next_wp))
-        for ac_idx in range(self.num_traf):
-
-            self.idx_active_wp[ac_idx] = bs.traf.ap.route[ac_idx].iactwp
-            if bs.traf.ap.route[ac_idx].nwp > self.idx_active_wp[ac_idx] + 1:
-                self.idx_next_wp[ac_idx] = self.idx_active_wp[ac_idx] + 1
-            else:
-                self.idx_next_wp[ac_idx] = self.idx_active_wp[ac_idx]
-
-            nextwp_lat[ac_idx] = bs.traf.ap.route[ac_idx].wplat[self.idx_next_wp[ac_idx]]
-            nextwp_lon[ac_idx] = bs.traf.ap.route[ac_idx].wplon[self.idx_next_wp[ac_idx]]
-
-        qdr_to_next_wp, _ = qdrdist(bs.traf.lat, bs.traf.lon,
-                                    nextwp_lat, nextwp_lon)
-        self.crs_to_next_wp = tg.ned2crs(qdr_to_next_wp)
 
     def calculate_positions_and_predicted_paths(self):
         """
@@ -671,7 +642,6 @@ class AreaRestrictionManager(TrafficArrays):
         # Determine which of the two courses should be used based on the
         # course to the current active waypoint. We choose the course with
         # the smallest angle difference with respect to the waypoint
-        wp_crs = self.crs_to_active_wp[ac_indices]
         wp_dest_crs = self.crs_to_dest_wp[ac_indices]
         new_crs = tg.crs_closest(wp_dest_crs, crs_left, crs_right)
 
