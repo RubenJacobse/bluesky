@@ -643,7 +643,16 @@ class AreaRestrictionManager(TrafficArrays):
         # course to the current active waypoint. We choose the course with
         # the smallest angle difference with respect to the waypoint
         wp_dest_crs = self.crs_to_dest_wp[ac_indices]
-        new_crs = tg.crs_closest(wp_dest_crs, crs_left, crs_right)
+        avoidance_crs = tg.crs_closest(wp_dest_crs, crs_left, crs_right)
+
+        # Follow ASAS resolutions which do not result in area conflicts
+        asas_active = bs.traf.asas.active[ac_indices]
+        pilot_crs = bs.traf.pilot.hdg[ac_indices]
+        free_of_conflict = np.array([not tg.crs_is_between(crs, crs_l, crs_r)
+                                     for crs, crs_l, crs_r
+                                     in zip(pilot_crs, crs_left, crs_right)])
+        avoidance_crs = np.where(asas_active & free_of_conflict,
+                                 pilot_crs, avoidance_crs)
 
         # Set new courses in the traffic object
-        self.hdg[ac_indices] = new_crs
+        self.hdg[ac_indices] = avoidance_crs
