@@ -164,34 +164,34 @@ cdef class AreaRestriction:
             #
             # Algorithm from: http://geomalgorithms.com/a15-_tangents.html
             for jj in range(1, vertex.shape[0] - 1):
-                edge_prev = is_left_of_line(vertex[jj - 1, 1],
-                                            vertex[jj - 1, 0],
-                                            vertex[jj, 1],
-                                            vertex[jj, 0],
-                                            ac_lon[ii],
-                                            ac_lat[ii])
-                edge_next = is_left_of_line(vertex[jj, 1],
-                                            vertex[jj, 0],
-                                            vertex[jj + 1, 1],
-                                            vertex[jj + 1, 0],
-                                            ac_lon[ii],
-                                            ac_lat[ii])
+                edge_prev = self.is_left_of_line(vertex[jj - 1, 0],
+                                                 vertex[jj - 1, 1],
+                                                 vertex[jj, 0],
+                                                 vertex[jj, 1],
+                                                 ac_lon[ii],
+                                                 ac_lat[ii])
+                edge_next = self.is_left_of_line(vertex[jj, 0],
+                                                 vertex[jj, 1],
+                                                 vertex[jj + 1, 0],
+                                                 vertex[jj + 1, 1],
+                                                 ac_lon[ii],
+                                                 ac_lat[ii])
 
                 if edge_prev <= 0 and edge_next > 0:
-                    if not is_left_of_line(ac_lon[ii],
-                                           ac_lat[ii],
-                                           vertex[jj, 1],
-                                           vertex[jj, 0],
-                                           vertex[idx_right_vert, 1],
-                                           vertex[idx_right_vert, 0]) < 0:
+                    if not self.is_left_of_line(ac_lon[ii],
+                                                ac_lat[ii],
+                                                vertex[jj, 0],
+                                                vertex[jj, 1],
+                                                vertex[idx_right_vert, 0],
+                                                vertex[idx_right_vert, 1]) < 0:
                         idx_right_vert = jj
                 elif edge_prev > 0 and edge_next <= 0:
-                    if not is_left_of_line(ac_lon[ii],
-                                           ac_lat[ii],
-                                           vertex[jj, 1],
-                                           vertex[jj, 0],
-                                           vertex[idx_left_vert, 1],
-                                           vertex[idx_left_vert, 0]) > 0:
+                    if not self.is_left_of_line(ac_lon[ii],
+                                                ac_lat[ii],
+                                                vertex[jj, 0],
+                                                vertex[jj, 1],
+                                                vertex[idx_left_vert, 0],
+                                                vertex[idx_left_vert, 1]) > 0:
                         idx_left_vert = jj
 
             # Calculate approximate tangents from aircraft to left- and
