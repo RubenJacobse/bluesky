@@ -9,7 +9,7 @@ Module that defines the AreaRestriction class in which the
 import cython
 import numpy as np
 cimport numpy as np
-from libc.math cimport sin, cos, pi, atan2
+from libc.math cimport sin, cos, pi, atan2, sqrt
 
 # Third-party imports
 import shapely.geometry as spgeom
@@ -17,7 +17,7 @@ import shapely.geometry as spgeom
 # BlueSky imports
 from bluesky.tools import areafilter, geo
 
-# Typedefs for numpy array 
+# Typedefs for numpy array
 DTYPE = np.double
 ctypedef np.double_t DTYPE_t
 
@@ -196,14 +196,14 @@ cdef class AreaRestriction:
 
             # Calculate approximate tangents from aircraft to left- and
             # rightmost vertices using equirectangular earth approximation
-            qdr_left[ii], _ = geo.kwikqdrdist(ac_pos[1],
-                                              ac_pos[0],
-                                              vertex[idx_left_vert][1],
-                                              vertex[idx_left_vert][0])
-            qdr_right[ii], _ = geo.kwikqdrdist(ac_pos[1],
-                                               ac_pos[0],
-                                               vertex[idx_right_vert][1],
-                                               vertex[idx_right_vert][0])
+            qdr_left[ii] = kwikqdr(ac_lat[ii],
+                                   ac_lon[ii],
+                                   vertex[idx_left_vert][1],
+                                   vertex[idx_left_vert][0])
+            qdr_right[ii] = kwikqdr(ac_lat[ii],
+                                    ac_lon[ii],
+                                    vertex[idx_right_vert][1],
+                                    vertex[idx_right_vert][0])
 
         return qdr_left, qdr_right
 
@@ -255,3 +255,27 @@ cdef DTYPE_t _is_left_of_line(DTYPE_t line_start_x,
     """
     return ((line_end_x - line_start_x) * (point_y - line_start_y)
             - (point_x - line_start_x) * (line_end_y - line_start_y))
+
+
+@cython.cdivision(True)
+cdef DTYPE_t kwikqdr(DTYPE_t lata,
+                     DTYPE_t lona,
+                     DTYPE_t latb,
+                     DTYPE_t lonb):
+    """Gives quick and dirty qdr[deg]
+       from lat/lon. (note: does not work well close to poles)"""
+
+    cdef DTYPE_t re, dlat, dlon, cavelat, dangle, qdr
+
+    re      = 6371000.0  # radius earth [m]
+    dlat    = (latb - lata) * pi / 180
+    dlon    = (lonb - lona) * pi / 180
+    cavelat = cos(((lata + latb) * pi / 180) * 0.5)
+
+    dangle  = sqrt(dlat * dlat + dlon * dlon * cavelat * cavelat)
+    # dist    = re * dangle / nm
+
+    qdr = atan2(dlon * cavelat, dlat) * 180 / pi
+    qdr = qdr % 360.0
+
+    return qdr
