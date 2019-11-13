@@ -52,13 +52,6 @@ AREALOG_HEADER = ("simt [s], "
                   + "t_int [s], "
                   + "ac lat [deg], "
                   + "ac lon [deg]")
-ASASLOG_HEADER = ("simt [s], "
-                  + "ac1 [-], "
-                  + "ac2 [-], "
-                  + "LoS [-], "
-                  + "dist [m], "
-                  + "avg lat [deg], "
-                  + "avg lon [deg]")
 
 # Ensure log files are saved in separate directory
 bs.settings.set_variable_defaults(log_path="thesis_ruben/output")
@@ -133,10 +126,6 @@ class AreaRestrictionManager(TrafficArrays):
         # Create and start area conflict logger
         self.area_conf_logger = datalog.crelog("AREALOG", None, AREALOG_HEADER)
         self.area_conf_logger.start()
-
-        # Create and start aircraft conflict logger
-        self.asas_conf_logger = datalog.crelog("ASASLOG", None, ASASLOG_HEADER)
-        self.asas_conf_logger.start()
 
     def make_parameter_lists(self, keys):
         """
@@ -305,31 +294,10 @@ class AreaRestrictionManager(TrafficArrays):
         if self.area_conf_logger.scenname != bs.stack.get_scenname():
             self.area_conf_logger.reset()
             self.area_conf_logger.start()
-        if self.asas_conf_logger.scenname != bs.stack.get_scenname():
-            self.asas_conf_logger.reset()
-            self.asas_conf_logger.start()
 
         # Cannot do any calculations if no aircraft or areas exist
         if not self.num_traf or not self.num_areas:
             return
-
-        # Log each aircraft-aircraft conflict pair only once
-        for (ac1, ac2), dist in zip(bs.traf.asas.confpairs,
-                                    bs.traf.asas.dist):
-            idx1 = bs.traf.id2idx(ac1)
-            idx2 = bs.traf.id2idx(ac2)
-            if idx1 > idx2:
-                continue
-
-            is_los = int((ac1, ac2) in bs.traf.asas.lospairs)  # Either 0 or 1
-
-            # Log stats and approximate midpoint between aircraft
-            self.asas_conf_logger.log(np.array(bs.traf.id)[[idx1]],
-                                      bs.traf.id[idx2],
-                                      is_los,
-                                      int(dist),
-                                      (bs.traf.lat[idx1] + bs.traf.lat[idx2]) / 2,
-                                      (bs.traf.lon[idx1] + bs.traf.lon[idx2]) / 2)
 
         # Compute values that will be used in later steps
         # of aircraft-area conflict detection

@@ -17,7 +17,7 @@ import numpy as np
 # BlueSky imports
 import bluesky as bs
 from bluesky import settings
-from bluesky.tools import geo
+from bluesky.tools import geo, datalog
 from bluesky.tools.simtime import timed_function
 from bluesky.tools.aero import ft, nm
 from bluesky.tools.trafficarrays import TrafficArrays, RegisterElementParameters
@@ -44,6 +44,15 @@ settings.set_variable_defaults(asas_dt=1.0,
                                asas_pzh=1000.0,
                                asas_vmin=200.0,
                                asas_vmax=500.0)
+
+# Header for logfile written by ASAS module
+ASASLOG_HEADER = ("simt [s], "
+                  + "ac1 [-], "
+                  + "ac2 [-], "
+                  + "LoS [-], "
+                  + "dist [m], "
+                  + "avg lat [deg], "
+                  + "avg lon [deg]")
 
 
 class ASAS(TrafficArrays):
@@ -100,6 +109,10 @@ class ASAS(TrafficArrays):
             self.tas = np.array([])  # speed provided by the ASAS (eas) [m/s]
             self.alt = np.array([])  # alt provided by the ASAS [m]
             self.vs = np.array([])  # vspeed provided by the ASAS [m/s]
+
+        # Create a new conflict logger
+        self.asas_conf_logger = datalog.crelog("ASASLOG", None, ASASLOG_HEADER)
+        self.asas_conf_logger.start()
 
         # All other ASAS variables are initialized in the reset function
         self.reset()
@@ -576,10 +589,31 @@ class ASAS(TrafficArrays):
         if not self.swasas or bs.traf.ntraf == 0:
             return
 
+        if self.asas_conf_logger.scenname != bs.stack.get_scenname():
+            self.asas_conf_logger.reset()
+            self.asas_conf_logger.start()
+
         # Conflict detection
         self.confpairs, self.lospairs, self.inconf, self.tcpamax, \
             self.qdr, self.dist, self.dcpa, self.tcpa, self.tLOS = \
             self.cd.detect(bs.traf, bs.traf, self.R, self.dh, self.dtlookahead)
+
+        # Log each aircraft-aircraft conflict pair only once
+        for (ac1, ac2), dist in zip(self.confpairs, self.dist):
+            idx1 = bs.traf.id2idx(ac1)
+            idx2 = bs.traf.id2idx(ac2)
+            if idx1 > idx2:
+                continue
+
+            is_los = int((ac1, ac2) in self.lospairs)  # Either 0 or 1
+
+            # Log stats and approximate midpoint between aircraft
+            self.asas_conf_logger.log(np.array(bs.traf.id)[[idx1]],
+                                      bs.traf.id[idx2],
+                                      is_los,
+                                      int(dist),
+                                      (bs.traf.lat[idx1] + bs.traf.lat[idx2]) / 2,
+                                      (bs.traf.lon[idx1] + bs.traf.lon[idx2]) / 2)
 
         # Conflict resolution only if there are conflicts or if swarming /
         # leader-following with follow through is used (does not require a
