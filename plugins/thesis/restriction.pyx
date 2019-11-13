@@ -164,34 +164,34 @@ cdef class AreaRestriction:
             #
             # Algorithm from: http://geomalgorithms.com/a15-_tangents.html
             for jj in range(1, vertex.shape[0] - 1):
-                edge_prev = self.is_left_of_line(vertex[jj - 1, 0],
-                                                 vertex[jj - 1, 1],
-                                                 vertex[jj, 0],
-                                                 vertex[jj, 1],
-                                                 ac_lon[ii],
-                                                 ac_lat[ii])
-                edge_next = self.is_left_of_line(vertex[jj, 0],
-                                                 vertex[jj, 1],
-                                                 vertex[jj + 1, 0],
-                                                 vertex[jj + 1, 1],
-                                                 ac_lon[ii],
-                                                 ac_lat[ii])
+                edge_prev = _is_left_of_line(vertex[jj - 1, 0],
+                                             vertex[jj - 1, 1],
+                                             vertex[jj, 0],
+                                             vertex[jj, 1],
+                                             ac_lon[ii],
+                                             ac_lat[ii])
+                edge_next = _is_left_of_line(vertex[jj, 0],
+                                             vertex[jj, 1],
+                                             vertex[jj + 1, 0],
+                                             vertex[jj + 1, 1],
+                                             ac_lon[ii],
+                                             ac_lat[ii])
 
                 if edge_prev <= 0 and edge_next > 0:
-                    if not self.is_left_of_line(ac_lon[ii],
-                                                ac_lat[ii],
-                                                vertex[jj, 0],
-                                                vertex[jj, 1],
-                                                vertex[idx_right_vert, 0],
-                                                vertex[idx_right_vert, 1]) < 0:
+                    if not _is_left_of_line(ac_lon[ii],
+                                            ac_lat[ii],
+                                            vertex[jj, 0],
+                                            vertex[jj, 1],
+                                            vertex[idx_right_vert, 0],
+                                            vertex[idx_right_vert, 1]) < 0:
                         idx_right_vert = jj
                 elif edge_prev > 0 and edge_next <= 0:
-                    if not self.is_left_of_line(ac_lon[ii],
-                                                ac_lat[ii],
-                                                vertex[jj, 0],
-                                                vertex[jj, 1],
-                                                vertex[idx_left_vert, 0],
-                                                vertex[idx_left_vert, 1]) > 0:
+                    if not _is_left_of_line(ac_lon[ii],
+                                            ac_lat[ii],
+                                            vertex[jj, 0],
+                                            vertex[jj, 1],
+                                            vertex[idx_left_vert, 0],
+                                            vertex[idx_left_vert, 1]) > 0:
                         idx_left_vert = jj
 
             # Calculate approximate tangents from aircraft to left- and
@@ -222,13 +222,29 @@ cdef class AreaRestriction:
 
         return False if dir_sum > 0 else True
 
+    @staticmethod
+    def is_left_of_line(line_start, line_end, point):
+        """
+        Check if point lies to the left of the line through line_start
+        to line_end.
 
-cdef DTYPE_t is_left_of_line(DTYPE_t line_start_x,
-                             DTYPE_t line_start_y, 
-                             DTYPE_t line_end_x,
-                             DTYPE_t line_end_y, 
-                             DTYPE_t point_x,
-                             DTYPE_t point_y):
+        Returns:
+            > 0 if point lies on the left side of the line
+            = 0 if point lies exactly on the line
+            < 0 if point lies on the right side of the line
+        """
+
+        return is_left_of_line(line_start[0], line_start[1],
+                               line_end[0], line_end[1],
+                               point[0], point[1])
+
+
+cdef DTYPE_t _is_left_of_line(DTYPE_t line_start_x,
+                              DTYPE_t line_start_y,
+                              DTYPE_t line_end_x,
+                              DTYPE_t line_end_y,
+                              DTYPE_t point_x,
+                              DTYPE_t point_y):
     """
     Check if point lies to the left of the line through line_start
     to line_end.
@@ -237,5 +253,5 @@ cdef DTYPE_t is_left_of_line(DTYPE_t line_start_x,
         = 0 if point lies exactly on the line
         < 0 if point lies on the right side of the line
     """
-    return ((line_end_x - line_start_x) * (point_y - line_start_y) 
+    return ((line_end_x - line_start_x) * (point_y - line_start_y)
             - (point_x - line_start_x) * (line_end_y - line_start_y))
