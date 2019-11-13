@@ -1,5 +1,5 @@
 """
-Test the objects and functions defined in plugins/thesis/area.py
+Test the objects and functions defined in plugins/thesis/restriction.py
 
 © Ruben Jacobse, 2019
 """
@@ -10,7 +10,7 @@ import numpy as np
 import shapely.geometry as spgeom
 
 # Thesis imports
-from plugins.thesis.area import AreaRestriction
+from plugins.thesis.restriction import AreaRestriction
 
 # Error tolerances for floating point comparisons
 DIFF_DEG = 0.01 # [deg] Error tolerance for angle comparison
@@ -22,7 +22,7 @@ NM_TO_KM = 1.852 # Conversion factor from nautical miles to kilometers
 KM_TO_NM = 1/1.852 # Conversion factor from kilometers to nautical miles
 
 def test_raa_init(areafilter_):
-    """ Tests if the RestrictedAirspaceArea class is initialized correctly. """
+    """ Tests if the AreaRestriction class is initialized correctly. """
 
     test_id = "RAA_01"
     test_status = True
@@ -150,19 +150,19 @@ def test_raa_calc_tangents_four_aircraft(areafilter_):
 
     # Create area with vertices at (lon,lat): {(-1, -1), (1, -1), (1, 1), (-1, 1)}
     raa = AreaRestriction(
-        "RAA", True, [-1, -1, -1, 1, 1, 1, 1, -1, -1, -1])
+        "RAA", True, [-1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0])
     assert raa.ring.is_ccw
 
     # Create four aircraft at (lon,lat): {(0,2),(2,0),(0, -2),(-2, 0)}
     ntraf = 4
-    ac_lon = np.array([0, 2, 0, -2])
-    ac_lat = np.array([2, 0, -2, 0])
+    ac_lon = np.array([0.0, 2.0, 0.0, -2.0])
+    ac_lat = np.array([2.0, 0.0, -2.0, 0.0])
 
     # Correct qdr (defined as [-180 .. 180] degrees East-North-Up)
     # Headings 135, 225, 315, 45 in North-East-Down
-    qdr_cor_l = np.array([135, -135, -45, 45])
+    qdr_cor_l = np.array([135.0, -135.0, -45.0, 45.0])
     # Headings 225, 315, 45, 135 in North-East-Down
-    qdr_cor_r = np.array([-135, -45, 45, 135])
+    qdr_cor_r = np.array([-135.0, -45.0, 45.0, 135.0])
 
     # Perform calculation
     qdr_res_l, qdr_res_r = raa.calc_tangents(ntraf, ac_lon, ac_lat)
@@ -207,7 +207,7 @@ def test_raa_calc_tangents_single_aircraft(areafilter_):
     raa = AreaRestriction("RAA", True,
                                  [1.0, -3.0, 1.0, -0.5, -1.0, -0.5, -1.0, -3.0, 1.0, -3.0])
 
-    # Create two aircraft at (lon,lat): {(-1.5,-1.5),(1.5,-1.5)}
+    # Create one aircraft at (lon,lat): (-1.5,-1.5)
     ntraf = 1
     ac_lon1 = np.array([-1.5])
     ac_lat1 = np.array([-1.5])
@@ -222,141 +222,6 @@ def test_raa_calc_tangents_single_aircraft(areafilter_):
     # Check that the results are within margin from the correct values
     assert np.allclose(lox_az_res_l1, lox_az_cor_l1, DIFF_DEG)
     assert np.allclose(lox_az_res_r1, lox_ax_cor_r1, DIFF_DEG)
-
-# def test_raa_calc_qdr_tangents_four_aircraft(areafilter_):
-#     """ Test the correctness of the function that calculates the bearing
-#         and distance from aircraft positions to the tangent points of the
-#         area. """
-
-#     # Create area with vertices at (lon,lat): {(-1, -1), (1, -1), (1, 1), (-1, 1)}
-#     raa = RestrictedAirspaceArea(
-#         "RAA", True, [-1, -1, -1, 1, 1, 1, 1, -1, -1, -1])
-#     assert raa.ring.is_ccw
-
-#     # Create four aircraft at (lon,lat): {(0,2),(2,0),(0, -2),(-2, 0)}
-#     ntraf = 4
-#     ac_lon = np.array([0, 2, 0, -2])
-#     ac_lat = np.array([2, 0, -2, 0])
-
-#     # Correct qdr (defined as [-180 .. 180] degrees East-North-Up)
-#     # Headings 135, 225, 315, 45 in North-East-Down
-#     qdr_cor_l = np.array([135, -135, -45, 45])
-#     # Headings 225, 315, 45, 135 in North-East-Down
-#     qdr_cor_r = np.array([-135, -45, 45, 135])
-
-#     # Perform calculation
-#     qdr_res_l, qdr_res_r = raa.calc_qdr_tangents(ntraf, ac_lon, ac_lat)
-
-#     # Check that the results are within margin from the correct values
-#     assert np.allclose(qdr_res_l, qdr_cor_l, DIFF_DEG)
-#     assert np.allclose(qdr_res_r, qdr_cor_r, DIFF_DEG)
-
-
-# def test_raa_calc_qdr_tangents_two_aircraft(areafilter_):
-#     """ Test the correctness of the function that calculates the bearing
-#         and distance from aircraft positions to the tangent points of the
-#         area. """
-
-#     # Create area with vertices at (lon,lat): {(-3, 1), (-0.5, 1), (-0.5, -1), (-3, -1)}
-#     raa = RestrictedAirspaceArea("RAA", True,
-#                                  [1.0, -3.0, 1.0, -0.5, -1.0, -0.5, -1.0, -3.0, 1.0, -3.0])
-
-#     # Create two aircraft at (lon,lat): {(0,2),(2,0),(0, -2),(-2, 0)}
-#     ntraf = 2
-#     ac_lon1 = np.array([-1.5, 1.5])
-#     ac_lat1 = np.array([-1.5, -1.5])
-
-#     # Correct qdr (defined as [-180 .. 180] degrees East-North-Up)
-#     qdr_cor_l1 = np.array([-71.69, -83.75])  # [deg] Correct left tangent headings
-#     qdr_cor_r1 = np.array([63.595, -38.857])  # [deg] Correct right tangent headings
-
-#     # Perform calculation
-#     qdr_res_l1, qdr_res_r1 = raa.calc_qdr_tangents(ntraf, ac_lon1, ac_lat1)
-
-#     # Check that the results are within margin from the correct values
-#     assert np.allclose(qdr_res_l1, qdr_cor_l1, DIFF_DEG)
-#     assert np.allclose(qdr_res_r1, qdr_cor_r1, DIFF_DEG)
-
-
-# def test_raa_calc_rhumb_tangents_single_aircraft(areafilter_):
-#     """ Test the correctness of the function that calculates the bearing
-#         and distance from aircraft positions to the tangent points of the
-#         area. """
-
-#     # Create area with vertices at (lon,lat): {(-3, 1), (-0.5, 1), (-0.5, -1), (-3, -1)}
-#     raa = RestrictedAirspaceArea("RAA", True,
-#                                  [1.0, -3.0, 1.0, -0.5, -1.0, -0.5, -1.0, -3.0, 1.0, -3.0])
-
-#     # Create two aircraft at (lon,lat): {(-1.5,-1.5),(1.5,-1.5)}
-#     ntraf = 1
-#     ac_lon1 = np.array([-1.5])
-#     ac_lat1 = np.array([-1.5])
-
-#     # Correct loxodrome azimuth (defined as [-180 .. 180] degrees East-North-Up)
-#     lox_az_cor_l1 = np.array([-71.67601713])  # [deg] Correct left tangent headings
-#     lox_ax_cor_r1 = np.array([63.58299887])  # [deg] Correct right tangent headings
-
-#     # Perform calculation
-#     lox_az_res_l1, lox_az_res_r1 = raa.calc_rhumb_tangents(ntraf, ac_lon1, ac_lat1)
-
-#     # Check that the results are within margin from the correct values
-#     assert np.allclose(lox_az_res_l1, lox_az_cor_l1, DIFF_DEG)
-#     assert np.allclose(lox_az_res_r1, lox_ax_cor_r1, DIFF_DEG)
-
-
-# def test_raa_calc_rhumb_tangents_two_aircraft(areafilter_):
-#     """ Test the correctness of the function that calculates the bearing
-#         and distance from aircraft positions to the tangent points of the
-#         area. """
-
-#     # Create area with vertices at (lon,lat): {(-3, 1), (-0.5, 1), (-0.5, -1), (-3, -1)}
-#     raa = RestrictedAirspaceArea("RAA", True,
-#                                  [1.0, -3.0, 1.0, -0.5, -1.0, -0.5, -1.0, -3.0, 1.0, -3.0])
-
-#     # Create two aircraft at (lon,lat): {(-1.5,-1.5),(1.5,-1.5)}
-#     ntraf = 2
-#     ac_lon1 = np.array([-1.5, 1.5])
-#     ac_lat1 = np.array([-1.5, -1.5])
-
-#     # Correct loxodrome azimuth (defined as [-180 .. 180] degrees East-North-Up)
-#     # [deg] Correct left tangent headings
-#     lox_az_cor_l1 = np.array([-71.67601713, -83.70038260])
-#     # [deg] Correct right tangent headings
-#     lox_ax_cor_r1 = np.array([63.58299887, -38.84515642])
-
-#     # Perform calculation
-#     lox_az_res_l1, lox_az_res_r1 = raa.calc_rhumb_tangents(ntraf, ac_lon1, ac_lat1)
-
-#     # Check that the results are within margin from the correct values
-#     assert np.allclose(lox_az_res_l1, lox_az_cor_l1, DIFF_DEG)
-#     assert np.allclose(lox_az_res_r1, lox_ax_cor_r1, DIFF_DEG)
-
-
-# def test_raa_calc_rhumb_tangents_four_aircraft(areafilter_):
-#     """ Test the correctness of the function that calculates the bearing
-#         and distance from aircraft positions to the tangent points of the
-#         area. """
-
-#     # Create area with vertices at (lon,lat): {(-1, -1), (1, -1), (1, 1), (-1, 1)}
-#     raa = RestrictedAirspaceArea(
-#         "RAA", True, [-1, -1, -1, 1, 1, 1, 1, -1, -1, -1])
-#     assert raa.ring.is_ccw
-
-#     # Create four aircraft at (lon,lat): {(0,2),(2,0),(0, -2),(-2, 0)}
-#     ntraf = 4
-#     ac_lon = np.array([0, 2, 0, -2])
-#     ac_lat = np.array([2, 0, -2, 0])
-
-#     # Correct loxodrome azimuth (defined as [-180 .. 180] degrees East-North-Up)
-#     lox_az_cor_l = np.array([134.81789556, -134.80905074, -45.18210444, 45.19094926])
-#     lox_az_cor_r = np.array([-134.81789556, -45.19094926, 45.18210444, 134.80905074])
-
-#     # Perform calculation
-#     lox_az_res_l, lox_az_res_r = raa.calc_rhumb_tangents(ntraf, ac_lon, ac_lat)
-
-#     # Check that the results are within margin from the correct values
-#     assert np.allclose(lox_az_res_l, lox_az_cor_l, DIFF_DEG)
-#     assert np.allclose(lox_az_res_r, lox_az_cor_r, DIFF_DEG)
 
 
 def test_raa_is_left_of_line_on_line(areafilter_):

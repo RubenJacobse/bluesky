@@ -11,7 +11,7 @@ import pytest
 import bluesky as bs
 from bluesky import stack
 from bluesky.tools import areafilter, datalog, TrafficArrays, RegisterElementParameters
-from plugins.thesis.area_manager import AreaRestrictionManager
+from plugins.thesis.restriction_manager import AreaRestrictionManager
 
 
 def mockfun(*args):
@@ -75,7 +75,7 @@ class MockTraf(TrafficArrays):
 
     def delete(self, idx):
         """ Delete aircraft at index idx from all variables. """
-        
+
         if isinstance(idx, Collection):
             idx.sort()
             dec = len(idx)
@@ -84,7 +84,7 @@ class MockTraf(TrafficArrays):
 
         # Call actual delete() method
         super().delete(idx)
-        
+
         self.ntraf -= dec
 
         return True

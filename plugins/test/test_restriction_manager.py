@@ -1,5 +1,5 @@
 """
-Test the objects and functions defined in area_manager.py
+Test the objects and functions defined in restriction_manager.py
 
 © Ruben Jacobse, 2019
 """
@@ -10,9 +10,9 @@ import numpy as np
 import shapely.geometry as spgeom
 
 # BlueSky imports
-from plugins.thesis import area_manager as ar
-from plugins.thesis.area_manager import AreaRestrictionManager
-from plugins.thesis.area import AreaRestriction
+from plugins.thesis import restriction_manager as ar
+from plugins.thesis.restriction_manager import AreaRestrictionManager
+from plugins.thesis.restriction import AreaRestriction
 
 # Error tolerances for floating point comparisons
 DIFF_DEG = 0.01 # [deg] Error tolerance for angle comparison
@@ -182,18 +182,6 @@ def test_arm_reset(AreaRestrictionManager_, MockTraf_):
     assert AreaRestrictionManager_.area_ids == []
     assert AreaRestrictionManager_.num_areas == 0
     assert AreaRestrictionManager_.t_lookahead == 120
-
-
-def test_arm_preudate(AreaRestrictionManager_, MockTraf_):
-    """ Test the preupdate() method. """
-
-    # Initialize area and traffic
-    coords_1 = [0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0]
-    AreaRestrictionManager_.create_area("RAA_1", True, *coords_1)
-    MockTraf_.fake_traf()
-
-    # Call preupdate to perform a single time step
-    AreaRestrictionManager_.preupdate()
 
 
 @pytest.mark.xfail
