@@ -234,9 +234,9 @@ cdef class AreaRestriction:
             < 0 if point lies on the right side of the line
         """
 
-        return is_left_of_line(line_start[0], line_start[1],
-                               line_end[0], line_end[1],
-                               point[0], point[1])
+        return _is_left_of_line(line_start[0], line_start[1],
+                                line_end[0], line_end[1],
+                                point[0], point[1])
 
 
 cdef DTYPE_t _is_left_of_line(DTYPE_t line_start_x,
