@@ -157,17 +157,19 @@ class CSVLogger:
             varlist += [v.get() for v in self.selvars]
             varlist += additional_vars
 
-            # Get the number of rows from the first array/list
-            nrows = 0
-            for v in varlist:
-                if isinstance(v, (list, np.ndarray)):
-                    nrows = len(v)
-                    break
-            if nrows == 0:
-                return
-            # Convert (numeric) arrays to text, leave text arrays untouched
-            txtdata = ",".join([txtcol[0] for col in varlist
-                                for txtcol in col2txt(col, nrows)]) + "\n"
+            txtdata = ",".join([str(var) for var in varlist]) + "\n"
+
+            # # Get the number of rows from the first array/list
+            # nrows = 0
+            # for v in varlist:
+            #     if isinstance(v, (list, np.ndarray)):
+            #         nrows += len(v)
+            #         # break
+            # # if nrows == 0:
+            # #     return
+            # # Convert (numeric) arrays to text, leave text arrays untouched
+            # txtdata = ",".join([txtcol[0] for col in varlist
+            #                     for txtcol in col2txt(col, nrows)]) + "\n"
 
             # log the data to file
             self.file.write(bytearray(txtdata, "ascii"))

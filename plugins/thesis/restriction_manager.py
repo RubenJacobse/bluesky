@@ -534,11 +534,11 @@ class AreaRestrictionManager(TrafficArrays):
             self.time_to_intrusion[area_idx, ac_idx] = t_int
 
             if not t_int == -1:
-                self.area_conf_logger.log(np.array(bs.traf.id)[[ac_idx]],
+                self.area_conf_logger.log(bs.traf.id[ac_idx],
                                           self.area_ids[area_idx],
-                                          t_int,
-                                          bs.traf.lat[ac_idx],
-                                          bs.traf.lon[ac_idx])
+                                          int(t_int),
+                                          f"{bs.traf.lat[ac_idx]:.4f}",
+                                          f"{bs.traf.lon[ac_idx]:.4f}")
 
     def calculate_area_resolution_vectors(self):
         """

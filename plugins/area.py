@@ -147,37 +147,39 @@ class Area(TrafficArrays):
             routedist = np.zeros(len(delidx))
             lastwpdist = np.zeros(len(delidx))
             for idx, ac_idx in enumerate(delidx):
-                routedist[idx] = sum(traf.ap.route[ac_idx].wpdistto) * 1852
-                lastwpdist[idx] = geo.latlondist(traf.lat[ac_idx],
-                                                 traf.lon[ac_idx],
-                                                 traf.ap.route[ac_idx].wplat[-1],
-                                                 traf.ap.route[ac_idx].wplon[-1])
+                routedist = sum(traf.ap.route[ac_idx].wpdistto) * 1852
+                lastwpdist = geo.latlondist(traf.lat[ac_idx],
+                                            traf.lon[ac_idx],
+                                            traf.ap.route[ac_idx].wplat[-1],
+                                            traf.ap.route[ac_idx].wplon[-1])
 
-            self.logger.log(
-                np.array(traf.id)[delidx],
-                self.create_time[delidx],
-                sim.simt - self.create_time[delidx],
-                routedist,
-                self.distance2D[delidx],
-                self.distance3D[delidx],
-                self.work[delidx],
-                lastwpdist,
-                traf.lat[delidx],
-                traf.lon[delidx],
-                traf.alt[delidx],
-                traf.tas[delidx],
-                traf.vs[delidx],
-                traf.hdg[delidx],
-                # traf.ap.origlat[delidx],
-                # traf.ap.origlon[delidx],
-                # traf.ap.destlat[delidx],
-                # traf.ap.destlon[delidx],
-                # traf.asas.active[delidx],
-                # traf.pilot.alt[delidx],
-                # traf.pilot.tas[delidx],
-                # traf.pilot.vs[delidx],
-                # traf.pilot.hdg[delidx]
-            )
+                if (self.create_time[ac_idx] >= 1800
+                      and self.create_time[ac_idx] <= 16200):
+                    self.logger.log(
+                        f"{traf.id[ac_idx]}",
+                        f"{self.create_time[ac_idx]}",
+                        f"{(sim.simt - self.create_time[ac_idx]):.0f}",
+                        f"{routedist:.0f}",
+                        f"{self.distance2D[ac_idx]:.0f}",
+                        f"{self.distance3D[ac_idx]:.0f}",
+                        f"{self.work[ac_idx]:.0f}",
+                        f"{lastwpdist:.0f}",
+                        f"{traf.lat[ac_idx]:.4f}",
+                        f"{traf.lon[ac_idx]:.4f}",
+                        f"{traf.alt[ac_idx]:.0f}",
+                        f"{traf.tas[ac_idx]:.0f}",
+                        f"{traf.vs[ac_idx]:.0f}",
+                        f"{traf.hdg[ac_idx]:.0f}",
+                        # traf.ap.origlat[ac_idx],
+                        # traf.ap.origlon[ac_idx],
+                        # traf.ap.destlat[ac_idx],
+                        # traf.ap.destlon[ac_idx],
+                        # traf.asas.active[ac_idx],
+                        # traf.pilot.alt[ac_idx],
+                        # traf.pilot.tas[ac_idx],
+                        # traf.pilot.vs[ac_idx],
+                        # traf.pilot.hdg[ac_idx]
+                    )
             # delete all aicraft in self.delidx
             traf.delete(delidx)
 

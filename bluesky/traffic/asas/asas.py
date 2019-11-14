@@ -47,12 +47,15 @@ settings.set_variable_defaults(asas_dt=1.0,
 
 # Header for logfile written by ASAS module
 ASASLOG_HEADER = ("simt [s], "
-                  + "ac1 [-], "
-                  + "ac2 [-], "
+                  + "ac1, "
+                  + "ac2, "
                   + "LoS [-], "
-                  + "dist [m], "
-                  + "avg lat [deg], "
-                  + "avg lon [deg]")
+                  + "Sev [-], "
+                  + "duration [-]")
+ASASPOS_HEADER = ("simt [s], "
+                  + "LoS [-], "
+                  + "lat [deg], "
+                  + "lon [deg]")
 
 
 class ASAS(TrafficArrays):
@@ -111,8 +114,10 @@ class ASAS(TrafficArrays):
             self.vs = np.array([])  # vspeed provided by the ASAS [m/s]
 
         # Create a new conflict logger
-        self.asas_conf_logger = datalog.crelog("ASASLOG", None, ASASLOG_HEADER)
-        self.asas_conf_logger.start()
+        self.conf_logger = datalog.crelog("ASASLOG", None, ASASLOG_HEADER)
+        self.conf_logger.start()
+        self.pos_logger = datalog.crelog("ASASPOS", None, ASASPOS_HEADER)
+        self.pos_logger.start()
 
         # All other ASAS variables are initialized in the reset function
         self.reset()
@@ -191,6 +196,10 @@ class ASAS(TrafficArrays):
         self.tLOS = np.array([])  # Time to start LoS
         self.qdr = np.array([])  # Bearing from ownship to intruder
         self.dist = np.array([])  # Horizontal distance between ""
+
+        # Dictionaries used for logging
+        self.conf_tracker = {}
+        self.los_tracker = {}
 
     def create(self, n=1):
         """
@@ -589,31 +598,18 @@ class ASAS(TrafficArrays):
         if not self.swasas or bs.traf.ntraf == 0:
             return
 
-        if self.asas_conf_logger.scenname != bs.stack.get_scenname():
-            self.asas_conf_logger.reset()
-            self.asas_conf_logger.start()
+        # BlueSky does not signal start of new scenario, thus always check
+        if self.conf_logger.scenname != bs.stack.get_scenname():
+            self.conf_logger.reset()
+            self.conf_logger.start()
+        if self.pos_logger.scenname != bs.stack.get_scenname():
+            self.pos_logger.reset()
+            self.pos_logger.start()
 
         # Conflict detection
         self.confpairs, self.lospairs, self.inconf, self.tcpamax, \
             self.qdr, self.dist, self.dcpa, self.tcpa, self.tLOS = \
             self.cd.detect(bs.traf, bs.traf, self.R, self.dh, self.dtlookahead)
-
-        # Log each aircraft-aircraft conflict pair only once
-        for (ac1, ac2), dist in zip(self.confpairs, self.dist):
-            idx1 = bs.traf.id2idx(ac1)
-            idx2 = bs.traf.id2idx(ac2)
-            if idx1 > idx2:
-                continue
-
-            is_los = int((ac1, ac2) in self.lospairs)  # Either 0 or 1
-
-            # Log stats and approximate midpoint between aircraft
-            self.asas_conf_logger.log(np.array(bs.traf.id)[[idx1]],
-                                      bs.traf.id[idx2],
-                                      is_los,
-                                      int(dist),
-                                      (bs.traf.lat[idx1] + bs.traf.lat[idx2]) / 2,
-                                      (bs.traf.lon[idx1] + bs.traf.lon[idx2]) / 2)
 
         # Conflict resolution only if there are conflicts or if swarming /
         # leader-following with follow through is used (does not require a
@@ -636,7 +632,63 @@ class ASAS(TrafficArrays):
         self.confpairs_unique = confpairs_unique
         self.lospairs_unique = lospairs_unique
 
+        # Update conflict and los tracker variables
+        if bs.sim.simt >= 1800 and bs.sim.simt <= 16200:
+            for pair in confpairs_unique:
+                if pair not in self.conf_tracker.keys():
+                    self.conf_tracker[pair] = {"duration": 1}
+                else:
+                    self.conf_tracker[pair]["duration"] += 1
+
+            for pair in lospairs_unique:
+                pair_idx = self.confpairs.index(tuple(pair))
+                severity = (self.R - self.dist[pair_idx]) / self.R
+                if pair not in self.los_tracker.keys():
+                    self.los_tracker[pair] = {"duration": 1,
+                                              "severity": severity}
+                else:
+                    self.los_tracker[pair]["duration"] += 1
+                    if severity < self.los_tracker[pair]["severity"]:
+                        self.los_tracker[pair]["severity"] = severity
+
         self.resume_navigation()
+
+        # Pairs that are no longer in conflict or los are logged
+        # and deleted from the tracker dictionaries
+        if bs.sim.simt >= 1800 and bs.sim.simt <= 16200:
+            for pair in list(self.conf_tracker.keys()):
+                if pair not in confpairs_unique:
+                    self.conf_logger.log(tuple(pair)[0],
+                                         tuple(pair)[1],
+                                         0,
+                                         0,
+                                         self.conf_tracker[pair]["duration"])
+                    del self.conf_tracker[pair]
+
+            for pair in list(self.los_tracker.keys()):
+                if pair not in lospairs_unique:
+                    self.conf_logger.log(tuple(pair)[0],
+                                         tuple(pair)[1],
+                                         1,
+                                         self.los_tracker[pair]["severity"],
+                                         self.los_tracker[pair]["duration"])
+                    del self.los_tracker[pair]
+
+        # Only log conflict positions for t between 1800 and 3600 seconds
+        if bs.sim.simt >= 1800 and bs.sim.simt <= 3600:  # 1800:
+            for (ac1, ac2) in self.confpairs_unique:
+                idx1 = bs.traf.id2idx(ac1)
+                idx2 = bs.traf.id2idx(ac2)
+
+                is_los = int((ac1, ac2) in self.lospairs)  # Either 0 or 1
+
+                # Log LoS status and locations of both aircraft
+                self.pos_logger.log(is_los,
+                                         f"{bs.traf.lat[idx1]:.4f} ",
+                                         f"{bs.traf.lon[idx1]:.4f}")
+                self.pos_logger.log(is_los,
+                                         f"{bs.traf.lat[idx2]:.4f} ",
+                                         f"{bs.traf.lon[idx2]:.4f}")
 
     def resume_navigation(self):
         """
