@@ -70,8 +70,12 @@ def summarize_logfiles(timestamp):
         asaslogfiles,
         os.path.join(summary_save_dir, "asaslog_occurence.csv")
     )
-    output_parser.ASASLogLocationParser(
-        asaslogfiles,
+
+    # Process the ASAS pos files
+    asasposfiles = [os.path.join(logfile_save_dir, filename)
+                    for filename in logfiles if "ASASPOS" in filename]
+    output_parser.ASASPosLocationParser(
+        asasposfiles,
         os.path.join(summary_save_dir, "asaslog_locations.csv")
     )
 

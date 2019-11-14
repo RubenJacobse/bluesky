@@ -252,43 +252,19 @@ class ASASLogSummaryParser(LogListParser):
 
         num_los = 0
         num_conf = 0
-        conf_dict = {}
-        los_dict = {}
 
         for row in log_data:
-            [simt, ac1_id, ac2_id, is_los, _, _, _] = row
+            [simt, _, _, is_los, _, _] = row
             simt = int(float(simt))
+            is_los = int(is_los)
+
             if simt < T_LOG_INTERVAL_START or simt > T_LOG_INTERVAL_END:
                 continue
 
-            is_los = int(is_los)
-
-            confpair = f"{ac1_id}-{ac2_id}"
-
-            if confpair not in conf_dict.keys():
-                conf_dict[confpair] = []
-
-            # Check if intrusion count needs to be incremented
-            if conf_dict[confpair]:
-                if not conf_dict[confpair][-1] == simt-1:
-                    num_conf += 1
+            if is_los:
+                num_los += 1
             else:
                 num_conf += 1
-            conf_dict[confpair].append(simt)
-
-            # Continue to next occurence if no loss of separation
-            if not is_los:
-                continue
-
-            # Check if los count needs to be incremented
-            if confpair not in los_dict.keys():
-                los_dict[confpair] = []
-            if los_dict[confpair]:
-                if not los_dict[confpair][-1] == simt-1:
-                    num_los += 1
-            else:
-                num_los += 1
-            los_dict[confpair].append(simt)
 
         int_prev_rate = (num_conf - num_los) / num_conf
 
@@ -363,62 +339,27 @@ class ASASLogOccurrenceParser(LogListParser):
         write the summary to 'logfile'.
         """
 
-        conf_dict = {}
         outputlines = []
 
         # Loop over all rows and create a dictionary with each conflict
         # and its parameters listed once
         for row in log_data:
-            [simt, ac1_id, ac2_id, is_los, dist, _, _] = row
+            [simt, ac1_id, ac2_id, is_los, los_severity, duration] = row
             simt = int(float(simt))
+
             if simt < T_LOG_INTERVAL_START or simt > T_LOG_INTERVAL_END:
                 continue
 
-            dist = float(dist)
-            is_los = str(bool(int(is_los)))
-
             confpair = f"{ac1_id}-{ac2_id}"
-            los_severity = (PZ_RADIUS - dist) / PZ_RADIUS
+            is_los = str(bool(int(is_los)))
+            los_severity = float(los_severity)
+            duration = int(duration)
+            start = simt - duration
+            end = simt
 
-            new_conflict = {"start_time": simt,
-                            "end_time": simt + 1,
-                            "duration": 1,
-                            "is_los": is_los,
-                            "los_severity": los_severity}
-
-            if confpair not in conf_dict.keys():
-                # New conflict pair
-                conf_dict[confpair] = [new_conflict]
-            elif conf_dict[confpair][-1]["end_time"] == simt:
-                # Continuing conflict, intrement time 'counters'
-                conf_dict[confpair][-1]["end_time"] += 1
-                conf_dict[confpair][-1]["duration"] += 1
-
-                # Check for LoS of separation (once set to True will always
-                # remain True)
-                conf_dict[confpair][-1]["is_los"] = (
-                    conf_dict[confpair][-1]["is_los"] or is_los)
-
-                # Reset severity if worse than current worst
-                if (conf_dict[confpair][-1]["is_los"]
-                        and conf_dict[confpair][-1]["los_severity"] < los_severity):
-                    conf_dict[confpair][-1]["los_severity"] = los_severity
-            else:
-                # Add new conflict for this confpair
-                conf_dict[confpair].append(new_conflict)
-
-        # Write all conflicts to file
-        for confpair in conf_dict:
-            for conflict in conf_dict[confpair]:
-                duration = conflict["duration"]
-                los_severity = conflict["los_severity"]
-                start = conflict["start_time"]
-                end = conflict["end_time"]
-                is_los = conflict["is_los"]
-
-                outputlines.append(f"{geometry},{reso_method},{traffic_level},"
-                                   + f"{scenario},{confpair},{duration},{is_los},"
-                                   + f"{los_severity:0.3f},{start},{end}")
+            outputlines.append(f"{geometry},{reso_method},{traffic_level},"
+                            + f"{scenario},{confpair},{duration},{is_los},"
+                            + f"{los_severity:0.4f},{start},{end}")
 
         self.write_lines_to_output_file(outputlines)
 
@@ -428,7 +369,7 @@ class ASASLogOccurrenceParser(LogListParser):
                        + "LoS severity [-],t start [s],t end[s]")
 
 
-class ASASLogLocationParser(LogListParser):
+class ASASPosLocationParser(LogListParser):
     """
     Parse and process the contents of all ASAS_LOG_... files that are
     in 'input_list' and write all coordinates at which aircraft are in
@@ -451,18 +392,18 @@ class ASASLogLocationParser(LogListParser):
         # Loop over all rows and create a dictionary with each conflict
         # and its parameters listed once
         for row in log_data:
-            [simt, _, _, is_los, _, avg_lat, avg_lon] = row
-            simt = float(simt)
+            [simt, is_los, lat, lon] = row
+            simt = int(simt)
             if simt < T_LOG_INTERVAL_START or simt > T_LOG_INTERVAL_END:
                 continue
 
-            avg_lat = float(avg_lat)
-            avg_lon = float(avg_lon)
+            lat = float(lat)
+            lon = float(lon)
             is_los = str(bool(int(is_los)))
 
             # Write lines for ac1 and ac2 at once
             outputlines.append(f"{geometry},{reso_method},{traffic_level},"
-                               + f"{scenario},{avg_lat:0.4f},{avg_lon:0.4f},"
+                               + f"{scenario},{lat:0.4f},{lon:0.4f},"
                                + f"{is_los}")
 
         self.write_lines_to_output_file(outputlines)
@@ -490,6 +431,7 @@ class FLSTLogOccurrenceParser(LogListParser):
         write the summary to 'logfile'.
         """
 
+        outputlines = []
         for row in log_data:
             del_time = float(row[0])
             spawn_time = float(row[2])
@@ -508,7 +450,9 @@ class FLSTLogOccurrenceParser(LogListParser):
             line = (f"{geometry},{reso_method},{traffic_level},{scenario},"
                     + f"{ac_id},{work_performed:0.0f},{route_efficiency:0.3f},"
                     + f"{dist_to_last_wp:0.1f}")
-            self.write_to_output_file(line)
+            outputlines.append(line)
+
+        self.write_lines_to_output_file(outputlines)
 
     def set_header(self):
         self.header = ("geometry,resolution method,traffic level,scenario,"
