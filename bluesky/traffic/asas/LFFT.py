@@ -22,7 +22,7 @@ from bluesky.tools import geo
 from .MVP import MVP
 from .LF import find_lf_status
 
-# Store follower, leader as key, value pairs for use over mulitple time steps
+# Store follower, leader as key, value pairs for use over multiple time steps
 ft_dict = {}
 
 

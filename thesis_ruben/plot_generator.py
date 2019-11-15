@@ -157,17 +157,8 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
             # Create the plots showing the conflict and intrusion locations
             for method in self.combination_dict[geometry]:
                 for level in self.combination_dict[geometry][method]:
-                    # Make area conflict figures
-                    # self.make_geo_location_figure(geo_data,
-                    #                               geometry,
-                    #                               method,
-                    #                               level,
-                    #                               location_type="conflict")
-                    # self.make_geo_location_figure(geo_data,
-                    #                               geometry,
-                    #                               method,
-                    #                               level,
-                    #                               location_type="intrusion")
+                    # Make area conflict figures. Valid location_type
+                    # settings: "conflict", "intrusion", "both"
                     self.make_geo_location_figure(geo_data,
                                                   geometry,
                                                   method,
@@ -215,11 +206,13 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
                      facecolor=RESTRICTION_FACECOLOR,
                      edgecolor=RESTRICTION_EDGECOLOR,
                      linewidth=1,
-                     label="_nolegend_")
+                     label="_nolegend_",
+                     zorder=0)
         plt.plot(*ring_polygon.exterior.xy,
                  "k",
                  linewidth=1,
-                 label="_nolegend_")
+                 label="_nolegend_",
+                 zorder=0)
         plt.axis("scaled")
         plt.xlabel("longitude [deg]")
         plt.ylabel("latitude [deg]")
@@ -449,17 +442,17 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
                                           "logfiles_summary",
                                           "asaslog_occurence.csv"))
             df_geometry = df[df["#geometry"] == geometry]
-            self.make_single_figure(geometry,
-                                    df_geometry,
-                                    "conflict duration [s]",
-                                    "conflict_duration")
+            # self.make_single_figure(geometry,
+            #                         df_geometry,
+            #                         "conflict duration [s]",
+            #                         "conflict_duration")
 
             df_LoS_sev = df[(df["#geometry"] == geometry)
                             & (df["is LoS [-]"] == True)]
-            self.make_single_figure(geometry,
-                                    df_LoS_sev,
-                                    "conflict duration [s]",
-                                    "los_conflict_duration")
+            # self.make_single_figure(geometry,
+            #                         df_LoS_sev,
+            #                         "conflict duration [s]",
+            #                         "los_conflict_duration")
             self.make_single_figure(geometry,
                                     df_LoS_sev,
                                     "LoS severity [-]",
@@ -497,22 +490,22 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             df_destnotreached = df[(df["#geometry"] == geometry)
                                    & (df["dist to last wp [NM]"] > 0.5)]
 
-            self.make_single_figure(geometry,
-                                    df_geometry,
-                                    "work [GJ]",
-                                    "work")
-            self.make_single_figure(geometry,
-                                    df_destreached,
-                                    "work [GJ]",
-                                    "work_destreached")
+            # self.make_single_figure(geometry,
+            #                         df_geometry,
+            #                         "work [GJ]",
+            #                         "work")
+            # self.make_single_figure(geometry,
+            #                         df_destreached,
+            #                         "work [GJ]",
+            #                         "work_destreached")
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "route efficiency [-]",
                                     "efficiency")
-            self.make_single_figure(geometry,
-                                    df_destreached,
-                                    "route efficiency [-]",
-                                    "efficiency_destreached")
+            # self.make_single_figure(geometry,
+            #                         df_destreached,
+            #                         "route efficiency [-]",
+            #                         "efficiency_destreached")
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "dist to last wp [NM]",
@@ -521,10 +514,10 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             #                         df_destreached,
             #                         "dist to last wp [NM]",
             #                         "dist_to_last_destreached")
-            self.make_single_figure(geometry,
-                                    df_destnotreached,
-                                    "dist to last wp [NM]",
-                                    "dist_to_last_destnotreached")
+            # self.make_single_figure(geometry,
+            #                         df_destnotreached,
+            #                         "dist to last wp [NM]",
+            #                         "dist_to_last_destnotreached")
 
             # Make figures based on data in flstlog_occurence.csv
             df = pd.read_csv(os.path.join(self.batch_dir,
