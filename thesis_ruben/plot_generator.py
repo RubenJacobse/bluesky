@@ -29,6 +29,8 @@ GEOVECTOR_FACECOLOR = "xkcd:light seafoam green"
 INTRUSION_MARKER_COLOR = "red"
 CONFLICT_MARKER_COLOR = "blue"
 
+# Save figures as following type
+FIGURE_FILETYPE = "png"
 
 def make_batch_figures(timestamp):
     """
@@ -150,7 +152,7 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
             # Create and save the base plot with geometry only
             geo_plot = self.make_geo_base_figure(geo_data)
             geo_plot_filename = os.path.join(self.figure_dir,
-                                             f"{geometry}.png")
+                                             f"{geometry}.{FIGURE_FILETYPE}")
             geo_plot.savefig(geo_plot_filename, dpi=300, bbox_inches="tight")
             geo_plot.close()
 
@@ -342,7 +344,7 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
         plt.legend(handles=legend_elements, loc="lower center",
                    ncol=2, bbox_to_anchor=(0.5, 1))
         plt_filename = (f"{geometry}_{separation_method}_{traffic_level}"
-                        + f"_{location_type}.png")
+                        + f"_{location_type}.{FIGURE_FILETYPE}")
         plt_filepath = os.path.join(self.figure_dir, plt_filename)
         plt.savefig(plt_filepath, dpi=300, bbox_inches="tight")
         plt.close()
@@ -561,7 +563,7 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
                                   hue_order=["LOW", "MID", "HIGH"],
                                   linewidth=0.5,
                                   palette="Blues")
-            plt.ticklabel_format(axis="y", style="sci", scilimits=(0, 2))
+            plt.ticklabel_format(axis="y", style="sci", scilimits=(0, 4))
             ax.legend(loc="lower center", ncol=3, bbox_to_anchor=(0.5, 1))
             # # For OFF,MVP only runs
             # ax.set(xticklabels=["OFF", "MVP"])
@@ -571,12 +573,12 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             yminplot = ymin - 0.05 * yrange
             ymaxplot = ymax + 0.05 * yrange
             ax.set_ylim(yminplot, ymaxplot)
-            plt_filename = f"{geometry}_{namestr}.png"
+            plt_filename = f"{geometry}_{namestr}.{FIGURE_FILETYPE}"
             plt_filepath = os.path.join(self.figure_dir, plt_filename)
             plt.savefig(plt_filepath, dpi=300, bbox_inches="tight")
             plt.close()
         except ValueError:
-            print(f"Plot generator failed to create {geometry}_{namestr}.png")
+            print(f"Plot generator failed to create {plt_filename}")
 
     def create_plot(self, **kwargs):
         raise NotImplementedError
