@@ -10,6 +10,9 @@ Geovector is defined as:
  (  [ vsmin,vsmax ]  ) [fpm]
 """
 
+# Python imports
+from collections import OrderedDict
+
 # Third party imports
 import numpy as np
 
@@ -20,7 +23,7 @@ from bluesky.tools.aero import ft
 from bluesky.tools.misc import degto180
 
 # A dictionary of areas with a geovector specification
-geovecs = dict()
+geovecs = OrderedDict()
 
 
 class GeoVector:
