@@ -16,15 +16,13 @@ def start(asas):
 def resolve(asas, traf):
     """ Resolve all current conflicts """
 
-    # Premble------------------------------------------------------------------
-
     # Check if ASAS is ON first!
     if not asas.swasas:
         return
 
     # Initialize an array to store the resolution velocity vector for all A/C
     delta_v = np.zeros((traf.ntraf, 3))
-    
+
     # Stores resolution vector, also used in visualization
     asas.asasn = np.zeros(traf.ntraf, dtype=np.float32)
     asas.asase = np.zeros(traf.ntraf, dtype=np.float32)
@@ -33,33 +31,37 @@ def resolve(asas, traf):
     t_solve_vertical = np.ones(traf.ntraf) * 1e9
 
     # Call MVP function to resolve conflicts-----------------------------------
-    for ((ac1, ac2), qdr, dist, tcpa, tLOS) in zip(asas.confpairs, asas.qdr, 
-                                                   asas.dist, asas.tcpa, asas.tLOS):
-        idx1 = traf.id.index(ac1)
-        idx2 = traf.id.index(ac2)
+    for ((ac1, ac2), qdr, dist, tcpa, tLOS) in zip(asas.confpairs,
+                                                   asas.qdr,
+                                                   asas.dist,
+                                                   asas.tcpa,
+                                                   asas.tLOS):
+        idx1 = traf.id2idx(ac1)
+        idx2 = traf.id2idx(ac2)
 
-        # If A/C indexes are found, then apply MVP on this conflict pair
-        # Because ADSB is ON, this is done for each aircraft separately
-        if idx1 > -1 and idx2 > -1:
-            # If ac1 is resooff or ac2 is noreso, then ac1 does not perform
-            # any manoeuver
-            if ((asas.swresooff and ac1 in asas.resoofflst)
-                    or (asas.swnoreso and ac2 in asas.noresolst)):
-                continue
+        # Do not resolve current pair if:
+        # - the pair contains an aircraft that no longer exists
+        # - resolutions are switched off for ac1
+        # - ac2 is a noreso aircraft which ac1 should not avoid
+        if (not (idx1 > -1 and idx2 > -1)
+                or (asas.swresooff and ac1 in asas.resoofflst)
+                or (asas.swnoreso and ac2 in asas.noresolst)):
+            continue
 
-            dv_mvp, tsolV = MVP(traf, asas, qdr, dist, tcpa, tLOS, idx1, idx2)
-            if tsolV < t_solve_vertical[idx1]:
-                t_solve_vertical[idx1] = tsolV
+        dv_mvp, tsolV = MVP(traf, asas, qdr, dist, tcpa, tLOS, idx1, idx2)
+        if tsolV < t_solve_vertical[idx1]:
+            t_solve_vertical[idx1] = tsolV
 
-            # Use priority rules if activated
-            if asas.swprio:
-                delta_v[idx1], _ = prioRules(traf, asas.priocode, dv_mvp,
-                                             delta_v[idx1], delta_v[idx2], idx1, idx2)
-            else:
-                # Since cooperative, the vertical resolution component can be
-                # halved, and then dv_mvp can be added
-                dv_mvp[2] = 0.5 * dv_mvp[2]
-                delta_v[idx1] = delta_v[idx1] - dv_mvp
+        # Use priority rules if activated
+        if asas.swprio:
+            delta_v[idx1], _ = prioRules(traf, asas.priocode, dv_mvp,
+                                         delta_v[idx1], delta_v[idx2],
+                                         idx1, idx2)
+        else:
+            # Since cooperative, the vertical resolution component can be
+            # halved, and then dv_mvp can be added
+            dv_mvp[2] = 0.5 * dv_mvp[2]
+            delta_v[idx1] = delta_v[idx1] - dv_mvp
 
     # Determine new speed and limit resolution direction for all aicraft-------
 
