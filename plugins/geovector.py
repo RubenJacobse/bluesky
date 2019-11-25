@@ -155,7 +155,7 @@ def applygeovec():
                 bs.traf.ap.tas[limit_tas & usemax] = tasmax[limit_tas & usemax]
                 bs.traf.swvnav[limit_tas & usemax] = False
 
-            #------ Limit Track(so hdg)
+            #------ Limit Track(so trk)
             # Max track interval is 180 degrees to avoid ambiguity of what is
             # inside the interval
             if None not in [vec.trkmin, vec.trkmax]:
@@ -183,6 +183,92 @@ def applygeovec():
                                                             np.sign(vec.vsmax)*200.*ft
 
     return
+
+
+def applygeovec_pilot():
+    # Apply each geovector
+    for areaname, vec in geovecs.items():
+        if areafilter.hasArea(areaname):
+            # Check if aircraft are inside the geovectoring area
+            in_geovec = areafilter.checkInside(areaname,
+                                               bs.traf.lat,
+                                               bs.traf.lon,
+                                               bs.traf.alt)
+
+            # Boolean arrays that determine whether each limit type shall
+            # be applied. For aircraft inside the geovectoring area the speed
+            # limits are always applied, but the track limits are only applied
+            # if the aircraft is not resolving a restricted airspace conflict.
+            limit_tas = in_geovec
+            limit_trk = in_geovec
+            limit_vs = in_geovec
+
+            # Keep track of ids of aircraft that are entering and leaving
+            # the geovector area
+            insids = set(np.array(bs.traf.id)[in_geovec])
+            new_ids = insids - vec.previnside
+            delids = vec.previnside - insids
+            vec.previnside = insids
+
+            # Store LNAV/VNAV status of aircraft entering the geovector area
+            for acid in new_ids:
+                idx = bs.traf.id2idx(acid)
+                vec.prevstatus[acid] = [bs.traf.swlnav[idx],
+                                        bs.traf.swvnav[idx]]
+
+            # Revert aircraft who have exited the geovectoring area to their
+            # original status
+            for acid in delids:
+                idx = bs.traf.id2idx(acid)
+                if idx >= 0:
+                    bs.traf.swlnav[idx], bs.traf.swvnav[idx] \
+                        = vec.prevstatus.pop(acid)
+
+            # -----Ground speed limiting
+            # For now assume no wind:  so use tas as gs
+            if vec.gsmin is not None:
+                tasmin = np.ones(bs.traf.ntraf) * vec.gsmin
+                usemin = bs.traf.pilot.tas < tasmin
+                bs.traf.pilot.tas[limit_tas & usemin] = tasmin[limit_tas & usemin]
+                bs.traf.swvnav[limit_tas & usemin] = False
+
+            if vec.gsmax is not None:
+                tasmax = np.ones(bs.traf.ntraf) * vec.gsmax
+                usemax = bs.traf.pilot.tas > tasmax
+                bs.traf.pilot.tas[limit_tas & usemax] = tasmax[limit_tas & usemax]
+                bs.traf.swvnav[limit_tas & usemax] = False
+
+            #------ Limit Track(so hdg)
+            # Max track interval is 180 degrees to avoid ambiguity of what is
+            # inside the interval
+            if None not in [vec.trkmin, vec.trkmax]:
+                # Use degto180 to avoid problems for e.g interval [350,30]
+                usemin = limit_trk & (
+                    degto180(bs.traf.pilot.hdg - vec.trkmin) < 0)  # Left of minimum
+                usemax = limit_trk & (
+                    degto180(bs.traf.pilot.hdg - vec.trkmax) > 0)  # Right of maximum
+                bs.traf.pilot.hdg[limit_trk & usemin] = vec.trkmin
+                bs.traf.pilot.hdg[limit_trk & usemax] = vec.trkmax
+                bs.traf.swlnav[limit_trk & (usemin | usemax)] = False
+
+            # -----Vertical speed limiting
+            # For now assume no wind:  so use tas as gs
+            if vec.vsmin is not None:
+                bs.traf.selvs[limit_vs & (bs.traf.vs < vec.vsmin)] = vec.vsmin
+                bs.traf.swvnav[limit_vs & (bs.traf.vs < vec.vsmin)] = False
+                # Activate V/S mode by using a slightly higher altitude than current values
+                bs.traf.selalt[limit_vs & (bs.traf.vs < vec.vsmin)] = bs.traf.alt[limit_vs & (bs.traf.vs < vec.vsmin)] + \
+                    np.sign(vec.vsmin)*200.*ft
+
+            if vec.vsmax is not None:
+                bs.traf.selvs[limit_vs & (bs.traf.vs > vec.vsmax)] = vec.vsmax
+                bs.traf.swvnav[limit_vs & (bs.traf.vs < vec.vsmax)] = False
+                # Activate V/S mode by using a slightly higher altitude than current values
+                bs.traf.selalt[limit_vs & (bs.traf.vs > vec.vsmax)] = bs.traf.alt[limit_vs & (bs.traf.vs > vec.vsmax)] + \
+                    np.sign(vec.vsmax)*200.*ft
+
+    return
+
 
 def update(): # Not used
     return

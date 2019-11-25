@@ -403,6 +403,10 @@ class Traffic(TrafficArrays):
 
         self.pilot.APorASAS() # Decide autopilot or ASAS
 
+        # # Apply geovector by overriding BOTH autopilot and asas
+        # if geovector.geovecs:
+        #     geovector.applygeovec_pilot()
+
         # Apply area-avoidance maneuver that can override the values of
         # self.tas, self.trk, self.vs and, self.alt set in APorASAS()
         if self.restrictions.areas:
