@@ -34,29 +34,30 @@ def resolve(asas, traf):
     t_solve_vertical = np.ones(traf.ntraf) * 1e9
 
     # Call MVP function to resolve conflicts-----------------------------------
-    for ((ac1, ac2), qdr, dist, tcpa, tLOS) in zip(asas.confpairs, asas.qdr,
-                                                   asas.dist, asas.tcpa, asas.tLOS):
+    for ((ac1, ac2), qdr, dist, tcpa, tLOS) in zip(asas.confpairs,
+                                                   asas.qdr,
+                                                   asas.dist,
+                                                   asas.tcpa,
+                                                   asas.tLOS):
         idx1 = traf.id.index(ac1)
         idx2 = traf.id.index(ac2)
 
-        # Do not resolve if:
+        # Do not resolve current pair if:
         # - the pair contains an aircraft that no longer exists
         # - resolutions are switched off for ac1
-        # - ac2 is a noreso aircraft which nobody avoids
-        if idx1 == -1 or idx2 == -1:
-            continue
-        elif asas.swresooff and ac1 in asas.resoofflst:
-            continue
-        elif asas.swnoreso and ac2 in asas.noresolst:
+        # - ac2 is a noreso aircraft which ac1 should not avoid
+        if (not (idx1 > -1 and idx2 > -1)
+                or (asas.swresooff and ac1 in asas.resoofflst)
+                or (asas.swnoreso and ac2 in asas.noresolst)):
             continue
 
         dv_mvp, tsolV = MVP(traf, asas, qdr, dist, tcpa, tLOS, idx1, idx2)
         if tsolV < t_solve_vertical[idx1]:
             t_solve_vertical[idx1] = tsolV
 
-        trk_diff = crs_diff(bs.traf.trk[idx1], bs.traf.trk[idx2])
+        trk_diff = crs_diff(bs.traf.trk[idx1], qdr)
 
-        if not (trk_diff > -45 and trk_diff < 110):
+        if abs(trk_diff) > 90:# and bs.traf.lat[idx1] > 0.332736:
             continue
 
         dv_mvp[2] = 0.5 * dv_mvp[2]
