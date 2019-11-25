@@ -34,6 +34,7 @@ from . import SSD
 from . import LF
 from . import LFFT
 from . import Swarm_alt
+from . import Swarm_v3
 from . import MVP_PRIO
 
 # Register default settings
@@ -74,6 +75,7 @@ class ASAS(TrafficArrays):
                   "EBY": Eby,
                   "SWARM": Swarm,
                   "SWARM-V2": Swarm_alt,
+                  "SWARM-V3": Swarm_v3,
                   "LF": LF,
                   "LFFT": LFFT,
                   "MVP-PRIO": MVP_PRIO}  # MVP + priority - experimental
