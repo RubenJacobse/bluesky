@@ -39,7 +39,7 @@ from . import MVP_PRIO
 # Register default settings
 settings.set_variable_defaults(asas_dt=1.0,
                                asas_dtlookahead=300.0,
-                               asas_mar=1.2,
+                               asas_mar=1.05,
                                asas_pzr=5.0,
                                asas_pzh=1000.0,
                                asas_vmin=200.0,
