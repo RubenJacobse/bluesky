@@ -381,6 +381,10 @@ class ScenarioGenerator():
         elif self.traffic_level == "HIGH":  # Average 24 seconds = ~150 ac/hr
             cre_interval_min = 14
             cre_interval_max = 34
+        else:
+            interval_avg = round(3600 / int(self.traffic_level))
+            cre_interval_min = max(0, interval_avg - 10)
+            cre_interval_max = interval_avg + 10
 
         self.cre_interval_min = cre_interval_min
         self.cre_interval_max = cre_interval_max
