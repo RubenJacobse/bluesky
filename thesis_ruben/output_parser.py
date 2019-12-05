@@ -358,8 +358,8 @@ class ASASLogOccurrenceParser(LogListParser):
             end = simt
 
             outputlines.append(f"{geometry},{reso_method},{traffic_level},"
-                            + f"{scenario},{confpair},{duration},{is_los},"
-                            + f"{los_severity:0.4f},{start},{end}")
+                               + f"{scenario},{confpair},{duration},{is_los},"
+                               + f"{los_severity:0.4f},{start},{end}")
 
         self.write_lines_to_output_file(outputlines)
 
