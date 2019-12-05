@@ -487,11 +487,6 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
                                           "logfiles_summary",
                                           "flstlog_occurence.csv"))
             df_geometry = df[df["#geometry"] == geometry]
-            # df_destreached = df[(df["#geometry"] == geometry)
-            #                     & (df["dist to last wp [NM]"] <= 0.5)]
-            # df_destnotreached = df[(df["#geometry"] == geometry)
-            #                        & (df["dist to last wp [NM]"] > 0.5)]
-
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "route efficiency [-]",
@@ -500,28 +495,6 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             #                         df_geometry,
             #                         "work [GJ]",
             #                         "work")
-            # self.make_single_figure(geometry,
-            #                         df_destreached,
-            #                         "work [GJ]",
-            #                         "work_destreached")
-            # self.make_single_figure(geometry,
-            #                         df_destreached,
-            #                         "route efficiency [-]",
-            #                         "efficiency_destreached")
-
-            # # NO LONGER USEFUL; also, dist_to_last is now in meters!
-            # # self.make_single_figure(geometry,
-            # #                         df_geometry,
-            # #                         "dist to last wp [NM]",
-            # #                         "dist_to_last")
-            # # self.make_single_figure(geometry,
-            # #                         df_destreached,
-            # #                         "dist to last wp [NM]",
-            # #                         "dist_to_last_destreached")
-            # # self.make_single_figure(geometry,
-            # #                         df_destnotreached,
-            # #                         "dist to last wp [NM]",
-            # #                         "dist_to_last_destnotreached")
 
             # Make figures based on data in flstlog_occurence.csv
             df = pd.read_csv(os.path.join(self.batch_dir,
