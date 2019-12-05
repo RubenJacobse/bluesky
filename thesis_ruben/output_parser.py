@@ -455,8 +455,7 @@ class FLSTLogOccurrenceParser(LogListParser):
 
     def set_header(self):
         self.header = ("geometry,resolution method,traffic level,scenario,"
-                       + "ac id,work [GJ],route efficiency [-],"
-                       + "dist to last wp [NM]")
+                       + "ac id,work [GJ],route efficiency [-]")
 
 
 class FLSTLogSummaryParser(LogListParser):
