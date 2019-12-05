@@ -477,7 +477,6 @@ class FLSTLogSummaryParser(LogListParser):
         write the summary to 'logfile'.
         """
 
-        num_dest_not_reached = 0
         num_turnaround = 0
 
         for row in log_data:
@@ -487,19 +486,15 @@ class FLSTLogSummaryParser(LogListParser):
                     or del_time > T_LOG_INTERVAL_END):
                 continue
 
-            dist_to_last_wp = float(row[8]) / 1852
             lat = float(row[9])
-
-            if dist_to_last_wp > 0.5:
-                num_dest_not_reached += 1
 
             if lat < 0:
                 num_turnaround += 1
 
         outputline = (f"{geometry},{reso_method},{traffic_level},{scenario},"
-                      + f"{num_dest_not_reached},{num_turnaround}")
+                      + f"{num_turnaround}")
         self.write_to_output_file(outputline)
 
     def set_header(self):
         self.header = ("geometry,resolution method,traffic level,scenario,"
-                       + "num dest not reached [-],num turnaround [-]")
+                       + "num turnaround [-]")

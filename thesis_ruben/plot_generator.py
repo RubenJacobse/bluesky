@@ -503,10 +503,6 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             df_geometry = df[df["#geometry"] == geometry]
             self.make_single_figure(geometry,
                                     df_geometry,
-                                    "num dest not reached [-]",
-                                    "num_destnotreached")
-            self.make_single_figure(geometry,
-                                    df_geometry,
                                     "num turnaround [-]",
                                     "num_turnaround")
 
