@@ -432,7 +432,7 @@ class ScenarioGenerator():
             (dest_lat, dest_lon) = bsgeo.qdrpos(CENTER_LAT,
                                                 CENTER_LON,
                                                 curr_dest_angle,
-                                                AREA_RADIUS + 0.5)
+                                                2 * AREA_RADIUS)
 
             # Heading to waypoint at start of corridor
             curr_hdg, _ = bsgeo.qdrdist(curr_lat,
