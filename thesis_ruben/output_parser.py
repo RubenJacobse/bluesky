@@ -442,14 +442,13 @@ class FLSTLogOccurrenceParser(LogListParser):
             ac_id = row[1]
             nominal_dist = float(row[4])
             actual_dist = float(row[5])
+            dist_to_last_wp = float(row[8])
             work_performed = float(row[7]) / 1e9
-            dist_to_last_wp = float(row[8]) / 1852
 
-            route_efficiency = nominal_dist / actual_dist
+            route_efficiency = nominal_dist / (actual_dist + dist_to_last_wp)
 
             line = (f"{geometry},{reso_method},{traffic_level},{scenario},"
-                    + f"{ac_id},{work_performed:0.0f},{route_efficiency:0.3f},"
-                    + f"{dist_to_last_wp:0.1f}")
+                    + f"{ac_id},{work_performed:0.1f},{route_efficiency:0.3f}")
             outputlines.append(line)
 
         self.write_lines_to_output_file(outputlines)
