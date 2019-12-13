@@ -17,7 +17,7 @@ import numpy as np
 # BlueSky imports
 import bluesky as bs
 from bluesky import settings
-from bluesky.tools import geo, datalog
+from bluesky.tools import geo, datalog, areafilter
 from bluesky.tools.simtime import timed_function
 from bluesky.tools.aero import ft, nm
 from bluesky.tools.trafficarrays import TrafficArrays, RegisterElementParameters
@@ -615,7 +615,7 @@ class ASAS(TrafficArrays):
 
         # Conflict resolution only if there are conflicts or if swarming /
         # leader-following with follow through is used (does not require a
-        # conflict for resolution)
+        # conflict for 'preventative' resolution)
         if self.confpairs or self.cr_name in ["SWARM-V2", "LFFT", "SWARM-V3"]:
             self.cr.resolve(self, bs.traf)
 
@@ -686,13 +686,42 @@ class ASAS(TrafficArrays):
 
                 # Log LoS status and locations of both aircraft
                 self.pos_logger.log(is_los,
-                                         f"{bs.traf.lat[idx1]:.4f} ",
-                                         f"{bs.traf.lon[idx1]:.4f}")
+                                    f"{bs.traf.lat[idx1]:.4f}",
+                                    f"{bs.traf.lon[idx1]:.4f}")
                 self.pos_logger.log(is_los,
-                                         f"{bs.traf.lat[idx2]:.4f} ",
-                                         f"{bs.traf.lon[idx2]:.4f}")
+                                    f"{bs.traf.lat[idx2]:.4f}",
+                                    f"{bs.traf.lon[idx2]:.4f}")
 
     def resume_navigation(self):
+        """
+
+        """
+        self.resume_navigation_old()
+
+        if "SWARM" in self.cr_name:
+            in_swarming_area = areafilter.checkInside("SWARMING_ZONE",
+                                                      bs.traf.lat,
+                                                      bs.traf.lon,
+                                                      bs.traf.alt)
+            id_in_swarming_area = [bs.traf.id[idx] for idxs in np.where(in_swarming_area) for idx in idxs] if np.any(in_swarming_area) else []
+
+            self.active = np.logical_or(self.active, in_swarming_area)
+            # Ugly piece of code to handle aircraft leaving the swarming area
+            if bs.traf.ntraf > 1: # dirty workaround to deal with first aircraft
+                id_exited_swarming_area = [ac_id for ac_id in self.prev_in_swarming_area if ac_id not in id_in_swarming_area]
+                idxs = [bs.traf.id2idx(ac_id) for ac_id in id_exited_swarming_area]
+                for idx in idxs:
+                    iwpid = bs.traf.ap.route[idx].findact(idx)
+                    if iwpid != -1:  # To avoid problems if there are no waypoints
+                        bs.traf.ap.route[idx].direct(
+                            idx, bs.traf.ap.route[idx].wpname[iwpid])
+                        print(f"{bs.traf.id[idx]} exiting swarming zone")
+
+            # For next timestep
+            self.prev_in_swarming_area = id_in_swarming_area
+
+
+    def resume_navigation_old(self):
         """
         Decide for each aircraft in the conflict list whether the ASAS
         should be followed or not, based on if the aircraft pairs passed
