@@ -54,14 +54,19 @@ def resolve(asas, traf):
     Swarming = np.logical_or(ac_in_swarm, ac_own)
 
     # For each aircraft determine whether they use swarming rules or mvp rules
-    ac_use_swarm = np.any(ac_in_swarm, axis=0)
+    ac_in_swarm_zone = areafilter.checkInside("SWARMING_ZONE",
+                                              bs.traf.lat,
+                                              bs.traf.lon,
+                                              bs.traf.alt)
+    ac_use_swarm = np.logical_and(np.any(ac_in_swarm, axis=0), ac_in_swarm_zone)
     ac_use_mvp = np.logical_and(np.any(np.logical_not(ac_in_swarm_range),
                                        axis=0),
                                 asas.inconf)
 
     # Prepare matrices to use for calculating averages
+    gseast_matrix = np.ones((traf.ntraf, traf.ntraf)) * traf.gseast
+    gsnorth_matrix = np.ones((traf.ntraf, traf.ntraf)) * traf.gsnorth
     tas_matrix = np.ones((traf.ntraf, traf.ntraf)) * traf.tas
-    trk_matrix = np.ones((traf.ntraf, traf.ntraf)) * traf.trk
     vs_matrix = np.ones((traf.ntraf, traf.ntraf)) * traf.vs
     alt_matrix = np.ones((traf.ntraf, traf.ntraf)) * traf.alt
 
@@ -69,8 +74,10 @@ def resolve(asas, traf):
     ca_trk, ca_tas, ca_vs, _, _, _ = MVP_alt.resolve(asas, traf)
 
     # Calculate Velocity Alignment (VA) parameters
+    va_gsnorth = np.average(gsnorth_matrix, axis=1, weights=Swarming)
+    va_gseast = np.average(gseast_matrix, axis=1, weights=Swarming)
+    va_trk = np.degrees(np.arctan2(va_gseast, va_gsnorth)) % 360.
     va_tas = np.average(tas_matrix, axis=1, weights=Swarming)
-    va_trk = np.average(trk_matrix, axis=1, weights=Swarming)
     va_vs = np.average(vs_matrix, axis=1, weights=Swarming)
 
     # # Calculate Flock Centering (FC) parameters
