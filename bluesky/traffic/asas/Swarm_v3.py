@@ -21,7 +21,7 @@ def start(asas):
     asas.swarm_min_radius = 10 * nm
     asas.swarm_max_radius = 15 * nm
     asas.swarm_altitude = 1500 * ft  # [m]
-    asas.swarm_weights = np.array([10, 3])
+    asas.swarm_weights = np.array([10, 1, 0])
 
 
 def resolve(asas, traf):
@@ -32,10 +32,13 @@ def resolve(asas, traf):
         raise RuntimeError("This should not be happening...")
 
     # Use flat-earth approximation for qdr and distance calculation
-    _, dist = geo.kwikqdrdist_matrix(np.mat(traf.lat), np.mat(traf.lon),
+    qdr, dist = geo.kwikqdrdist_matrix(np.mat(traf.lat), np.mat(traf.lon),
                                      np.mat(traf.lat), np.mat(traf.lon))
     dist = np.array(dist) * nm + np.eye(traf.ntraf) * 1e9
     dist_sqrd = dist * dist
+    qdr = np.radians(np.array(qdr))
+    delta_x = dist * np.sin(qdr) * nm
+    delta_y = dist * np.cos(qdr) * nm
     delta_h = traf.alt.reshape((1, traf.ntraf)) \
         - traf.alt.reshape((1, traf.ntraf)).T
 
@@ -80,20 +83,22 @@ def resolve(asas, traf):
     va_tas = np.average(tas_matrix, axis=1, weights=Swarming)
     va_vs = np.average(vs_matrix, axis=1, weights=Swarming)
 
-    # # Calculate Flock Centering (FC) parameters
-    # dx_to_flock_center = np.average(delta_x, axis=1, weights=Swarming)
-    # dy_to_flock_center = np.average(delta_y, axis=1, weights=Swarming)
-    # dz_to_flock_center = np.average(alt_matrix, axis=1, weights=Swarming) - traf.alt
+    # Calculate Flock Centering (FC) parameters
+    delta_x_flock = np.ones((traf.ntraf, traf.ntraf)) * delta_x
+    delta_y_flock = np.ones((traf.ntraf, traf.ntraf)) * delta_y
+    dx_to_flock_center = np.average(delta_x_flock, axis=1, weights=Swarming)
+    dy_to_flock_center = np.average(delta_y_flock, axis=1, weights=Swarming)
+    dz_to_flock_center = np.average(alt_matrix, axis=1, weights=Swarming) - traf.alt
 
-    # fc_trk = np.degrees(np.arctan2(dx_to_flock_center, dy_to_flock_center))
-    # fc_tas = traf.tas
-    # ttoreach = np.sqrt(dx_to_flock_center**2 + dy_to_flock_center**2) / fc_tas
-    # fc_vs = np.where(ttoreach == 0, 0, dz_to_flock_center / ttoreach)
+    fc_trk = np.degrees(np.arctan2(dx_to_flock_center, dy_to_flock_center))
+    fc_tas = traf.tas
+    ttoreach = np.sqrt(dx_to_flock_center**2 + dy_to_flock_center**2) / fc_tas
+    fc_vs = np.where(ttoreach == 0, 0, dz_to_flock_center / ttoreach)
 
     # Combine parameter vectors into multidimensional arrays
-    tas_arr = np.array([ca_tas, va_tas])
-    trk_arr = np.array([ca_trk, va_trk])
-    vs_arr = np.array([ca_vs, va_vs])
+    tas_arr = np.array([ca_tas, va_tas, fc_tas])
+    trk_arr = np.array([ca_trk, va_trk, fc_trk])
+    vs_arr = np.array([ca_vs, va_vs, fc_vs])
     vx_arr = tas_arr * np.sin(np.radians(trk_arr))
     vy_arr = tas_arr * np.cos(np.radians(trk_arr))
 
