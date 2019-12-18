@@ -10,7 +10,7 @@ import numpy as np
 
 # Bluesky imports
 import bluesky as bs
-from bluesky.tools import geo
+from bluesky.tools import geo, areafilter
 from bluesky.tools.aero import nm, ft
 
 # Local imports
@@ -18,7 +18,7 @@ from . import MVP_alt
 
 
 def start(asas):
-    asas.swarm_min_radius = 5 * nm
+    asas.swarm_min_radius = 10 * nm
     asas.swarm_max_radius = 15 * nm
     asas.swarm_altitude = 1500 * ft  # [m]
     asas.swarm_weights = np.array([10, 3])

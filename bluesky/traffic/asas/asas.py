@@ -694,7 +694,8 @@ class ASAS(TrafficArrays):
 
     def resume_navigation(self):
         """
-
+        Decide whether to continue using ASAS resolution or start
+        following LNAV route again.
         """
         self.resume_navigation_old()
 
@@ -703,21 +704,26 @@ class ASAS(TrafficArrays):
                                                       bs.traf.lat,
                                                       bs.traf.lon,
                                                       bs.traf.alt)
-            id_in_swarming_area = [bs.traf.id[idx] for idxs in np.where(in_swarming_area) for idx in idxs] if np.any(in_swarming_area) else []
-
+            id_in_swarming_area = \
+                [bs.traf.id[idx] for idxs in np.where(in_swarming_area)
+                 for idx in idxs] if np.any(in_swarming_area) else []
             self.active = np.logical_or(self.active, in_swarming_area)
-            # Ugly piece of code to handle aircraft leaving the swarming area
-            if bs.traf.ntraf > 1: # dirty workaround to deal with first aircraft
-                id_exited_swarming_area = [ac_id for ac_id in self.prev_in_swarming_area if ac_id not in id_in_swarming_area]
-                idxs = [bs.traf.id2idx(ac_id) for ac_id in id_exited_swarming_area]
-                for idx in idxs:
-                    iwpid = bs.traf.ap.route[idx].findact(idx)
-                    if iwpid != -1:  # To avoid problems if there are no waypoints
-                        bs.traf.ap.route[idx].direct(
-                            idx, bs.traf.ap.route[idx].wpname[iwpid])
-                        print(f"{bs.traf.id[idx]} exiting swarming zone")
 
-            # For next timestep
+            # Handle aircraft leaving the swarming zone
+            if bs.traf.ntraf > 1: # dirty workaround to deal with first aircraft
+                id_exited_swarming_area = \
+                    [ac_id for ac_id in self.prev_in_swarming_area
+                     if ac_id not in id_in_swarming_area]
+                idxs = [bs.traf.id2idx(ac_id) for ac_id in id_exited_swarming_area]
+                # On exiting, set asas inactive and fly direct to destination
+                # waypoint. If the aircraft is in conflict ASAS will be
+                # reactivated in next timestep using normal MVP.
+                for idx in idxs:
+                    self.active[idx] = False
+                    bs.traf.ap.route[idx].direct(idx,
+                                                 bs.traf.ap.route[idx].wpname[3])
+
+            # Save for use in next timestep
             self.prev_in_swarming_area = id_in_swarming_area
 
 
