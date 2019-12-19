@@ -46,7 +46,7 @@ settings.set_variable_defaults(asas_dt=1.0,
                                asas_vmin=200.0,
                                asas_vmax=500.0)
 
-# Header for logfile written by ASAS module
+# Header for logfiles written by ASAS module
 ASASLOG_HEADER = ("simt [s], "
                   + "ac1, "
                   + "ac2, "

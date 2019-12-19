@@ -18,9 +18,15 @@ from . import MVP_alt
 
 
 def start(asas):
-    asas.swarm_min_radius = 10 * nm
-    asas.swarm_max_radius = 15 * nm
+    """ Set swarming parameters """
+
+    # Swarm inclusion parameters
+    asas.swarm_min_radius = 10 * nm  # [m]
+    asas.swarm_max_radius = 15 * nm  # [m]
     asas.swarm_altitude = 1500 * ft  # [m]
+    asas.swarm_trk_diff = 90  # [deg]
+
+    # Weights: [Collision Avoidance, Velocity Alignment, Flock Centering]
     asas.swarm_weights = np.array([10, 1, 0])
 
 
@@ -33,12 +39,12 @@ def resolve(asas, traf):
 
     # Use flat-earth approximation for qdr and distance calculation
     qdr, dist = geo.kwikqdrdist_matrix(np.mat(traf.lat), np.mat(traf.lon),
-                                     np.mat(traf.lat), np.mat(traf.lon))
-    dist = np.array(dist) * nm + np.eye(traf.ntraf) * 1e9
-    dist_sqrd = dist * dist
+                                       np.mat(traf.lat), np.mat(traf.lon))
     qdr = np.radians(np.array(qdr))
-    delta_x = dist * np.sin(qdr) * nm
-    delta_y = dist * np.cos(qdr) * nm
+    dist = np.array(dist) * nm
+    dist_sqrd = dist * dist
+    delta_x = dist * np.sin(qdr)
+    delta_y = dist * np.cos(qdr)
     delta_h = traf.alt.reshape((1, traf.ntraf)) \
         - traf.alt.reshape((1, traf.ntraf)).T
 
@@ -51,7 +57,7 @@ def resolve(asas, traf):
     ac_in_swarm_range = np.logical_and(dist_sqrd > asas.swarm_min_radius**2,
                                        dist_sqrd < asas.swarm_max_radius**2,
                                        np.abs(delta_h) < asas.swarm_altitude)
-    ac_in_swarm_direction = np.abs(delta_trk) < 90
+    ac_in_swarm_direction = np.abs(delta_trk) < asas.swarm_trk_diff
     ac_in_swarm = np.logical_and(ac_in_swarm_range, ac_in_swarm_direction)
     ac_own = np.eye(traf.ntraf, dtype='bool')
     Swarming = np.logical_or(ac_in_swarm, ac_own)
@@ -84,13 +90,11 @@ def resolve(asas, traf):
     va_vs = np.average(vs_matrix, axis=1, weights=Swarming)
 
     # Calculate Flock Centering (FC) parameters
-    delta_x_flock = np.ones((traf.ntraf, traf.ntraf)) * delta_x
-    delta_y_flock = np.ones((traf.ntraf, traf.ntraf)) * delta_y
-    dx_to_flock_center = np.average(delta_x_flock, axis=1, weights=Swarming)
-    dy_to_flock_center = np.average(delta_y_flock, axis=1, weights=Swarming)
+    dx_to_flock_center = np.average(delta_x, axis=1, weights=Swarming)
+    dy_to_flock_center = np.average(delta_y, axis=1, weights=Swarming)
     dz_to_flock_center = np.average(alt_matrix, axis=1, weights=Swarming) - traf.alt
 
-    fc_trk = np.degrees(np.arctan2(dx_to_flock_center, dy_to_flock_center))
+    fc_trk = np.degrees(np.arctan2(dx_to_flock_center, dy_to_flock_center)) % 360
     fc_tas = traf.tas
     ttoreach = np.sqrt(dx_to_flock_center**2 + dy_to_flock_center**2) / fc_tas
     fc_vs = np.where(ttoreach == 0, 0, dz_to_flock_center / ttoreach)
@@ -106,11 +110,11 @@ def resolve(asas, traf):
     swarm_gseast = np.average(vx_arr, axis=0, weights=asas.swarm_weights)
     swarm_gsnorth = np.average(vy_arr, axis=0, weights=asas.swarm_weights)
     swarm_hdg = np.degrees(np.arctan2(swarm_gseast, swarm_gsnorth)) % 360
+    swarm_tas = np.average(tas_arr, axis=0, weights=asas.swarm_weights)
     swarm_vs = np.average(vs_arr, axis=0, weights=asas.swarm_weights)
 
     # Cap the velocity
-    swarm_tas = np.average(tas_arr, axis=0, weights=asas.swarm_weights)
-    tas_arr = np.clip(swarm_tas, asas.vmin, asas.vmax)
+    swarm_tas = np.clip(swarm_tas, asas.vmin, asas.vmax)
 
     # Assign either swarming or MVP resolution
     new_hdg = np.where(ac_use_mvp, ca_trk, swarm_hdg) % 360
@@ -123,4 +127,3 @@ def resolve(asas, traf):
     asas.tas = new_tas
     asas.vs = new_vs
     asas.alt = new_alt
-    asas.swarm_active = ac_use_swarm
