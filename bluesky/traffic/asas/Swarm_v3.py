@@ -54,9 +54,9 @@ def resolve(asas, traf):
 
     # Apply swarming criteria (distance and direction) to find all aircraft
     # combinations for which swarming rules have to be applied
-    ac_in_swarm_range = np.logical_and(dist_sqrd > asas.swarm_min_radius**2,
-                                       dist_sqrd < asas.swarm_max_radius**2,
-                                       np.abs(delta_h) < asas.swarm_altitude)
+    ac_in_swarm_range = np.logical_and.reduce([dist_sqrd > asas.swarm_min_radius**2,
+                                               dist_sqrd < asas.swarm_max_radius**2,
+                                               np.abs(delta_h) < asas.swarm_altitude])
     ac_in_swarm_direction = np.abs(delta_trk) < asas.swarm_trk_diff
     ac_in_swarm = np.logical_and(ac_in_swarm_range, ac_in_swarm_direction)
     ac_own = np.eye(traf.ntraf, dtype='bool')
