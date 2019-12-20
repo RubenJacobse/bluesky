@@ -33,10 +33,6 @@ def start(asas):
 def resolve(asas, traf):
     """ Resolve conflicts using the swarming principle. """
 
-    # Check if ASAS is ON:
-    if not asas.swasas:
-        raise RuntimeError("This should not be happening...")
-
     # Use flat-earth approximation for qdr and distance calculation
     qdr, dist = geo.kwikqdrdist_matrix(np.mat(traf.lat), np.mat(traf.lon),
                                        np.mat(traf.lat), np.mat(traf.lon))
@@ -52,22 +48,33 @@ def resolve(asas, traf):
     delta_trk = traf.trk.reshape(1, traf.ntraf) - traf.trk.reshape(traf.ntraf, 1)
     delta_trk = (delta_trk + 180) % 360 - 180
 
-    # Apply swarming criteria (distance and direction) to find all aircraft
-    # combinations for which swarming rules have to be applied
+    # Calculate swarming criteria matrices with all aircraft combinations
     ac_in_swarm_range = np.logical_and.reduce([dist_sqrd > asas.swarm_min_radius**2,
                                                dist_sqrd < asas.swarm_max_radius**2,
                                                np.abs(delta_h) < asas.swarm_altitude])
     ac_in_swarm_direction = np.abs(delta_trk) < asas.swarm_trk_diff
-    ac_in_swarm = np.logical_and(ac_in_swarm_range, ac_in_swarm_direction)
-    ac_own = np.eye(traf.ntraf, dtype='bool')
-    Swarming = np.logical_or(ac_in_swarm, ac_own)
+    ac_in_swarm_zone = np.ones((traf.ntraf, traf.ntraf)) \
+                        * areafilter.checkInside("SWARMING_ZONE",
+                                                 bs.traf.lat,
+                                                 bs.traf.lon,
+                                                 bs.traf.alt)
+
+    # Determine which criteria to use in swarm calculations
+    include_ac_outside_zone = True
+    if include_ac_outside_zone:
+        criteria_list = [ac_in_swarm_range, ac_in_swarm_direction]
+    else:
+        criteria_list = [ac_in_swarm_range,
+                         ac_in_swarm_direction,
+                         ac_in_swarm_zone]
+
+    # Setup swarming matrix such that swarm calculations use
+    # the surrounding aircraft in the swarm as well as the ownship
+    ac_in_swarm = np.logical_and.reduce(criteria_list)
+    ac_ownship = np.eye(traf.ntraf, dtype='bool')
+    Swarming = np.logical_or(ac_in_swarm, ac_ownship)
 
     # For each aircraft determine whether they use swarming rules or mvp rules
-    ac_in_swarm_zone = areafilter.checkInside("SWARMING_ZONE",
-                                              bs.traf.lat,
-                                              bs.traf.lon,
-                                              bs.traf.alt)
-    ac_use_swarm = np.logical_and(np.any(ac_in_swarm, axis=0), ac_in_swarm_zone)
     ac_use_mvp = np.logical_and(np.any(np.logical_not(ac_in_swarm_range),
                                        axis=0),
                                 asas.inconf)
