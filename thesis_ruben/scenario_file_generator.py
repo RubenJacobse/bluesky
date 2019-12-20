@@ -49,7 +49,7 @@ AC_SPD_STDDEV = 5  # [kts] Standard deviation of cruise speed distributions
 # is defined by a fixed simulation time period.
 SCEN_AC_MODE = "RUNTIME"  # "TOT_AC"
 SCEN_TOT_AC = 50  # Total number of aircraft in the scenario
-SCEN_RUNTIME = 18000  # Scenario run duration in seconds
+SCEN_RUNTIME = 10800  # Scenario run duration in seconds
 
 
 class ScenarioGenerator():

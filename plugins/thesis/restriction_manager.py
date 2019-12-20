@@ -533,7 +533,7 @@ class AreaRestrictionManager(TrafficArrays):
 
             self.time_to_intrusion[area_idx, ac_idx] = t_int
 
-            if not t_int == -1:
+            if bs.sim.simt >= 1800 and bs.sim.simt <= 9000 and not t_int == -1:
                 self.area_conf_logger.log(bs.traf.id[ac_idx],
                                           self.area_ids[area_idx],
                                           int(t_int),

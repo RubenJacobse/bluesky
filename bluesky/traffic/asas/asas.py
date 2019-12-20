@@ -635,7 +635,7 @@ class ASAS(TrafficArrays):
         self.lospairs_unique = lospairs_unique
 
         # Update conflict and los tracker variables
-        if bs.sim.simt >= 1800 and bs.sim.simt <= 16200:
+        if bs.sim.simt >= 1800 and bs.sim.simt <= 9000:
             for pair in confpairs_unique:
                 if pair not in self.conf_tracker.keys():
                     self.conf_tracker[pair] = {"duration": 1}
@@ -657,7 +657,7 @@ class ASAS(TrafficArrays):
 
         # Pairs that are no longer in conflict or los are logged
         # and deleted from the tracker dictionaries
-        if bs.sim.simt >= 1800 and bs.sim.simt <= 16200:
+        if bs.sim.simt >= 1800 and bs.sim.simt <= 9000:
             for pair in list(self.conf_tracker.keys()):
                 if pair not in confpairs_unique:
                     self.conf_logger.log(tuple(pair)[0],

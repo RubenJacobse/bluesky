@@ -154,7 +154,7 @@ class Area(TrafficArrays):
                                             traf.ap.route[ac_idx].wplon[-1])
 
                 if (self.create_time[ac_idx] >= 1800
-                      and self.create_time[ac_idx] <= 16200):
+                      and self.create_time[ac_idx] <= 9000):
                     self.logger.log(
                         f"{traf.id[ac_idx]}",
                         f"{self.create_time[ac_idx]}",
