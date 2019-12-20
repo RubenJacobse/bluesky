@@ -30,15 +30,15 @@ import scenario_config
 
 # BlueSky simulator settings
 SIM_TIME_STEP = 0.1  # [s] Simulation time step
-SIM_SHOW_TRAILS = True  # Plot trails in the radar window
+SIM_SHOW_TRAILS = False  # Plot trails in the radar window
 
 # Area restriction settings
-CENTER_LAT = 0.0  # [deg]
-CENTER_LON = 0.0  # [deg]
+CENTER_LAT = 0.0  # [deg] Scenario area center latitude
+CENTER_LON = 0.0  # [deg] Scenario area center longitude
+AREA_RADIUS = 100  # [NM] Scenario area radius
 PLUGIN_NAME = "RAA"
 AREA_LOOKAHEAD_TIME = 120  # [s] Look-ahead time used to detect area conflicts
 RMETHH = "BOTH"  # Horizontal resolution method, allow both spd and hdg changes
-AREA_RADIUS = 100  # [NM]
 
 # Aircraft creation settings
 AC_TYPES = ["A320", "B738", "A333", "B744"]
@@ -395,18 +395,18 @@ class ScenarioGenerator():
         """
 
         angle = self.ac_creation_arc_angle_range
-        ac_spd = 280  # [kts] Speed
 
         # Minimum distance and time differences at creation
         min_dist = 6  # [nm]
+        ac_spd = 411  # [kts] Lowest possible ground speed in scenario (B738)
         min_dt = min_dist / ac_spd * 3600  # [s]
 
         num_created_ac = 0
         while ((SCEN_AC_MODE == "TOT_AC" and num_created_ac < SCEN_TOT_AC)
                or (SCEN_AC_MODE == "RUNTIME")):
             # while num_created_ac < SCEN_TOT_AC:
-            # Will be set True if creation results in a conflict
-            in_conflict_at_creation = False
+            # Will be set True if creation results in a loss of separation
+            in_los_at_creation = False
 
             # Create an aircraft at random time and position
             prev_time = self.aircraft_list[-1]["time"] if num_created_ac else 0
@@ -454,16 +454,16 @@ class ScenarioGenerator():
 
                 for time_diff, dist_diff in zip(time_diff_list, dist_diff_list):
                     # Either time OR distance difference must be smaller than
-                    # the minimum value; if not: the aircraft is in conflict
+                    # the minimum value; if not: the aircraft is in LoS
                     if not (((dist_diff < min_dist) and (time_diff > min_dt))
                             or ((dist_diff > min_dist) and (time_diff < min_dt))
                             or ((dist_diff > min_dist) and (time_diff > min_dt))):
-                        in_conflict_at_creation = True
+                        in_los_at_creation = True
                         break
 
-                # If the current aircraft is in conflict, continue the
+                # If the current aircraft is in LoS, continue the
                 # while loop and try another random creation.
-                if in_conflict_at_creation:
+                if in_los_at_creation:
                     continue
 
             # Store the current aircraft as a dictionary in the aircraft list
@@ -530,7 +530,7 @@ class ScenarioGenerator():
             scnfile.write(zero_time + "TRAIL {}"
                           .format("ON" if SIM_SHOW_TRAILS else "OFF"))
             scnfile.write(zero_time + "SWRAD SYM")
-            scnfile.write(zero_time + "SWRAD LABEL 0")
+            scnfile.write(zero_time + "SWRAD LABEL 1")
             scnfile.write(zero_time + "SWRAD WPT")
             scnfile.write(zero_time + "SWRAD SAT")
             scnfile.write(zero_time + "SWRAD APT")
