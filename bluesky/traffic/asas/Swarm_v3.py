@@ -27,7 +27,7 @@ def start(asas):
     asas.swarm_trk_diff = 90  # [deg]
 
     # Weights: [Collision Avoidance, Velocity Alignment, Flock Centering]
-    asas.swarm_weights = np.array([10, 1, 0])
+    asas.swarm_weights = np.array([20, 1, 0])
 
 
 def resolve(asas, traf):
