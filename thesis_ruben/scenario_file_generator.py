@@ -14,7 +14,7 @@ import random
 import datetime
 
 # Third party imports
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, JOIN_STYLE
 
 # Enable BlueSky imports by adding the project folder to the path
 sys.path.append(os.path.abspath(os.path.join('..')))
@@ -84,16 +84,21 @@ class ScenarioGenerator():
         # random numbers are used.
         random.seed(self.random_seed)
 
-        # Calculate airspace restriction, corridor, and geovector parameters
+        # Calculate all geometric parameters
         self.airspace_restrictions = []
+        self.geovectors = []
+        self.corridor = {}
+        self.polygons = {}
+
         self.create_airspace_restriction("LEFT")
         self.create_airspace_restriction("RIGHT")
-
-        self.corridor = {}
         self.calculate_corridor_parameters()
-
-        self.geovectors = []
-        self.create_geovectors()
+        self.create_polygons()
+        if "GV" in self.resolution_method:
+            self.create_geovectors()
+        self.swarm_zones = []
+        if "SWARM-V3" in self.resolution_method:
+            self.create_swarm_zones()
 
         # Create aircraft and store for further use
         self.set_ac_creation_intervals()
@@ -234,15 +239,74 @@ class ScenarioGenerator():
         area["midpoint_str"] = f"{midpoint_lat:.6f},{midpoint_lon:.6f}"
         self.airspace_restrictions.append(area)
 
+    def create_polygons(self):
+        """
+        Create a number of relevant shapely polygons that can be
+        used as basis for geovector areas or swarming zones.
+        """
+
+        # Experiment area
+        ring_radius = 100  # [NM]
+        ring_coords = [bsgeo.qdrpos(CENTER_LAT, CENTER_LON, angle, ring_radius)
+                       for angle in range(0, 360)]
+        ring_poly = Polygon(ring_coords)
+        self.polygons["experiment_area"] = ring_poly
+
+        # Left-side airspace restriction
+        left_area = self.airspace_restrictions[0]
+        left_coords = [left_area["inner_top"], left_area["inner_bottom"],
+                       left_area["outer_bottom"], left_area["outer_top"]]
+        left_poly = Polygon(left_coords).intersection(ring_poly)
+        self.polygons["left_restriction"] = left_poly
+        self.airspace_restrictions[0]["poly"] = left_poly
+
+        # Right-side airspace restriction
+        right_area = self.airspace_restrictions[1]
+        right_coords = [right_area["inner_top"], right_area["inner_bottom"],
+                        right_area["outer_bottom"], right_area["outer_top"]]
+        right_poly = Polygon(right_coords).intersection(ring_poly)
+        self.polygons["right_restriction"] = right_poly
+        self.airspace_restrictions[1]["poly"] = right_poly
+
+        # Corridor rectangular area
+        corridor_coords = [(self.corridor["south_lat"],
+                            self.corridor["left_lon"]),
+                           (self.corridor["south_lat"],
+                            self.corridor["right_lon"]),
+                           (self.corridor["north_lat"],
+                            self.corridor["right_lon"]),
+                           (self.corridor["north_lat"],
+                            self.corridor["left_lon"])]
+        corridor_poly = Polygon(corridor_coords)
+        self.polygons["corridor"] = corridor_poly
+
+        # Coordinates of wedge shaped merging area
+        # First find bounding box using corridor south latitude and
+        # experiment area bounds
+        (min_lat, min_lon, max_lat, max_lon) = ring_poly.bounds
+        merge_box_coords = [(self.corridor["south_lat"], min_lon),
+                            (min_lat, min_lon),
+                            (min_lat, max_lon),
+                            (self.corridor["south_lat"], max_lon)]
+        merge_box_poly = Polygon(merge_box_coords)
+        merge_circle_poly = merge_box_poly.intersection(ring_poly)
+        wedge_poly = merge_circle_poly.difference(left_poly).difference(right_poly)
+        # Use Polygon.buffer() to fix potential slivers
+        wedge_poly = wedge_poly \
+                        .buffer(0.0001, 1, join_style=JOIN_STYLE.mitre) \
+                        .buffer(-0.0001, 1, join_style=JOIN_STYLE.mitre)
+        self.polygons["merge_wedge"] = Polygon(wedge_poly)
+
+        # Corwedge polygon: union of merge wedge and corridor area
+        corwedge_poly = wedge_poly.union(corridor_poly)
+        self.polygons["corwedge"] = Polygon(corwedge_poly)
+
     def create_geovectors(self):
         """
         If required, creates all geovector restrictions for the scenario.
 
         NOTE: Currently only creates a single geovector area!
         """
-
-        if not self.resolution_method.startswith("GV"):
-            return
 
         # Set up the dictionary, relevant values will be overwritten depending
         # on the type of geovector that will be used
@@ -253,53 +317,18 @@ class ScenarioGenerator():
                      "crs_min": "",
                      "crs_max": ""}
 
-        # Coordinates of corridor rectangular area
-        corridor_tuples = [(self.corridor["south_lat"],
-                            self.corridor["left_lon"]),
-                           (self.corridor["south_lat"],
-                            self.corridor["right_lon"]),
-                           (self.corridor["north_lat"],
-                            self.corridor["right_lon"]),
-                           (self.corridor["north_lat"],
-                            self.corridor["left_lon"])]
-        corridor_poly = Polygon(corridor_tuples)
-        corridor_coords = [x for (lat, lon) in corridor_tuples
-                           for x in (lat, lon)]
-
-        # Coordinates of circular area
-        ring_radius = self.corridor_length/2 + 30
-        ring_tuples = [bsgeo.qdrpos(CENTER_LAT,
-                                    CENTER_LON,
-                                    angle,
-                                    ring_radius)
-                       for angle in range(0, 360)]
-        ring_poly = Polygon(ring_tuples)
-        ring_coords = [x for (lat, lon) in ring_tuples for x in (lat, lon)]
-
-        # Coordinates of wedge shaped area
-        merge_area = [self.airspace_restrictions[0]["inner_bottom"],
-                      self.airspace_restrictions[0]["outer_bottom"],
-                      self.airspace_restrictions[1]["outer_bottom"],
-                      self.airspace_restrictions[1]["inner_bottom"]]
-        merge_area_poly = Polygon(merge_area)
-        wedge_poly = ring_poly.intersection(merge_area_poly)
-        wedge_coords = [x for (lat, lon) in wedge_poly.exterior.coords
-                        for x in (lat, lon)]
-
-        # Coordinates of (wedge, corridor) union
-        cor_wedge_poly = wedge_poly.union(corridor_poly)
-        cor_wedge_coords = [x for (lat, lon) in cor_wedge_poly.exterior.coords
-                            for x in (lat, lon)]
-
         # Set the geo vector coordinates
         if "CORRIDOR" in self.resolution_method:
-            geovector["coords"] = corridor_coords
+            gv_poly = self.polygons["corridor"]
         elif "CIRCLE" in self.resolution_method:
-            geovector["coords"] = ring_coords
+            gv_poly = self.polygons["ring"]
         elif "WEDGE" in self.resolution_method:
-            geovector["coords"] = wedge_coords
+            gv_poly = self.polygons["merge_wedge"]
         elif "CORWEDGE" in self.resolution_method:
-            geovector["coords"] = cor_wedge_coords
+            gv_poly = self.polygons["corwedge"]
+
+        geovector["coords"] = [x for (lat, lon) in gv_poly.exterior.coords
+                               for x in (lat, lon)]
 
         # A two dimensional geovector can restrict ground speed and/or course
         gs_min_cas = 260  # [kts]
@@ -324,6 +353,13 @@ class ScenarioGenerator():
             geovector["crs_max"] = crs_max
 
         self.geovectors.append(geovector)
+
+    def create_swarm_zones(self):
+        """
+        Create
+        """
+
+        self.swarm_zones.append(self.polygons["corwedge"])
 
     def calculate_corridor_parameters(self):
         """
@@ -536,14 +572,6 @@ class ScenarioGenerator():
             scnfile.write(zero_time + "SWRAD APT")
             scnfile.write(zero_time + "FF")
 
-            scnfile.write("\n\n# Setup circular experiment area and activate"
-                          + " it as a traffic area in BlueSky")
-            scnfile.write(zero_time + "PLUGINS LOAD AREA")
-            scnfile.write(zero_time + "CIRCLE EXPERIMENT {},{},{}"
-                          .format(CENTER_LAT, CENTER_LON, AREA_RADIUS))
-            scnfile.write(zero_time + "AREA EXPERIMENT")
-            scnfile.write(zero_time + "COLOR EXPERIMENT 0,128,0")
-
             scnfile.write("\n\n# Setup BlueSky ASAS module options")
             scnfile.write(zero_time + "ASAS ON")
             if self.resolution_method.startswith("GV"):
@@ -552,27 +580,52 @@ class ScenarioGenerator():
                 scnfile.write(zero_time + f"RESO {self.resolution_method}")
             scnfile.write(zero_time + f"RMETHH {RMETHH}")
 
+            # Experiment area
+            scnfile.write("\n\n# Setup circular experiment area and activate"
+                          + " it as a traffic area in BlueSky")
+            scnfile.write(zero_time + "PLUGINS LOAD AREA")
+            coords = [x for (lat, lon)
+                      in self.polygons["experiment_area"].exterior.coords
+                      for x in (lat, lon)]
+            coords_str = ",".join(str(f"{x:.6f}") for x in coords)
+            scnfile.write(zero_time + f"POLY EXPERIMENT {coords_str}")
+            scnfile.write(zero_time + "AREA EXPERIMENT")
+            scnfile.write(zero_time + "COLOR EXPERIMENT 0,128,0")
+
             # Restricted airspaces
             scnfile.write("\n\n# LOAD RAA plugin and create area restrictions")
             scnfile.write(zero_time + f"PLUGINS LOAD {PLUGIN_NAME}")
             scnfile.write(zero_time + f"RAALOG {self.timestamp}")
             scnfile.write(zero_time + f"RAACONF {AREA_LOOKAHEAD_TIME}")
-
             for idx, area in enumerate(self.airspace_restrictions):
-                scnfile.write(zero_time + f"RAA RAA{idx + 1},ON,"
-                              + f"{area['coord_str']}")
+                coords = [x for (lat, lon) in area["poly"].exterior.coords
+                          for x in (lat, lon)]
+                coords_str = ",".join(str(f"{x:.6f}") for x in coords)
+                # scnfile.write(zero_time + f"RAA RAA{idx + 1},ON,"
+                #               + f"{area['coord_str']}")
+                scnfile.write(zero_time + f"RAA RAA{idx + 1},ON,{coords_str}")
                 scnfile.write(zero_time + f"COLOR RAA{idx + 1},164,0,0")
                 scnfile.write(zero_time + f"DEFWPT RAA_{idx + 1},"
                               + f"{area['midpoint_str']},FIX")
 
-            # Geovectors (skip if no geovectors are defined)
+            # Swarming zones (skipped if no swarming zones are defined)
+            if self.swarm_zones:
+                scnfile.write("\n\n# Create SWARMING zone(s)")
+            for swarm_zone in self.swarm_zones:
+                coords = [x for (lat, lon)
+                          in swarm_zone.exterior.coords
+                          for x in (lat, lon)]
+                coords_str = ",".join(str(f"{x:.6f}") for x in coords)
+                scnfile.write(zero_time + f"POLY SWARMING_ZONE {coords_str}")
+                scnfile.write(zero_time + "COLOR SWARMING_ZONE 255,255,255")
+
+            # Geovectors (skipped if no geovectors are defined)
             if self.geovectors:
                 scnfile.write("\n\n# Create GEOVECTOR area(s)")
             for geovector in self.geovectors:
-                coords = geovector["coords"]
-                coord_str = ",".join(str(f"{x:.6f}") for x in coords)
-                area_str = f"POLY {geovector['name']} {coord_str}"
-
+                gv_coords = geovector["coords"]
+                gv_coord_str = ",".join(str(f"{x:.6f}") for x in gv_coords)
+                area_str = f"POLY {geovector['name']} {gv_coord_str}"
                 scnfile.write(zero_time + area_str)
                 scnfile.write(zero_time + (f"COLOR {geovector['name']},"
                                            + "102,178,255"))
