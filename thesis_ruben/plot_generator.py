@@ -520,27 +520,29 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             ymax = df[column].max()
             yrange = df[column].max() - df[column].min()
 
+            # Set resolution method plotting orders
+            reso_methods = ["OFF", "MVP", "LF", "LFFT", "SWARM", "SWARM-V3",
+                            "GV-SPD", "GV-CRS", "GV-BOTH"]
+            reso_order = [method for method in reso_methods
+                          if method in df["resolution method"].unique()]
+            level_order = df["traffic level"].unique().sort()
+            num_levels = df["traffic level"].nunique()
+
+            # Make figure
             plt.figure(figsize=(16, 9))
             ax = self.create_plot(x="resolution method",
                                   y=column,
                                   data=df,
-                                  #   For OFF,MVP only runs
-                                  #   order=["OFF", "MVP"],
-                                  # For full run
-                                  order=["OFF", "MVP", "LF", "LFFT", "SWARM-V2",
-                                         "GV-CORRIDOR-SPD", "GV-CORRIDOR-CRS",
-                                         "GV-CORRIDOR-BOTH"],
+                                  order=reso_order,
                                   hue="traffic level",
-                                  hue_order=["LOW", "MID", "HIGH"],
+                                  hue_order=level_order,
                                   linewidth=0.5,
                                   palette="Blues")
             plt.ticklabel_format(axis="y", style="sci", scilimits=(0, 4))
-            ax.legend(loc="lower center", ncol=3, bbox_to_anchor=(0.5, 1))
-            # # For OFF,MVP only runs
-            # ax.set(xticklabels=["OFF", "MVP"])
-            # For full run
-            ax.set(xticklabels=["OFF", "MVP", "LF", "LF+FT", "SWARM",
-                                "GV-SPD", "GV-CRS", "GV-BOTH"])
+            ax.legend(loc="lower center",
+                      ncol=num_levels,
+                      bbox_to_anchor=(0.5, 1))
+            ax.set(xticklabels=reso_order)
             yminplot = ymin - 0.05 * yrange
             ymaxplot = ymax + 0.05 * yrange
             ax.set_ylim(yminplot, ymaxplot)
