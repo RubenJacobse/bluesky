@@ -16,10 +16,6 @@ def start(asas):
 def resolve(asas, traf):
     """ Resolve all current conflicts """
 
-    # Check if ASAS is ON first!
-    if not asas.swasas:
-        return
-
     # Initialize an array to store the resolution velocity vector for all A/C
     delta_v = np.zeros((traf.ntraf, 3))
 
@@ -143,12 +139,8 @@ def resolve(asas, traf):
     asas.alt = asas.alt*(1-asas.swresohoriz) + traf.selalt*asas.swresohoriz
 
 
-#======================= Modified Voltage Potential ===========================
-
-
 def MVP(traf, asas, qdr, dist, tcpa, tLOS, id1, id2):
     """Modified Voltage Potential (MVP) resolution method"""
-    # Preliminary calculations-------------------------------------------------
 
     # Convert qdr from degrees to radians
     qdr = np.radians(qdr)

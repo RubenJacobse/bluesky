@@ -62,7 +62,7 @@ def resolve(asas, traf):
                 # Since cooperative, the vertical resolution component can be
                 # halved, and then dv_mvp can be added
                 dv_mvp[2] = 0.5 * dv_mvp[2]
-                delta_v[idx1] = delta_v[idx1] - dv_mvp
+                delta_v[idx1] -= dv_mvp
 
     # Determine new speed and limit resolution direction for all aicraft-------
 
@@ -183,8 +183,8 @@ def MVP(traf, asas, qdr, dist, tcpa, tLOS, id1, id2):
 
     # Compute the resolution velocity vector in horizontal direction
     # abs(tcpa) because it bcomes negative during intrusion
-    dv1 = (iH*dcpa[0])/(abs(tcpa)*dabsH)
-    dv2 = (iH*dcpa[1])/(abs(tcpa)*dabsH)
+    dv1 = (iH * dcpa[0]) / (abs(tcpa) * dabsH)
+    dv2 = (iH * dcpa[1]) / (abs(tcpa) * dabsH)
 
     # If intruder is outside the ownship PZ, then apply extra factor
     # to make sure that resolution does not graze IPZ
