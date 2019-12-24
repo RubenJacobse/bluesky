@@ -434,30 +434,33 @@ class FLSTLogOccurrenceParser(LogListParser):
         outputlines = []
         for row in log_data:
             del_time = float(row[0])
-            ac_id = row[1]
             spawn_time = float(row[2])
-            flight_time = float(row[3])
-            nominal_dist = float(row[4])
-            actual_dist = float(row[5])
-            dist_to_last_wp = float(row[6])
-            time_in_conf = float(row[9])
-            time_in_los = float(row[10])
-            num_tot_conf = int(row[11])
-            num_tot_los = int(row[12])
 
             # Do not log if outside logging interval
             if (spawn_time < T_LOG_INTERVAL_START
                     or del_time > T_LOG_INTERVAL_END):
                 continue
 
+            ac_id = row[1]
+            flight_time = float(row[3])
+            nominal_dist = float(row[4])
+            actual_dist = float(row[5])
+            dist_to_last_wp = float(row[6])
+            time_in_conf = float(row[9])
+            time_in_los = float(row[10])
+            time_in_reso = float(row[11])
+            num_tot_conf = int(row[12])
+            num_tot_los = int(row[13])
+
             route_efficiency = nominal_dist / (actual_dist + dist_to_last_wp)
             perc_time_in_conf = time_in_conf / flight_time * 100
             perc_time_in_los = time_in_los / flight_time * 100
+            perc_time_in_reso = time_in_reso / flight_time * 100
 
             line = (f"{geometry},{reso_method},{traffic_level},{scenario},"
                     + f"{ac_id},{route_efficiency:0.3f},"
-                    + f"{perc_time_in_conf:0.3f},{perc_time_in_los:0.3f}"
-                    + f"{num_tot_conf},{num_tot_los}")
+                    + f"{perc_time_in_conf:0.3f},{perc_time_in_los:0.3f},"
+                    + f"{perc_time_in_reso:0.3f},{num_tot_conf},{num_tot_los}")
             outputlines.append(line)
 
         self.write_lines_to_output_file(outputlines)
@@ -465,7 +468,7 @@ class FLSTLogOccurrenceParser(LogListParser):
     def set_header(self):
         self.header = ("geometry,resolution method,traffic level,scenario,"
                        + "ac id,route efficiency [-],t in conf [%],t in los [%],"
-                       + "num tot conf [-],num tot los [-]")
+                       + "t in reso [%],num tot conf [-],num tot los [-]")
 
 
 class FLSTLogSummaryParser(LogListParser):

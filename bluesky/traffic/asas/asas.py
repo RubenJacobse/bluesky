@@ -111,6 +111,7 @@ class ASAS(TrafficArrays):
             self.inlos = np.array([], dtype=bool)  # In loss of separation flag
             self.tot_time_inconf = np.array([])  # Total time spent in conflict
             self.tot_time_inlos = np.array([])  # Total time spent in LoS
+            self.tot_time_inreso = np.array([])  # Total time spent in resolutions
             self.num_tot_conf = np.array([])  # Total number of conflicts
             self.num_tot_los = np.array([])  # Total number of LoS
             self.tcpamax = np.array([])  # Maximum time to CPA for aircraft in conflict
@@ -621,6 +622,7 @@ class ASAS(TrafficArrays):
         # Update conflict and resolution time counts
         self.tot_time_inconf += self.inconf
         self.tot_time_inlos += self.inlos
+        self.tot_time_inreso += self.active
 
         # Conflict resolution only if there are conflicts or if swarming /
         # leader-following with follow through is used (does not require a

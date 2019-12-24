@@ -501,6 +501,10 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
                                     "t_in_los")
             self.make_single_figure(geometry,
                                     df_geometry,
+                                    "t in reso [%]",
+                                    "t_in_reso")
+            self.make_single_figure(geometry,
+                                    df_geometry,
                                     "num tot conf [-]",
                                     "conf_per_ac")
             self.make_single_figure(geometry,

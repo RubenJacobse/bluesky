@@ -29,6 +29,9 @@ header = \
     #  + "Heading [deg], "
      + "Time in conflict [s], "
      + "Time in LoS [s], "
+     + "Time in resolution [s], "
+     + "Num conflicts [-],"
+     + "Num LoS [-]"
      # + "Origin Lat [deg], "
      # + "Origin Lon [deg], "
      # + "Destination Lat [deg], "
@@ -174,6 +177,7 @@ class Area(TrafficArrays):
                         # f"{traf.hdg[ac_idx]:.0f}",
                         f"{traf.asas.tot_time_inconf[ac_idx]:.0f}",
                         f"{traf.asas.tot_time_inlos[ac_idx]:.0f}",
+                        f"{traf.asas.tot_time_inreso[ac_idx]:.0f}",
                         f"{traf.asas.num_tot_conf[ac_idx]}",
                         f"{traf.asas.num_tot_los[ac_idx]}",
                         # traf.ap.origlat[ac_idx],
