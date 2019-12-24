@@ -499,6 +499,14 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
                                     df_geometry,
                                     "t in los [%]",
                                     "t_in_los")
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "num tot conf [-]",
+                                    "conf_per_ac")
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "num tot los [-]",
+                                    "los_per_ac")
 
             # Make figures based on data in flstlog_occurence.csv
             df = pd.read_csv(os.path.join(self.batch_dir,

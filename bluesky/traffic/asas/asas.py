@@ -108,9 +108,11 @@ class ASAS(TrafficArrays):
         with RegisterElementParameters(self):
             # ASAS info per aircraft:
             self.inconf = np.array([], dtype=bool)  # In-conflict flag
-            self.inlos = np.array([], dtype=bool) # In loss of separation flag
+            self.inlos = np.array([], dtype=bool)  # In loss of separation flag
             self.tot_time_inconf = np.array([])  # Total time spent in conflict
-            self.tot_time_inlos = np.array([]) # Total time spent in LoS
+            self.tot_time_inlos = np.array([])  # Total time spent in LoS
+            self.num_tot_conf = np.array([])  # Total number of conflicts
+            self.num_tot_los = np.array([])  # Total number of LoS
             self.tcpamax = np.array([])  # Maximum time to CPA for aircraft in conflict
             self.active = np.array([], dtype=bool)  # whether the autopilot follows ASAS or not
             self.trk = np.array([])  # heading provided by the ASAS [deg]
@@ -646,6 +648,8 @@ class ASAS(TrafficArrays):
             for pair in confpairs_unique:
                 if pair not in self.conf_tracker.keys():
                     self.conf_tracker[pair] = {"duration": 1}
+                    self.num_tot_conf[bs.traf.id2idx(pair[0])] += 1
+                    self.num_tot_conf[bs.traf.id2idx(pair[1])] += 1
                 else:
                     self.conf_tracker[pair]["duration"] += 1
 
@@ -655,6 +659,8 @@ class ASAS(TrafficArrays):
                 if pair not in self.los_tracker.keys():
                     self.los_tracker[pair] = {"duration": 1,
                                               "severity": severity}
+                    self.num_tot_los[bs.traf.id2idx(pair[0])] += 1
+                    self.num_tot_los[bs.traf.id2idx(pair[1])] += 1
                 else:
                     self.los_tracker[pair]["duration"] += 1
                     if severity < self.los_tracker[pair]["severity"]:

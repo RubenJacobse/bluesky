@@ -442,6 +442,8 @@ class FLSTLogOccurrenceParser(LogListParser):
             dist_to_last_wp = float(row[6])
             time_in_conf = float(row[9])
             time_in_los = float(row[10])
+            num_tot_conf = int(row[11])
+            num_tot_los = int(row[12])
 
             # Do not log if outside logging interval
             if (spawn_time < T_LOG_INTERVAL_START
@@ -454,14 +456,16 @@ class FLSTLogOccurrenceParser(LogListParser):
 
             line = (f"{geometry},{reso_method},{traffic_level},{scenario},"
                     + f"{ac_id},{route_efficiency:0.3f},"
-                    + f"{perc_time_in_conf:0.3f},{perc_time_in_los:0.3f}")
+                    + f"{perc_time_in_conf:0.3f},{perc_time_in_los:0.3f}"
+                    + f"{num_tot_conf},{num_tot_los}")
             outputlines.append(line)
 
         self.write_lines_to_output_file(outputlines)
 
     def set_header(self):
         self.header = ("geometry,resolution method,traffic level,scenario,"
-                       + "ac id,route efficiency [-],t in conf [%],t in los [%]")
+                       + "ac id,route efficiency [-],t in conf [%],t in los [%],"
+                       + "num tot conf [-],num tot los [-]")
 
 
 class FLSTLogSummaryParser(LogListParser):

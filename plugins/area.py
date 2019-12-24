@@ -174,6 +174,8 @@ class Area(TrafficArrays):
                         # f"{traf.hdg[ac_idx]:.0f}",
                         f"{traf.asas.tot_time_inconf[ac_idx]:.0f}",
                         f"{traf.asas.tot_time_inlos[ac_idx]:.0f}",
+                        f"{traf.asas.num_tot_conf[ac_idx]}",
+                        f"{traf.asas.num_tot_los[ac_idx]}",
                         # traf.ap.origlat[ac_idx],
                         # traf.ap.origlon[ac_idx],
                         # traf.ap.destlat[ac_idx],
