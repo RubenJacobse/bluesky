@@ -437,10 +437,11 @@ class ScenarioGenerator():
         ac_spd = 411  # [kts] Lowest possible ground speed in scenario (B738)
         min_dt = min_dist / ac_spd * 3600  # [s]
 
+        # Generate all aircraft using either a fixed total number or a fixed
+        # time interval.
         num_created_ac = 0
         while ((SCEN_AC_MODE == "TOT_AC" and num_created_ac < SCEN_TOT_AC)
                or (SCEN_AC_MODE == "RUNTIME")):
-            # while num_created_ac < SCEN_TOT_AC:
             # Will be set True if creation results in a loss of separation
             in_los_at_creation = False
 
@@ -487,7 +488,7 @@ class ScenarioGenerator():
                                              aircraft["dep_lon"],
                                              curr_lat, curr_lon))
                              for aircraft in self.aircraft_list
-                             if curr_time - aircraft["time"] < min_dt]
+                             if (curr_time - aircraft["time"]) < min_dt]
 
                 for (time_diff, dist_diff) in diff_list:
                     # Either time OR distance difference must be larger than
@@ -600,8 +601,6 @@ class ScenarioGenerator():
                 coords = [x for (lat, lon) in area["poly"].exterior.coords
                           for x in (lat, lon)]
                 coords_str = ",".join(str(f"{x:.6f}") for x in coords)
-                # scnfile.write(zero_time + f"RAA RAA{idx + 1},ON,"
-                #               + f"{area['coord_str']}")
                 scnfile.write(zero_time + f"RAA RAA{idx + 1},ON,{coords_str}")
                 scnfile.write(zero_time + f"COLOR RAA{idx + 1},164,0,0")
                 scnfile.write(zero_time + f"DEFWPT RAA_{idx + 1},"
