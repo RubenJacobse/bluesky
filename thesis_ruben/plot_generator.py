@@ -454,7 +454,7 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             # self.make_single_figure(geometry,
             #                         df_LoS_sev,
             #                         "conflict duration [s]",
-            #                         "los_conflict_duration")
+            #                         "los_duration")
             self.make_single_figure(geometry,
                                     df_LoS_sev,
                                     "LoS severity [-]",
@@ -491,10 +491,14 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
                                     df_geometry,
                                     "route efficiency [-]",
                                     "efficiency")
-            # self.make_single_figure(geometry,
-            #                         df_geometry,
-            #                         "work [GJ]",
-            #                         "work")
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "t in conf [%]",
+                                    "t_in_conf")
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "t in los [%]",
+                                    "t_in_los")
 
             # Make figures based on data in flstlog_occurence.csv
             df = pd.read_csv(os.path.join(self.batch_dir,
@@ -521,8 +525,8 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             yrange = df[column].max() - df[column].min()
 
             # Set resolution method plotting orders
-            reso_methods = ["OFF", "MVP", "LF", "LFFT", "SWARM", "SWARM-V3",
-                            "GV-SPD", "GV-CRS", "GV-BOTH"]
+            reso_methods = ["OFF", "MVP", "EBY", "LF", "LFFT", "SWARM",
+                            "SWARM-V3", "GV-SPD", "GV-CRS", "GV-BOTH"]
             reso_order = [method for method in reso_methods
                           if method in df["resolution method"].unique()]
             level_order = df["traffic level"].unique().sort()

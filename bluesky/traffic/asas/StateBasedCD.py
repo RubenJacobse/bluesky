@@ -35,13 +35,14 @@ def detect(ownship, intruder, RPZ, HPZ, tlookahead):
     intu = intruder.gs * np.sin(inttrkrad).reshape((1, ownship.ntraf))  # m/s
     intv = intruder.gs * np.cos(inttrkrad).reshape((1, ownship.ntraf))  # m/s
 
+    # Calculate relative velocities
     du = ownu - intu.T  # Speed du[i,j] is perceived eastern speed of i to j
     dv = ownv - intv.T  # Speed dv[i,j] is perceived northern speed of i to j
-
     dv2 = du * du + dv * dv
     dv2 = np.where(np.abs(dv2) < 1e-6, 1e-6, dv2)  # limit lower absolute value
     vrel = np.sqrt(dv2)
 
+    # Calculate time to closest point of approach (CPA)
     tcpa = -(du * dx + dv * dy) / dv2 + 1e9 * I
 
     # Calculate distance^2 at CPA (minimum distance^2)
@@ -80,17 +81,17 @@ def detect(ownship, intruder, RPZ, HPZ, tlookahead):
 
     swconfl = np.array(swhorconf * (tinconf <= toutconf) * (toutconf > 0.0) * \
         (tinconf < tlookahead) * (1.0 - I), dtype=np.bool)
+    swlos = (dist < RPZ) * (np.abs(dalt) < HPZ)
 
     # --------------------------------------------------------------------------
-    # Update conflict lists
+    # Update conflict and loss of separation lists
     # --------------------------------------------------------------------------
-    # Ownship conflict flag and max tCPA
     inconf = np.any(swconfl, 1)
+    inlos = np.any(swlos, 1)
     tcpamax = np.max(tcpa * swconfl, 1)
 
     # Select conflicting pairs: each a/c gets their own record
     confpairs = [(ownship.id[i], ownship.id[j]) for i, j in zip(*np.where(swconfl))]
-    swlos = (dist < RPZ) * (np.abs(dalt) < HPZ)
     lospairs = [(ownship.id[i], ownship.id[j]) for i, j in zip(*np.where(swlos))]
 
     # bearing, dist, tcpa, tinconf, toutconf per conflict
@@ -100,4 +101,4 @@ def detect(ownship, intruder, RPZ, HPZ, tlookahead):
     dcpa = np.sqrt(dcpa2[swconfl])
     tinconf = tinconf[swconfl]
 
-    return confpairs, lospairs, inconf, tcpamax, qdr, dist, dcpa, tcpa, tinconf
+    return confpairs, lospairs, inconf, inlos, tcpamax, qdr, dist, dcpa, tcpa, tinconf

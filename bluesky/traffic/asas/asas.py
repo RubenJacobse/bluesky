@@ -108,6 +108,9 @@ class ASAS(TrafficArrays):
         with RegisterElementParameters(self):
             # ASAS info per aircraft:
             self.inconf = np.array([], dtype=bool)  # In-conflict flag
+            self.inlos = np.array([], dtype=bool) # In loss of separation flag
+            self.tot_time_inconf = np.array([])  # Total time spent in conflict
+            self.tot_time_inlos = np.array([]) # Total time spent in LoS
             self.tcpamax = np.array([])  # Maximum time to CPA for aircraft in conflict
             self.active = np.array([], dtype=bool)  # whether the autopilot follows ASAS or not
             self.trk = np.array([])  # heading provided by the ASAS [deg]
@@ -609,9 +612,13 @@ class ASAS(TrafficArrays):
             self.pos_logger.start()
 
         # Conflict detection
-        self.confpairs, self.lospairs, self.inconf, self.tcpamax, \
+        self.confpairs, self.lospairs, self.inconf, self.inlos, self.tcpamax, \
             self.qdr, self.dist, self.dcpa, self.tcpa, self.tLOS = \
             self.cd.detect(bs.traf, bs.traf, self.R, self.dh, self.dtlookahead)
+
+        # Update conflict and resolution time counts
+        self.tot_time_inconf += self.inconf
+        self.tot_time_inlos += self.inlos
 
         # Conflict resolution only if there are conflicts or if swarming /
         # leader-following with follow through is used (does not require a

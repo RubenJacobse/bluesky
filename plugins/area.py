@@ -18,15 +18,17 @@ header = \
      + "Flight time [s], "
      + "Nominal Distance 2D [m],"
      + "Actual Distance 2D [m], "
-     + "Actual Distance 3D [m], "
-     + "Work Done [J], "
+    #  + "Actual Distance 3D [m], "
+    #  + "Work Done [J], "
      + "Dist to last waypoint [m], "
      + "Latitude [deg], "
      + "Longitude [deg], "
-     + "Altitude [m], "
-     + "TAS [m/s], "
-     + "Vertical Speed [m/s], "
-     + "Heading [deg], "
+    #  + "Altitude [m], "
+    #  + "TAS [m/s], "
+    #  + "Vertical Speed [m/s], "
+    #  + "Heading [deg], "
+     + "Time in conflict [s], "
+     + "Time in LoS [s], "
      # + "Origin Lat [deg], "
      # + "Origin Lon [deg], "
      # + "Destination Lat [deg], "
@@ -146,7 +148,7 @@ class Area(TrafficArrays):
             # waypoint at deletion time
             routedist = np.zeros(len(delidx))
             lastwpdist = np.zeros(len(delidx))
-            for idx, ac_idx in enumerate(delidx):
+            for _, ac_idx in enumerate(delidx):
                 routedist = sum(traf.ap.route[ac_idx].wpdistto) * 1852
                 lastwpdist = geo.latlondist(traf.lat[ac_idx],
                                             traf.lon[ac_idx],
@@ -161,15 +163,17 @@ class Area(TrafficArrays):
                         f"{(sim.simt - self.create_time[ac_idx]):.0f}",
                         f"{routedist:.0f}",
                         f"{self.distance2D[ac_idx]:.0f}",
-                        f"{self.distance3D[ac_idx]:.0f}",
-                        f"{self.work[ac_idx]:.0f}",
+                        # f"{self.distance3D[ac_idx]:.0f}",
+                        # f"{self.work[ac_idx]:.0f}",
                         f"{lastwpdist:.0f}",
                         f"{traf.lat[ac_idx]:.4f}",
                         f"{traf.lon[ac_idx]:.4f}",
-                        f"{traf.alt[ac_idx]:.0f}",
-                        f"{traf.tas[ac_idx]:.0f}",
-                        f"{traf.vs[ac_idx]:.0f}",
-                        f"{traf.hdg[ac_idx]:.0f}",
+                        # f"{traf.alt[ac_idx]:.0f}",
+                        # f"{traf.tas[ac_idx]:.0f}",
+                        # f"{traf.vs[ac_idx]:.0f}",
+                        # f"{traf.hdg[ac_idx]:.0f}",
+                        f"{traf.asas.tot_time_inconf[ac_idx]:.0f}",
+                        f"{traf.asas.tot_time_inlos[ac_idx]:.0f}",
                         # traf.ap.origlat[ac_idx],
                         # traf.ap.origlon[ac_idx],
                         # traf.ap.destlat[ac_idx],
@@ -184,8 +188,8 @@ class Area(TrafficArrays):
             traf.delete(delidx)
 
 
-        # delete all aicraft in self.delidxalt
-        if len(delidxalt)>0:
+        # Delete all aicraft in self.delidxalt
+        if len(delidxalt) > 0:
             traf.delete(list(delidxalt))
 
     def set_area(self, *args):
