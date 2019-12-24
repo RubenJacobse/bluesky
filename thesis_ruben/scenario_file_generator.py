@@ -480,20 +480,19 @@ class ScenarioGenerator():
             # thereafter has to have at least minimum separation in space
             # OR time with ALL existing aircraft at the time of its creation.
             if num_created_ac:
-                time_diff_list = [curr_time - aircraft["time"]
-                                  for aircraft in self.aircraft_list]
-                dist_diff_list = [bsgeo.kwikdist(aircraft["dep_lat"],
-                                                 aircraft["dep_lon"],
-                                                 curr_lat,
-                                                 curr_lon)
-                                  for aircraft in self.aircraft_list]
+                # Make list of tuples with (time, distance) differences
+                # between aircraft created less than < min_dt apart in time
+                diff_list = [(curr_time - aircraft["time"],
+                              bsgeo.kwikdist(aircraft["dep_lat"],
+                                             aircraft["dep_lon"],
+                                             curr_lat, curr_lon))
+                             for aircraft in self.aircraft_list
+                             if curr_time - aircraft["time"] < min_dt]
 
-                for time_diff, dist_diff in zip(time_diff_list, dist_diff_list):
-                    # Either time OR distance difference must be smaller than
-                    # the minimum value; if not: the aircraft is in LoS
-                    if not (((dist_diff < min_dist) and (time_diff > min_dt))
-                            or ((dist_diff > min_dist) and (time_diff < min_dt))
-                            or ((dist_diff > min_dist) and (time_diff > min_dt))):
+                for (time_diff, dist_diff) in diff_list:
+                    # Either time OR distance difference must be larger than
+                    # its minimum value; if not: the aircraft is in LoS
+                    if time_diff < min_dt and dist_diff < min_dist:
                         in_los_at_creation = True
                         break
 
