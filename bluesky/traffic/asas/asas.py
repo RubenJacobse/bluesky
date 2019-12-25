@@ -52,12 +52,16 @@ ASASLOG_HEADER = ("simt [s], "
                   + "ac2, "
                   + "LoS [-], "
                   + "Sev [-], "
-                  + "duration [-]")
+                  + "duration [-], "
+                  + "delta v [kts], "
+                  + "delta trk [deg]")
 ASASPOS_HEADER = ("simt [s], "
                   + "LoS [-], "
                   + "lat [deg], "
                   + "lon [deg]")
 
+# Constants
+MPS_TO_KTS = 1.94384449
 
 class ASAS(TrafficArrays):
     """
@@ -649,9 +653,10 @@ class ASAS(TrafficArrays):
         if bs.sim.simt >= 1800 and bs.sim.simt <= 9000:
             for pair in confpairs_unique:
                 if pair not in self.conf_tracker.keys():
+                    (id1, id2) = tuple(pair)
                     self.conf_tracker[pair] = {"duration": 1}
-                    self.num_tot_conf[bs.traf.id2idx(pair[0])] += 1
-                    self.num_tot_conf[bs.traf.id2idx(pair[1])] += 1
+                    self.num_tot_conf[bs.traf.id2idx(id1)] += 1
+                    self.num_tot_conf[bs.traf.id2idx(id2)] += 1
                 else:
                     self.conf_tracker[pair]["duration"] += 1
 
@@ -659,10 +664,11 @@ class ASAS(TrafficArrays):
                 pair_idx = self.confpairs.index(tuple(pair))
                 severity = (self.R - self.dist[pair_idx]) / self.R
                 if pair not in self.los_tracker.keys():
+                    (id1, id2) = tuple(pair)
                     self.los_tracker[pair] = {"duration": 1,
                                               "severity": severity}
-                    self.num_tot_los[bs.traf.id2idx(pair[0])] += 1
-                    self.num_tot_los[bs.traf.id2idx(pair[1])] += 1
+                    self.num_tot_los[bs.traf.id2idx(id1)] += 1
+                    self.num_tot_los[bs.traf.id2idx(id2)] += 1
                 else:
                     self.los_tracker[pair]["duration"] += 1
                     if severity < self.los_tracker[pair]["severity"]:
@@ -675,20 +681,44 @@ class ASAS(TrafficArrays):
         if bs.sim.simt >= 1800 and bs.sim.simt <= 9000:
             for pair in list(self.conf_tracker.keys()):
                 if pair not in confpairs_unique:
-                    self.conf_logger.log(tuple(pair)[0],
-                                         tuple(pair)[1],
+                    (id1, id2) = tuple(pair)
+                    idx1 = bs.traf.id2idx(id1)
+                    idx2 = bs.traf.id2idx(id2)
+
+                    delta_v = [bs.traf.gseast[idx1] - bs.traf.gseast[idx2],
+                               bs.traf.gsnorth[idx1] - bs.traf.gsnorth[idx2]]
+                    delta_v_abs = np.linalg.norm(delta_v)
+                    delta_trk = crs_diff(bs.traf.trk[idx1], bs.traf.trk[idx2])
+
+                    self.conf_logger.log(id1,
+                                         id2,
                                          0,
                                          0,
-                                         self.conf_tracker[pair]["duration"])
+                                         self.conf_tracker[pair]["duration"],
+                                         f"{delta_v_abs * MPS_TO_KTS:.1f},",
+                                         f"{delta_trk:.1f}")
                     del self.conf_tracker[pair]
 
             for pair in list(self.los_tracker.keys()):
                 if pair not in lospairs_unique:
-                    self.conf_logger.log(tuple(pair)[0],
-                                         tuple(pair)[1],
-                                         1,
-                                         self.los_tracker[pair]["severity"],
-                                         self.los_tracker[pair]["duration"])
+                    (id1, id2) = tuple(pair)
+                    idx1 = bs.traf.id2idx(id1)
+                    idx2 = bs.traf.id2idx(id2)
+
+                    delta_v = [bs.traf.gseast[idx1] - bs.traf.gseast[idx2],
+                               bs.traf.gsnorth[idx1] - bs.traf.gsnorth[idx2]]
+                    delta_v_abs = np.linalg.norm(delta_v)
+                    delta_trk = crs_diff(bs.traf.trk[idx1], bs.traf.trk[idx2])
+
+                    self.conf_logger.log(
+                        id1,
+                        id2,
+                        1,
+                        f"{self.los_tracker[pair]['severity']:.4f}",
+                        self.los_tracker[pair]["duration"],
+                        f"{delta_v_abs * MPS_TO_KTS:.1f}",
+                        f"{delta_trk:.1f}"
+                    )
                     del self.los_tracker[pair]
 
         # Only log conflict positions for t between 1800 and 3600 seconds
@@ -823,3 +853,15 @@ class ASAS(TrafficArrays):
 
         # Remove pairs that are past CPA or have deleted aircraft from the list
         self.resopairs -= delpairs
+
+
+def crs_diff(crs_a, crs_b):
+    """
+    Returns the absolute difference per element between two course vectors crs_a
+    and crs_b.
+    """
+
+    # Calculate absolute angle difference between both courses and the reference
+    diff = np.remainder(crs_b - crs_a + 180, 360) - 180
+
+    return diff

@@ -344,7 +344,8 @@ class ASASLogOccurrenceParser(LogListParser):
         # Loop over all rows and create a dictionary with each conflict
         # and its parameters listed once
         for row in log_data:
-            [simt, ac1_id, ac2_id, is_los, los_severity, duration] = row
+            [simt, ac1_id, ac2_id, is_los, los_severity, duration, delta_v,
+             delta_trk] = row
             simt = int(float(simt))
 
             if simt < T_LOG_INTERVAL_START or simt > T_LOG_INTERVAL_END:
@@ -359,14 +360,16 @@ class ASASLogOccurrenceParser(LogListParser):
 
             outputlines.append(f"{geometry},{reso_method},{traffic_level},"
                                + f"{scenario},{confpair},{duration},{is_los},"
-                               + f"{los_severity:0.4f},{start},{end}")
+                               + f"{los_severity:0.4f},{start},{end},"
+                               + f"{delta_v},{delta_trk}")
 
         self.write_lines_to_output_file(outputlines)
 
     def set_header(self):
         self.header = ("geometry,resolution method,traffic level,scenario,"
                        + "confpair,conflict duration [s],is LoS [-],"
-                       + "LoS severity [-],t start [s],t end[s]")
+                       + "LoS severity [-],t start [s],t end[s],delta v[kts],
+                       + "delta trk [deg]")
 
 
 class ASASPosLocationParser(LogListParser):
