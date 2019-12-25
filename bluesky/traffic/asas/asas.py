@@ -695,8 +695,8 @@ class ASAS(TrafficArrays):
                                          0,
                                          0,
                                          self.conf_tracker[pair]["duration"],
-                                         f"{delta_v_abs * MPS_TO_KTS:.1f},",
-                                         f"{delta_trk:.1f}")
+                                         f"{(delta_v_abs * MPS_TO_KTS):.1f}",
+                                         f"{abs(delta_trk):.1f}")
                     del self.conf_tracker[pair]
 
             for pair in list(self.los_tracker.keys()):
@@ -716,8 +716,8 @@ class ASAS(TrafficArrays):
                         1,
                         f"{self.los_tracker[pair]['severity']:.4f}",
                         self.los_tracker[pair]["duration"],
-                        f"{delta_v_abs * MPS_TO_KTS:.1f}",
-                        f"{delta_trk:.1f}"
+                        f"{(delta_v_abs * MPS_TO_KTS):.1f}",
+                        f"{abs(delta_trk):.1f}"
                     )
                     del self.los_tracker[pair]
 
