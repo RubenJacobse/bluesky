@@ -116,8 +116,8 @@ class ASAS(TrafficArrays):
             self.tot_time_inconf = np.array([])  # Total time spent in conflict
             self.tot_time_inlos = np.array([])  # Total time spent in LoS
             self.tot_time_inreso = np.array([])  # Total time spent in resolutions
-            self.num_tot_conf = np.array([])  # Total number of conflicts
-            self.num_tot_los = np.array([])  # Total number of LoS
+            self.num_tot_conf = np.array([], dtype=int)  # Total number of conflicts
+            self.num_tot_los = np.array([], dtype=int)  # Total number of LoS
             self.tcpamax = np.array([])  # Maximum time to CPA for aircraft in conflict
             self.active = np.array([], dtype=bool)  # whether the autopilot follows ASAS or not
             self.trk = np.array([])  # heading provided by the ASAS [deg]
