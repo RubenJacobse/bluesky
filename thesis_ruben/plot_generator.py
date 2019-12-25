@@ -506,11 +506,11 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "num tot conf [-]",
-                                    "conf_per_ac")
+                                    "ac_conf")
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "num tot los [-]",
-                                    "los_per_ac")
+                                    "ac_los")
 
             # Make figures based on data in flstlog_occurence.csv
             df = pd.read_csv(os.path.join(self.batch_dir,
@@ -553,8 +553,8 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
                                   hue="traffic level",
                                   hue_order=level_order,
                                   linewidth=0.5,
-                                  palette="Blues",
-                                  showfliers=False)
+                                #   showfliers=False,
+                                  palette="Blues")
             plt.ticklabel_format(axis="y", style="sci", scilimits=(0, 4))
             ax.legend(title="Traffic rate [aircraft/hr]",
                       loc="lower center",

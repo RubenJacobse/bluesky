@@ -254,7 +254,7 @@ class ASASLogSummaryParser(LogListParser):
         num_conf = 0
 
         for row in log_data:
-            [simt, _, _, is_los, _, _] = row
+            [simt, _, _, is_los, _, _, _, _] = row
             simt = int(float(simt))
             is_los = int(is_los)
 
@@ -368,7 +368,7 @@ class ASASLogOccurrenceParser(LogListParser):
     def set_header(self):
         self.header = ("geometry,resolution method,traffic level,scenario,"
                        + "confpair,conflict duration [s],is LoS [-],"
-                       + "LoS severity [-],t start [s],t end[s],delta v[kts],
+                       + "LoS severity [-],t start [s],t end[s],delta v[kts],"
                        + "delta trk [deg]")
 
 
