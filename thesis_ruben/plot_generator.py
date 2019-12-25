@@ -553,9 +553,11 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
                                   hue="traffic level",
                                   hue_order=level_order,
                                   linewidth=0.5,
-                                  palette="Blues")
+                                  palette="Blues",
+                                  showfliers=False)
             plt.ticklabel_format(axis="y", style="sci", scilimits=(0, 4))
-            ax.legend(loc="lower center",
+            ax.legend(title="Traffic rate [aircraft/hr]",
+                      loc="lower center",
                       ncol=num_levels,
                       bbox_to_anchor=(0.5, 1))
             ax.set(xticklabels=reso_order)
