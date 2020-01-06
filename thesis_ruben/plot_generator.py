@@ -40,6 +40,7 @@ def make_batch_figures(timestamp):
     BoxPlotFigureGenerator(timestamp)
     AREAGeoFigureGenerator(timestamp)
     ASASGeoFigureGenerator(timestamp)
+    ASASConflictFigureGenerator(timestamp)
     # ViolinPlotFigureGenerator(timestamp)
     # StripPlotFigureGenerator(timestamp)
 
@@ -644,3 +645,147 @@ class StripPlotFigureGenerator(ComparisonFigureGeneratorBase):
         """
 
         return sbn.stripplot(**kwargs, dodge=True, jitter=True)
+
+
+class ASASConflictFigureGenerator(FigureGeneratorBase):
+
+    def __init__(self, timestamp):
+        super().__init__(timestamp)
+        self.load_conflict_data()
+        self.generate_figures()
+
+    def create_figure_dir_if_not_exists(self):
+        """
+        Ensures that the subdirectory in which all geo figures will be
+        saved is created in case it does not exist yet.
+        """
+
+        self.figure_dir = os.path.join(self.figure_dir, "conflict")
+        if not os.path.isdir(self.figure_dir):
+            os.makedirs(self.figure_dir)
+
+    def load_conflict_data(self):
+        """
+        Load the locations of all conflicts from file.
+        """
+
+        summary_dir = os.path.join(self.batch_dir, "logfiles_summary")
+        asaslog_file = os.path.join(summary_dir, "asaslog_occurence.csv")
+        self.conflict_list = load_csv_data(asaslog_file)
+
+    def generate_figures(self):
+        """
+        Creates the figures showing the geographic features of the scenario
+        as well as the locations of the conflicts and losses of separation
+        per separation method.
+        """
+
+        df = pd.read_csv(os.path.join(self.batch_dir,
+                                      "logfiles_summary",
+                                      "asaslog_occurence.csv"))
+        for geometry in self.combination_dict:
+            for method in self.combination_dict[geometry]:
+                for level in self.combination_dict[geometry][method]:
+                    # Make a figure
+                    df_figure = df[(df["#geometry"] == geometry)
+                                   & (df["resolution method"] == method)
+                                   & (df["traffic level"] == int(level))
+                                  ]
+                    self.make_vel_angle_figure(df_figure,
+                                               geometry,
+                                               method,
+                                               level)
+
+        # Workaround for nested dictionary due to order reversal
+        # for this type of plot
+        for geometry in self.combination_dict:
+            histplot_dict = {}
+            for method in self.combination_dict[geometry]:
+                for level in self.combination_dict[geometry][method]:
+                    if level not in histplot_dict:
+                        histplot_dict[level] = []
+                    histplot_dict[level].append(method)
+
+            # Generate figure for each traffic level
+            for level in histplot_dict.keys():
+                plt.figure(figsize=(16, 9))
+                x_axis = "delta trk [deg]"
+
+                # Get data for current traffic level
+                df_level = df[(df["#geometry"] == geometry)
+                              & (df["is LoS [-]"] == False)
+                              & (df["traffic level"] == int(level))]
+                plt_ymax = 0
+
+                # Add data for each method to the figure
+                for method in histplot_dict[level]:
+                    # Get data for current separation method
+                    df_method = df_level[(df_level["resolution method"] == method)]
+
+                    bins = [x for x in range(181)]
+                    sbn.distplot(df_method[x_axis],
+                                 bins=bins,
+                                # If use norm hist:
+                                #  norm_hist=True,
+                                #  hist=True,
+                                #  kde=False,
+                                #  label=method,
+                                #  hist_kws={"histtype": "step",
+                                #            "linewidth": 1,
+                                #            "alpha": 1}
+                                # If use kde:
+                                 hist=False,
+                                 kde=True,
+                                 label=method,
+                                 kde_kws={"kernel": "biw",
+                                          "clip": (0, 180)},
+                                )
+
+                # Set attributes and save figure
+                plt.xlabel(x_axis)
+                plt.ylabel("Density")
+                plt.axis("tight")
+                plt.xlim((0, 180))
+                plt.legend()
+                plt_filename = f"hist_{geometry}_{level}.{FIGURE_FILETYPE}"
+                plt_filepath = os.path.join(self.figure_dir, plt_filename)
+                plt.savefig(plt_filepath, dpi=300, bbox_inches="tight")
+                plt.close()
+
+    def make_vel_angle_figure(self, df, geometry, method, level):
+        """
+        Make a single boxplot figure for a given geometry. The data used
+        is specified in a pandas dataframe 'df', 'column' is the column used
+        for the plot and 'namestr' is the last part of the figure file name.
+        """
+
+        try:
+            # Set column labels to be used for data on x and y axes
+            x_axis = "delta trk [deg]"
+            y_axis = "delta v [kts]"
+
+            # Use the min and max of the unfiltered column in the dataframe
+            # to ensure all figures using this column have the same y-axis limits
+            ymin = 0
+            ymax = df[y_axis].max()
+            yrange = df[y_axis].max() - df[y_axis].min()
+
+            # Create and save figure
+            plt.figure(figsize=(16, 9))
+            plt.scatter(x=x_axis,
+                        y=y_axis,
+                        data=df[df["is LoS [-]"] == False],
+                        alpha=0.02,
+                        edgecolors='none',
+                        # marker="x",
+                        )
+            plt.xlabel(x_axis)
+            plt.ylabel(y_axis)
+            plt.axis([0, 180, 0, 1100])
+            plt_filename = f"va_{geometry}_{method}_{level}.{FIGURE_FILETYPE}"
+            plt_filepath = os.path.join(self.figure_dir, plt_filename)
+            plt.savefig(plt_filepath, dpi=300, bbox_inches="tight")
+            plt.close()
+        except RuntimeError:
+            print(f"Plot generator failed to create {plt_filename}")
+

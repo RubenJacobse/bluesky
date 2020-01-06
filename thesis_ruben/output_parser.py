@@ -368,7 +368,7 @@ class ASASLogOccurrenceParser(LogListParser):
     def set_header(self):
         self.header = ("geometry,resolution method,traffic level,scenario,"
                        + "confpair,conflict duration [s],is LoS [-],"
-                       + "LoS severity [-],t start [s],t end[s],delta v[kts],"
+                       + "LoS severity [-],t start [s],t end [s],delta v [kts],"
                        + "delta trk [deg]")
 
 
