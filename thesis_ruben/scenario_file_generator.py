@@ -52,6 +52,50 @@ SCEN_TOT_AC = 50  # Total number of aircraft in the scenario
 SCEN_RUNTIME = 10800  # Scenario run duration in seconds
 
 
+class Geovector():
+    """
+    Class that stores and prints the data of a geovector.
+    """
+
+    def __init__(self, name, crs_min=None, crs_max=None,
+                 gs_min_cas=None, gs_max_cas=None, poly=None, coords=None):
+        self.name = name
+        self.crs_min = crs_min
+        self.crs_max = crs_max
+
+        # Convert groundspeed from CAS to TAS
+        self.gs_min = cas2tas(gs_min_cas * 0.51444, 36000 * 0.3048) / 0.51444
+        self.gs_max = cas2tas(gs_max_cas * 0.51444, 36000 * 0.3048) / 0.51444
+
+        # Set up the polygon and coordinate representations based on
+        # the input received
+        if poly:
+            self.poly = poly
+            self.coords = [x for (lat, lon) in poly.exterior.coords
+                           for x in (lat, lon)]
+        elif coords:
+            self.coords = coords
+            self.poly = Polygon(coords)
+        else:
+            raise ValueError("No polygon or coordinates defined")
+
+    def scn_str(self):
+        """
+        Print the geovector and its attributes in TrafScript format.
+        """
+        zero_time = "\n0:00:00.00>"
+        coord_str = ",".join(str(f"{x:.6f}") for x in self.coords)
+        poly_str = zero_time + f"POLY {self.name} {coord_str}"
+        color_str = zero_time + f"COLOR {self.name},102,178,255"
+        gv_str = (zero_time + f"GEOVECTOR {self.name},"
+                  + "," + ("" if not self.gs_min else f"{self.gs_min}")
+                  + "," + ("" if not self.gs_max else f"{self.gs_max}")
+                  + "," + ("" if not self.crs_min else f"{self.crs_min}")
+                  + "," + ("" if not self.crs_max else f"{self.crs_max}"))
+
+        return poly_str + color_str + gv_str
+
+
 class ScenarioGenerator():
     """
     Create a scenario file which name reflects the properties of the
@@ -301,58 +345,58 @@ class ScenarioGenerator():
         corwedge_poly = wedge_poly.union(corridor_poly)
         self.polygons["corwedge"] = Polygon(corwedge_poly)
 
+        # Non-overlapping concentric rings in wedge on converging side
+        ring_radii = [40, 50, 60, 70, 80, 90, 100]  # [NM]
+        prev_ring = None
+        for radius in ring_radii:
+            ring_coords = [bsgeo.qdrpos(CENTER_LAT, CENTER_LON, angle, radius)
+                           for angle in range(0, 360)]
+            ring_poly = Polygon(ring_coords)
+            if prev_ring:
+                wedge_ring_poly = ring_poly.intersection(wedge_poly).difference(prev_ring)
+            else:
+                wedge_ring_poly = ring_poly.intersection(wedge_poly)
+            self.polygons[f"convring_{radius}"] = wedge_ring_poly
+            prev_ring = ring_poly
+
+
     def create_geovectors(self):
         """
-        If required, creates all geovector restrictions for the scenario.
-
-        NOTE: Currently only creates a single geovector area!
+        Create all geovector restrictions for the scenario.
         """
 
-        # Set up the dictionary, relevant values will be overwritten depending
-        # on the type of geovector that will be used
-        geovector = {"name": self.resolution_method,
-                     "coords": [],
-                     "gs_min": "",
-                     "gs_max": "",
-                     "crs_min": "",
-                     "crs_max": ""}
-
-        # Set the geo vector coordinates
-        if "CORRIDOR" in self.resolution_method:
-            gv_poly = self.polygons["corridor"]
-        elif "CIRCLE" in self.resolution_method:
-            gv_poly = self.polygons["ring"]
-        elif "CORWEDGE" in self.resolution_method:
-            gv_poly = self.polygons["corwedge"]
-        elif "WEDGE" in self.resolution_method:
-            gv_poly = self.polygons["merge_wedge"]
-
-        geovector["coords"] = [x for (lat, lon) in gv_poly.exterior.coords
-                               for x in (lat, lon)]
-
-        # A two dimensional geovector can restrict ground speed and/or course
+        # Default ground speed and course restrictions
         gs_min_cas = 260  # [kts]
         gs_max_cas = 270  # [kts]
         crs_min = 359  # [deg]
         crs_max = 1  # [deg]
 
-        # Convert speed limits from CAS [kts] to TAS [kts] for use in geovector
-        # cas2tas() is entirely in metric, so we need to convert kts and ft
-        gs_min = cas2tas(gs_min_cas * 0.51444, 36000 * 0.3048) / 0.51444
-        gs_max = cas2tas(gs_max_cas * 0.51444, 36000 * 0.3048) / 0.51444
-        if "SPD" in self.resolution_method:
-            geovector["gs_min"] = gs_min
-            geovector["gs_max"] = gs_max
-        elif "CRS" in self.resolution_method:
-            geovector["crs_min"] = crs_min
-            geovector["crs_max"] = crs_max
-        elif "BOTH" in self.resolution_method:
-            geovector["gs_min"] = gs_min
-            geovector["gs_max"] = gs_max
-            geovector["crs_min"] = crs_min
-            geovector["crs_max"] = crs_max
+        # Create geovector for resolution methods than only require a single
+        # geovector.
+        onevec_methods = ["CORRIDOR", "CIRCLE", "CORWEDGE", "WEDGE"]
+        if any(substr in self.resolution_method for substr in onevec_methods):
+            # Set the geovector coordinates
+            if "CORRIDOR" in self.resolution_method:
+                poly_name = "corridor"
+            elif "CIRCLE" in self.resolution_method:
+                poly_name = "ring"
+            elif "CORWEDGE" in self.resolution_method:
+                poly_name = "corwedge"
+            elif "WEDGE" in self.resolution_method:
+                poly_name = "merge_wedge"
 
-        self.geovectors.append(geovector)
+            geovector = Geovector(poly_name, crs_min=crs_min, crs_max=crs_max,
+                                  gs_min_cas=gs_min_cas, gs_max_cas=gs_max_cas,
+                                  poly=self.polygons[poly_name])
+            self.geovectors.append(geovector)
+
+        elif "CONCMERGE" in self.resolution_method:
+            for poly in [x for x in self.polygons.keys() if "convring" in x]:
+                geovector = Geovector(poly,
+                                      gs_min_cas=gs_min_cas,
+                                      gs_max_cas=gs_max_cas,
+                                      poly=self.polygons[poly])
+                self.geovectors.append(geovector)
 
     def create_swarm_zones(self):
         """
@@ -621,17 +665,7 @@ class ScenarioGenerator():
             if self.geovectors:
                 scnfile.write("\n\n# Create GEOVECTOR area(s)")
             for geovector in self.geovectors:
-                gv_coords = geovector["coords"]
-                gv_coord_str = ",".join(str(f"{x:.6f}") for x in gv_coords)
-                area_str = f"POLY {geovector['name']} {gv_coord_str}"
-                scnfile.write(zero_time + area_str)
-                scnfile.write(zero_time + (f"COLOR {geovector['name']},"
-                                           + "102,178,255"))
-                scnfile.write(zero_time + f"GEOVECTOR {geovector['name']},"
-                              + f"{geovector['gs_min']},"
-                              + f"{geovector['gs_max']},"
-                              + f"{geovector['crs_min']},"
-                              + f"{geovector['crs_max']},,")
+                scnfile.write(geovector.scn_str())
 
             # Corridor waypoints
             scnfile.write("\n\n# Corridor waypoints")
@@ -716,9 +750,9 @@ class ScenarioGenerator():
 
         with open(file_path, "w+") as geovectorfile:
             for idx, geovector in enumerate(self.geovectors):
-                gs_min, gs_max = geovector["gs_min"], geovector["gs_max"]
-                crs_min, crs_max = geovector["crs_min"], geovector["crs_max"]
-                coords = geovector["coords"]
+                gs_min, gs_max = geovector.gs_min, geovector.gs_max
+                crs_min, crs_max = geovector.crs_min, geovector.crs_max
+                coords = geovector.coords
                 coord_str = ",".join(str(f"{x:.6f}") for x in coords)
                 geovectorfile.write(f"GV{idx+1},{gs_min},{gs_max},"
                                     + f"{crs_min},{crs_max},{coord_str}\n")
