@@ -322,10 +322,10 @@ class ScenarioGenerator():
             gv_poly = self.polygons["corridor"]
         elif "CIRCLE" in self.resolution_method:
             gv_poly = self.polygons["ring"]
-        elif "WEDGE" in self.resolution_method:
-            gv_poly = self.polygons["merge_wedge"]
         elif "CORWEDGE" in self.resolution_method:
             gv_poly = self.polygons["corwedge"]
+        elif "WEDGE" in self.resolution_method:
+            gv_poly = self.polygons["merge_wedge"]
 
         geovector["coords"] = [x for (lat, lon) in gv_poly.exterior.coords
                                for x in (lat, lon)]
