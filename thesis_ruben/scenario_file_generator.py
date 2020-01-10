@@ -88,10 +88,10 @@ class Geovector():
         poly_str = zero_time + f"POLY {self.name} {coord_str}"
         color_str = zero_time + f"COLOR {self.name},102,178,255"
         gv_str = (zero_time + f"GEOVECTOR {self.name}"
-                  + "," + ("" if not self.gs_min else f"{self.gs_min}")
-                  + "," + ("" if not self.gs_max else f"{self.gs_max}")
-                  + "," + ("" if not self.crs_min else f"{self.crs_min}")
-                  + "," + ("" if not self.crs_max else f"{self.crs_max}"))
+                  + "," + ("" if not self.gs_min else f"{self.gs_min:.0f}")
+                  + "," + ("" if not self.gs_max else f"{self.gs_max:.0f}")
+                  + "," + ("" if not self.crs_min else f"{self.crs_min:.0f}")
+                  + "," + ("" if not self.crs_max else f"{self.crs_max:.0f}"))
 
         return poly_str + color_str + gv_str
 
