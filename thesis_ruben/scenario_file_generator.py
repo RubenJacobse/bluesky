@@ -87,7 +87,7 @@ class Geovector():
         coord_str = ",".join(str(f"{x:.6f}") for x in self.coords)
         poly_str = zero_time + f"POLY {self.name} {coord_str}"
         color_str = zero_time + f"COLOR {self.name},102,178,255"
-        gv_str = (zero_time + f"GEOVECTOR {self.name},"
+        gv_str = (zero_time + f"GEOVECTOR {self.name}"
                   + "," + ("" if not self.gs_min else f"{self.gs_min}")
                   + "," + ("" if not self.gs_max else f"{self.gs_max}")
                   + "," + ("" if not self.crs_min else f"{self.crs_min}")
@@ -352,10 +352,10 @@ class ScenarioGenerator():
             ring_coords = [bsgeo.qdrpos(CENTER_LAT, CENTER_LON, angle, radius)
                            for angle in range(0, 360)]
             ring_poly = Polygon(ring_coords)
+            wedge_ring_poly = ring_poly.intersection(wedge_poly)
             if prev_ring:
-                wedge_ring_poly = ring_poly.intersection(wedge_poly).difference(prev_ring)
-            else:
-                wedge_ring_poly = ring_poly.intersection(wedge_poly)
+                # Ensure no overlap with previous smaller ring
+                wedge_ring_poly = wedge_ring_poly.difference(prev_ring)
             self.polygons[f"convring_{radius}"] = wedge_ring_poly
             prev_ring = ring_poly
 
