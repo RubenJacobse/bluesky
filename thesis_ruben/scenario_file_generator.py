@@ -63,7 +63,7 @@ class Geovector():
         self.crs_min = crs_min
         self.crs_max = crs_max
 
-        # Convert groundspeed from CAS to TAS
+        # Convert groundspeed from CAS [kts] to TAS [m/s]
         self.gs_min = cas2tas(gs_min_cas * 0.51444, 36000 * 0.3048) / 0.51444
         self.gs_max = cas2tas(gs_max_cas * 0.51444, 36000 * 0.3048) / 0.51444
 
@@ -342,7 +342,7 @@ class ScenarioGenerator():
         self.polygons["merge_wedge"] = Polygon(merge_wedge_poly)
 
         # Coordinates of wedge shaped diverging area
-        # First find bounding box using corridor south latitude and
+        # First find bounding box using corridor north latitude and
         # experiment area bounds
         (min_lat, min_lon, max_lat, max_lon) = ring_poly.bounds
         div_box_coords = [(self.corridor["north_lat"], max_lon),
@@ -361,6 +361,17 @@ class ScenarioGenerator():
         # Corwedge polygon: union of merge wedge and corridor area
         corwedge_poly = merge_wedge_poly.union(corridor_poly)
         self.polygons["corwedge"] = Polygon(corwedge_poly)
+
+        # Box that encloses divergence speed box
+        div_spd_box_south_lat, _ = bsgeo.qdrpos(
+            CENTER_LAT, CENTER_LON, 0, self.corridor_length / 2 - 2
+        )
+        div_spd_box_coords = [(div_spd_box_south_lat, max_lon),
+                              (max_lat, max_lon),
+                              (max_lat, min_lon),
+                              (div_spd_box_south_lat, min_lon)]
+        div_spd_box = Polygon(div_spd_box_coords)
+        self.polygons["divspd_box"] = div_spd_box
 
         # Non-overlapping concentric rings in wedge on converging side
         ring_radii = [40, 50, 60, 70, 80, 90, 100]  # [NM]
@@ -388,6 +399,25 @@ class ScenarioGenerator():
                 # Ensure no overlap with previous smaller ring
                 wedge_ring_poly = wedge_ring_poly.difference(prev_ring)
             self.polygons[f"divring_{radius}"] = wedge_ring_poly
+            prev_ring = ring_poly
+
+        # Non-overlapping concentric rings in diverging speed wedge
+        # ring_radii = [19, 23, 45]  # [NM]
+        ring_radii = [45]  # [NM]
+        prev_ring = None
+        for radius in ring_radii:
+            ring_coords = [bsgeo.qdrpos(CENTER_LAT, CENTER_LON, angle, radius)
+                           for angle in range(0, 360)]
+            ring_poly = Polygon(ring_coords)
+            div_spd_wedge = div_spd_box.difference(left_poly).difference(right_poly)
+            wedge_ring_poly = ring_poly.intersection(div_spd_wedge)
+            wedge_ring_poly = wedge_ring_poly \
+                .buffer(-0.0001, 1, join_style=JOIN_STYLE.mitre) \
+                .buffer(0.0001, 1, join_style=JOIN_STYLE.mitre)
+            if prev_ring:
+                # Ensure no overlap with previous smaller ring
+                wedge_ring_poly = wedge_ring_poly.difference(prev_ring)
+            self.polygons[f"divspdring_{radius}"] = wedge_ring_poly
             prev_ring = ring_poly
 
     def create_geovectors(self):
@@ -430,6 +460,14 @@ class ScenarioGenerator():
 
         elif "CONCDIVERGE" in self.resolution_method:
             for poly in [x for x in self.polygons.keys() if "divring" in x]:
+                geovector = Geovector(poly,
+                                      gs_min_cas=gs_min_cas,
+                                      gs_max_cas=gs_max_cas,
+                                      poly=self.polygons[poly])
+                self.geovectors.append(geovector)
+
+        elif "DIVSPD" in self.resolution_method:
+            for poly in [x for x in self.polygons.keys() if "divspdring" in x]:
                 geovector = Geovector(poly,
                                       gs_min_cas=gs_min_cas,
                                       gs_max_cas=gs_max_cas,
