@@ -339,7 +339,7 @@ class ScenarioGenerator():
         merge_wedge_poly = merge_wedge_poly \
             .buffer(0.0001, 1, join_style=JOIN_STYLE.mitre) \
             .buffer(-0.0001, 1, join_style=JOIN_STYLE.mitre)
-        self.polygons["merge_wedge"] = Polygon(merge_wedge_poly)
+        self.polygons["merge_wedge"] = merge_wedge_poly
 
         # Coordinates of wedge shaped diverging area
         # First find bounding box using corridor north latitude and
@@ -356,11 +356,11 @@ class ScenarioGenerator():
         div_wedge_poly = div_wedge_poly \
             .buffer(-0.0001, 1, join_style=JOIN_STYLE.mitre) \
             .buffer(0.0001, 1, join_style=JOIN_STYLE.mitre)
-        self.polygons["diverge_wedge"] = Polygon(div_wedge_poly)
+        self.polygons["diverge_wedge"] = div_wedge_poly
 
         # Corwedge polygon: union of merge wedge and corridor area
         corwedge_poly = merge_wedge_poly.union(corridor_poly)
-        self.polygons["corwedge"] = Polygon(corwedge_poly)
+        self.polygons["corwedge"] = corwedge_poly
 
         # Box that encloses divergence speed box
         div_spd_box_south_lat, _ = bsgeo.qdrpos(
