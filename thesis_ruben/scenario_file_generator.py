@@ -335,10 +335,6 @@ class ScenarioGenerator():
         merge_box_poly = Polygon(merge_box_coords)
         merge_circle_poly = merge_box_poly.intersection(ring_poly)
         merge_wedge_poly = merge_circle_poly.difference(left_poly).difference(right_poly)
-        # Use Polygon.buffer() to fix potential slivers
-        merge_wedge_poly = merge_wedge_poly \
-            .buffer(0.0001, 1, join_style=JOIN_STYLE.mitre) \
-            .buffer(-0.0001, 1, join_style=JOIN_STYLE.mitre)
         self.polygons["merge_wedge"] = merge_wedge_poly
 
         # Coordinates of wedge shaped diverging area
@@ -352,10 +348,6 @@ class ScenarioGenerator():
         div_box_poly = Polygon(div_box_coords)
         div_circle_poly = div_box_poly.intersection(ring_poly)
         div_wedge_poly = div_circle_poly.difference(left_poly).difference(right_poly)
-        # Use Polygon.buffer() to fix potential slivers
-        div_wedge_poly = div_wedge_poly \
-            .buffer(-0.0001, 1, join_style=JOIN_STYLE.mitre) \
-            .buffer(0.0001, 1, join_style=JOIN_STYLE.mitre)
         self.polygons["diverge_wedge"] = div_wedge_poly
 
         # Corwedge polygon: union of merge wedge and corridor area
@@ -411,9 +403,6 @@ class ScenarioGenerator():
             ring_poly = Polygon(ring_coords)
             div_spd_wedge = div_spd_box.difference(left_poly).difference(right_poly)
             wedge_ring_poly = ring_poly.intersection(div_spd_wedge)
-            wedge_ring_poly = wedge_ring_poly \
-                .buffer(-0.0001, 1, join_style=JOIN_STYLE.mitre) \
-                .buffer(0.0001, 1, join_style=JOIN_STYLE.mitre)
             if prev_ring:
                 # Ensure no overlap with previous smaller ring
                 wedge_ring_poly = wedge_ring_poly.difference(prev_ring)
