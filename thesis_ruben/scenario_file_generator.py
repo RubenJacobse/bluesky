@@ -289,11 +289,16 @@ class ScenarioGenerator():
         used as basis for geovector areas or swarming zones.
         """
 
+        def ring_polygon(center_lat, center_lon, radius):
+            """
+            Create a shapely Polygon for a ring with center at
+            (center_lat, center_lon) with 'radius' in Nautical Miles.
+            """
+            return Polygon([bsgeo.qdrpos(center_lat, center_lon, angle, radius)
+                            for angle in range(0, 360)])
+
         # Experiment area
-        ring_radius = 100  # [NM]
-        ring_coords = [bsgeo.qdrpos(CENTER_LAT, CENTER_LON, angle, ring_radius)
-                       for angle in range(0, 360)]
-        ring_poly = Polygon(ring_coords)
+        ring_poly = ring_polygon(CENTER_LAT, CENTER_LON, AREA_RADIUS)
         self.polygons["experiment_area"] = ring_poly
 
         # Left-side airspace restriction
@@ -333,7 +338,8 @@ class ScenarioGenerator():
                             (min_lat, max_lon),
                             (self.corridor["south_lat"], max_lon)]
         merge_box_poly = Polygon(merge_box_coords)
-        merge_circle_poly = merge_box_poly.intersection(ring_poly)
+        merge_ring_poly = ring_polygon(CENTER_LON, CENTER_LON, 90)
+        merge_circle_poly = merge_box_poly.intersection(merge_ring_poly)
         merge_wedge_poly = merge_circle_poly.difference(left_poly).difference(right_poly)
         self.polygons["merge_wedge"] = merge_wedge_poly
 
@@ -346,13 +352,18 @@ class ScenarioGenerator():
                           (max_lat, min_lon),
                           (self.corridor["north_lat"], min_lon)]
         div_box_poly = Polygon(div_box_coords)
-        div_circle_poly = div_box_poly.intersection(ring_poly)
+        div_ring_poly = ring_polygon(CENTER_LON, CENTER_LON, 45)
+        div_circle_poly = div_box_poly.intersection(div_ring_poly)
         div_wedge_poly = div_circle_poly.difference(left_poly).difference(right_poly)
         self.polygons["diverge_wedge"] = div_wedge_poly
 
         # Corwedge polygon: union of merge wedge and corridor area
-        corwedge_poly = merge_wedge_poly.union(corridor_poly)
-        self.polygons["corwedge"] = corwedge_poly
+        merge_wedge_cor_poly = merge_wedge_poly.union(corridor_poly)
+        self.polygons["mergecorwedge"] = merge_wedge_cor_poly
+
+        # Corwedge polygon: union of diverge wedge and corridor area
+        div_wedge_cor_poly = div_wedge_poly.union(corridor_poly)
+        self.polygons["divcorwedge"] = div_wedge_cor_poly
 
         # Box that encloses divergence speed box
         div_spd_box_south_lat, _ = bsgeo.qdrpos(
@@ -366,48 +377,42 @@ class ScenarioGenerator():
         self.polygons["divspd_box"] = div_spd_box
 
         # Non-overlapping concentric rings in wedge on converging side
-        ring_radii = [40, 50, 60, 70, 80, 90, 100]  # [NM]
+        ring_radii = [40, 50, 60, 70, 80]  # [NM]
         prev_ring = None
         for radius in ring_radii:
-            ring_coords = [bsgeo.qdrpos(CENTER_LAT, CENTER_LON, angle, radius)
-                           for angle in range(0, 360)]
-            ring_poly = Polygon(ring_coords)
-            wedge_ring_poly = ring_poly.intersection(merge_wedge_poly)
+            radius_poly = ring_polygon(CENTER_LAT, CENTER_LON, radius)
+            wedge_ring_poly = radius_poly.intersection(merge_wedge_poly)
             if prev_ring:
                 # Ensure no overlap with previous smaller ring
                 wedge_ring_poly = wedge_ring_poly.difference(prev_ring)
             self.polygons[f"convring_{radius}"] = wedge_ring_poly
-            prev_ring = ring_poly
+            prev_ring = radius_poly
 
         # Non-overlapping concentric rings in wedge on diverging side
-        ring_radii = [40, 50, 60, 70, 80, 90, 100]  # [NM]
+        ring_radii = [40, 50, 60, 70, 80]  # [NM]
         prev_ring = None
         for radius in ring_radii:
-            ring_coords = [bsgeo.qdrpos(CENTER_LAT, CENTER_LON, angle, radius)
-                           for angle in range(0, 360)]
-            ring_poly = Polygon(ring_coords)
-            wedge_ring_poly = ring_poly.intersection(div_wedge_poly)
+            radius_poly = ring_polygon(CENTER_LAT, CENTER_LON, radius)
+            wedge_ring_poly = radius_poly.intersection(div_wedge_poly)
             if prev_ring:
                 # Ensure no overlap with previous smaller ring
                 wedge_ring_poly = wedge_ring_poly.difference(prev_ring)
             self.polygons[f"divring_{radius}"] = wedge_ring_poly
-            prev_ring = ring_poly
+            prev_ring = radius_poly
 
         # Non-overlapping concentric rings in diverging speed wedge
         # ring_radii = [19, 23, 45]  # [NM]
         ring_radii = [45]  # [NM]
         prev_ring = None
         for radius in ring_radii:
-            ring_coords = [bsgeo.qdrpos(CENTER_LAT, CENTER_LON, angle, radius)
-                           for angle in range(0, 360)]
-            ring_poly = Polygon(ring_coords)
+            radius_poly = ring_polygon(CENTER_LAT, CENTER_LON, radius)
             div_spd_wedge = div_spd_box.difference(left_poly).difference(right_poly)
-            wedge_ring_poly = ring_poly.intersection(div_spd_wedge)
+            wedge_ring_poly = radius_poly.intersection(div_spd_wedge)
             if prev_ring:
                 # Ensure no overlap with previous smaller ring
                 wedge_ring_poly = wedge_ring_poly.difference(prev_ring)
             self.polygons[f"divspdring_{radius}"] = wedge_ring_poly
-            prev_ring = ring_poly
+            prev_ring = radius_poly
 
     def create_geovectors(self):
         """
@@ -430,13 +435,34 @@ class ScenarioGenerator():
             elif "CIRCLE" in self.resolution_method:
                 poly_name = "ring"
             elif "CORWEDGE" in self.resolution_method:
-                poly_name = "corwedge"
+                poly_name = "mergecorwedge"
             elif "WEDGE" in self.resolution_method:
                 poly_name = "merge_wedge"
 
             geovector = Geovector(poly_name, crs_min=crs_min, crs_max=crs_max,
                                   gs_min_cas=gs_min_cas, gs_max_cas=gs_max_cas,
                                   poly=self.polygons[poly_name])
+            self.geovectors.append(geovector)
+
+        # Create geovectors for resolution methods that require multiple
+        # geovectors.
+        elif "MERGESPDDIVSPD" in self.resolution_method:
+            merge_area = self.polygons["mergecorwedge"].difference(
+                self.polygons["divspd_box"]
+            )
+            div_area = self.polygons["divcorwedge"].intersection(
+                self.polygons["divspd_box"]
+            )
+
+            geovector = Geovector("MERGE",
+                                  gs_min_cas=265,
+                                  gs_max_cas=265,
+                                  poly=merge_area)
+            self.geovectors.append(geovector)
+            geovector = Geovector("DIVERGE",
+                                  gs_min_cas=275,
+                                  gs_max_cas=275,
+                                  poly=div_area)
             self.geovectors.append(geovector)
 
         elif "CONCMERGE" in self.resolution_method:
@@ -463,13 +489,12 @@ class ScenarioGenerator():
                                       poly=self.polygons[poly])
                 self.geovectors.append(geovector)
 
-
     def create_swarm_zones(self):
         """
         Create
         """
 
-        self.swarm_zones.append(self.polygons["corwedge"])
+        self.swarm_zones.append(self.polygons["mergecorwedge"])
 
     def calculate_corridor_parameters(self):
         """
