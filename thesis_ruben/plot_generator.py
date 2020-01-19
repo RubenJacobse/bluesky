@@ -8,6 +8,7 @@ import sys
 import csv
 
 # Third-party imports
+import numpy as np
 import pandas as pd
 import seaborn as sbn
 import matplotlib.pyplot as plt
@@ -20,6 +21,9 @@ sys.path.append(os.path.abspath(os.path.join("..")))
 
 # BlueSky imports
 import bluesky.tools.geo as bsgeo
+
+# Local imports
+import extra_plot
 
 # Geo plot element colors
 RESTRICTION_FACECOLOR = "xkcd:pale pink"
@@ -37,9 +41,9 @@ def make_batch_figures(timestamp):
     Generate the figures for the batch with given timestamp.
     """
 
-    BoxPlotFigureGenerator(timestamp)
-    AREAGeoFigureGenerator(timestamp)
-    ASASGeoFigureGenerator(timestamp)
+    # BoxPlotFigureGenerator(timestamp)
+    # AREAGeoFigureGenerator(timestamp)
+    # ASASGeoFigureGenerator(timestamp)
     ASASConflictFigureGenerator(timestamp)
     # ViolinPlotFigureGenerator(timestamp)
     # StripPlotFigureGenerator(timestamp)
@@ -695,9 +699,17 @@ class ASASConflictFigureGenerator(FigureGeneratorBase):
                                                geometry,
                                                method,
                                                level)
+                    self.make_2D_boxplot_figure(df_figure,
+                                                geometry,
+                                                method,
+                                                level)
+                    self.make_dual_boxplot_figure(df_figure,
+                                                  geometry,
+                                                  method,
+                                                  level)
 
         # Workaround for nested dictionary due to order reversal
-        # for this type of plot
+        # of nesting required in iteration for this type of plot
         for geometry in self.combination_dict:
             histplot_dict = {}
             for method in self.combination_dict[geometry]:
@@ -715,7 +727,6 @@ class ASASConflictFigureGenerator(FigureGeneratorBase):
                 df_level = df[(df["#geometry"] == geometry)
                               & (df["is LoS [-]"] == False)
                               & (df["traffic level"] == int(level))]
-                plt_ymax = 0
 
                 # Add data for each method to the figure
                 for method in histplot_dict[level]:
@@ -739,14 +750,14 @@ class ASASConflictFigureGenerator(FigureGeneratorBase):
                                  label=method,
                                  kde_kws={"kernel": "biw",
                                           "clip": (0, 180)},
-                                )
+                    )
 
                 # Set attributes and save figure
                 plt.xlabel(x_axis)
                 plt.ylabel("Density")
                 plt.axis("tight")
                 plt.xlim((0, 180))
-                plt.legend()
+                plt.legend(title="Resolution method")
                 plt_filename = f"hist_{geometry}_{level}.{FIGURE_FILETYPE}"
                 plt_filepath = os.path.join(self.figure_dir, plt_filename)
                 plt.savefig(plt_filepath, dpi=300, bbox_inches="tight")
@@ -763,12 +774,6 @@ class ASASConflictFigureGenerator(FigureGeneratorBase):
             # Set column labels to be used for data on x and y axes
             x_axis = "delta trk [deg]"
             y_axis = "delta v [kts]"
-
-            # Use the min and max of the unfiltered column in the dataframe
-            # to ensure all figures using this column have the same y-axis limits
-            ymin = 0
-            ymax = df[y_axis].max()
-            yrange = df[y_axis].max() - df[y_axis].min()
 
             # Create and save figure
             plt.figure(figsize=(16, 9))
@@ -789,3 +794,66 @@ class ASASConflictFigureGenerator(FigureGeneratorBase):
         except RuntimeError:
             print(f"Plot generator failed to create {plt_filename}")
 
+    def make_2D_boxplot_figure(self, df, geometry, method, level):
+        """
+        Make a single boxplot figure for a given geometry. The data used
+        is specified in a pandas dataframe 'df', 'column' is the column used
+        for the plot and 'namestr' is the last part of the figure file name.
+        """
+
+        try:
+            # Set column labels to be used for data on x and y axes
+            x_axis = "delta trk [deg]"
+            y_axis = "delta v [kts]"
+
+            # Create and save figure
+            plt.figure(figsize=(16, 9))
+            ax = plt.axes()
+
+            df_plot = df[df["is LoS [-]"] == False]
+            x = np.asarray(df_plot[x_axis])
+            y = np.asarray(df_plot[y_axis])
+
+            extra_plot.boxplot_2d(x, y, ax)
+            plt.xlabel(x_axis)
+            plt.ylabel(y_axis)
+            plt.axis([0, 180, 0, 1100])
+            plt_filename = f"2box_{geometry}_{method}_{level}.{FIGURE_FILETYPE}"
+            plt_filepath = os.path.join(self.figure_dir, plt_filename)
+            plt.savefig(plt_filepath, dpi=300, bbox_inches="tight")
+            plt.close()
+        except RuntimeError:
+            print(f"Plot generator failed to create {plt_filename}")
+
+    def make_dual_boxplot_figure(self, df, geometry, method, level):
+        """
+        Make a single boxplot figure for a given geometry. The data used
+        is specified in a pandas dataframe 'df', 'column' is the column used
+        for the plot and 'namestr' is the last part of the figure file name.
+        """
+
+        try:
+            # Set column labels to be used for data on x and y axes
+            x_axis = "delta trk [deg]"
+            y_axis = "delta v [kts]"
+            df_plot = df[df["is LoS [-]"] == False]
+
+            # Create and save figure
+            plt.figure()
+            # plt.figure(figsize=(16, 9))
+            _, (ax1, ax2) = plt.subplots(1, 2)
+            sbn.boxplot(y=x_axis, data=df_plot, orient="v", ax=ax1)
+            ax1.set_ylim((0, 180))
+            # ax1.ylabel(x_axis)
+
+            sbn.boxplot(y=y_axis, data=df_plot, orient="v", ax=ax2)
+            ax2.set_ylim((0, 1100))
+            # ax2.ylabel(y_axis)
+
+            plt.tight_layout()
+            plt_filename = f"dual_{geometry}_{method}_{level}.{FIGURE_FILETYPE}"
+            plt_filepath = os.path.join(self.figure_dir, plt_filename)
+            plt.savefig(plt_filepath, dpi=300, bbox_inches="tight")
+            plt.close()
+        except RuntimeError:
+            print(f"Plot generator failed to create {plt_filename}")
