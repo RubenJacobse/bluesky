@@ -51,6 +51,7 @@ SCEN_AC_MODE = "RUNTIME"  # "TOT_AC"
 SCEN_TOT_AC = 50  # Total number of aircraft in the scenario
 SCEN_RUNTIME = 10800  # Scenario run duration in seconds
 
+from matplotlib import pyplot as plt
 
 class Geovector():
     """
@@ -295,7 +296,7 @@ class ScenarioGenerator():
             (center_lat, center_lon) with 'radius' in Nautical Miles.
             """
             return Polygon([bsgeo.qdrpos(center_lat, center_lon, angle, radius)
-                            for angle in range(0, 360)])
+                            for angle in range(0, 360, 3)])
 
         # Experiment area
         ring_poly = ring_polygon(CENTER_LAT, CENTER_LON, AREA_RADIUS)
@@ -352,7 +353,7 @@ class ScenarioGenerator():
                           (max_lat, min_lon),
                           (self.corridor["north_lat"], min_lon)]
         div_box_poly = Polygon(div_box_coords)
-        div_ring_poly = ring_polygon(CENTER_LON, CENTER_LON, 45)
+        div_ring_poly = ring_polygon(CENTER_LON, CENTER_LON, 90)
         div_circle_poly = div_box_poly.intersection(div_ring_poly)
         div_wedge_poly = div_circle_poly.difference(left_poly).difference(right_poly)
         self.polygons["diverge_wedge"] = div_wedge_poly
@@ -365,19 +366,8 @@ class ScenarioGenerator():
         div_wedge_cor_poly = div_wedge_poly.union(corridor_poly)
         self.polygons["divcorwedge"] = div_wedge_cor_poly
 
-        # Box that encloses divergence speed box
-        div_spd_box_south_lat, _ = bsgeo.qdrpos(
-            CENTER_LAT, CENTER_LON, 0, self.corridor_length / 2 - 2
-        )
-        div_spd_box_coords = [(div_spd_box_south_lat, max_lon),
-                              (max_lat, max_lon),
-                              (max_lat, min_lon),
-                              (div_spd_box_south_lat, min_lon)]
-        div_spd_box = Polygon(div_spd_box_coords)
-        self.polygons["divspd_box"] = div_spd_box
-
         # Non-overlapping concentric rings in wedge on converging side
-        ring_radii = [40, 50, 60, 70, 80]  # [NM]
+        ring_radii = [40, 60, 80]  # [NM]
         prev_ring = None
         for radius in ring_radii:
             radius_poly = ring_polygon(CENTER_LAT, CENTER_LON, radius)
@@ -389,7 +379,7 @@ class ScenarioGenerator():
             prev_ring = radius_poly
 
         # Non-overlapping concentric rings in wedge on diverging side
-        ring_radii = [40, 50, 60, 70, 80]  # [NM]
+        ring_radii = [40, 60, 80]  # [NM]
         prev_ring = None
         for radius in ring_radii:
             radius_poly = ring_polygon(CENTER_LAT, CENTER_LON, radius)
@@ -400,19 +390,54 @@ class ScenarioGenerator():
             self.polygons[f"divring_{radius}"] = wedge_ring_poly
             prev_ring = radius_poly
 
-        # Non-overlapping concentric rings in diverging speed wedge
-        # ring_radii = [19, 23, 45]  # [NM]
-        ring_radii = [45]  # [NM]
-        prev_ring = None
-        for radius in ring_radii:
-            radius_poly = ring_polygon(CENTER_LAT, CENTER_LON, radius)
-            div_spd_wedge = div_spd_box.difference(left_poly).difference(right_poly)
-            wedge_ring_poly = radius_poly.intersection(div_spd_wedge)
-            if prev_ring:
-                # Ensure no overlap with previous smaller ring
-                wedge_ring_poly = wedge_ring_poly.difference(prev_ring)
-            self.polygons[f"divspdring_{radius}"] = wedge_ring_poly
-            prev_ring = radius_poly
+        # Triangles from center point splitting the merge zone in equal areas
+        angle_list = [[135, 157.5], [157.5, 180], [180, 202.5], [202.5, 225]]
+        for idx, anglepair in enumerate(angle_list):
+            p1_lat, p1_lon = bsgeo.qdrpos(CENTER_LAT, CENTER_LON, anglepair[0], 150)
+            p2_lat, p2_lon = bsgeo.qdrpos(CENTER_LAT, CENTER_LON, anglepair[1], 150)
+            triangle_coords = [(CENTER_LAT, CENTER_LON),
+                               (p1_lat, p1_lon),
+                               (p2_lat, p2_lon)]
+            triangle_poly = Polygon(triangle_coords)
+            # cutoff_triangle_poly = triangle_poly.intersection(merge_wedge_poly)
+            self.polygons[f"radtri_{idx}"] = triangle_poly
+
+        # Box that encloses divergence speed box
+        div_spd_box_south_lat, _ = bsgeo.qdrpos(
+            CENTER_LAT, CENTER_LON, 0, self.corridor_length / 2 - 2
+        )
+        div_spd_box_coords = [(div_spd_box_south_lat, max_lon),
+                              (max_lat, max_lon),
+                              (max_lat, min_lon),
+                              (div_spd_box_south_lat, min_lon)]
+        div_spd_box = Polygon(div_spd_box_coords)
+        self.polygons["divspd_box"] = div_spd_box
+
+        # Diverging speed wedge
+        radius = 45  # [NM]
+        radius_poly = ring_polygon(CENTER_LAT, CENTER_LON, radius)
+        div_spd_wedge = div_spd_box.difference(left_poly).difference(right_poly)
+        wedge_ring_poly = radius_poly.intersection(div_spd_wedge)
+        self.polygons[f"divspdring_{radius}"] = wedge_ring_poly
+
+        # For debugging purposes
+        # plt.plot(*ring_poly.exterior.xy)
+        # plt.plot(*corridor_poly.exterior.xy)
+        # plt.plot(*left_poly.exterior.xy)
+        # plt.plot(*right_poly.exterior.xy)
+        # plt.plot(*merge_wedge_poly.exterior.xy)
+        # plt.plot(*merge_wedge_cor_poly.exterior.xy)
+        # plt.plot(*self.polygons["radtri_0"].exterior.xy)
+        # plt.plot(*self.polygons["radtri_1"].exterior.xy)
+        # plt.plot(*self.polygons["radtri_2"].exterior.xy)
+        # plt.plot(*self.polygons["radtri_3"].exterior.xy)
+        # plt.plot(*div_spd_box.exterior.xy)
+        # plt.plot(*div_wedge_poly.exterior.xy)
+        # plt.plot(*div_wedge_cor_poly.exterior.xy)
+        # plt.plot(*self.polygons["divring_40"].exterior.xy)
+        # plt.plot(*self.polygons["divring_60"].exterior.xy)
+        # plt.plot(*self.polygons["divring_80"].exterior.xy)
+        # plt.show()
 
     def create_geovectors(self):
         """
@@ -439,14 +464,17 @@ class ScenarioGenerator():
             elif "WEDGE" in self.resolution_method:
                 poly_name = "merge_wedge"
 
-            geovector = Geovector(poly_name, crs_min=crs_min, crs_max=crs_max,
+            geovector = Geovector(poly_name,
+                                  crs_min=crs_min, crs_max=crs_max,
                                   gs_min_cas=gs_min_cas, gs_max_cas=gs_max_cas,
                                   poly=self.polygons[poly_name])
             self.geovectors.append(geovector)
 
+            raise ValueError("Deprecated geovectoring method!")
+
         # Create geovectors for resolution methods that require multiple
         # geovectors.
-        elif "MERGESPDDIVSPD" in self.resolution_method:
+        elif "METHOD1" in self.resolution_method:
             merge_area = self.polygons["mergecorwedge"].difference(
                 self.polygons["divspd_box"]
             )
@@ -460,34 +488,223 @@ class ScenarioGenerator():
                                   poly=merge_area)
             self.geovectors.append(geovector)
             geovector = Geovector("DIVERGE",
-                                  gs_min_cas=275,
-                                  gs_max_cas=275,
+                                  gs_min_cas=276,
+                                  gs_max_cas=276,
                                   poly=div_area)
             self.geovectors.append(geovector)
 
-        elif "CONCMERGE" in self.resolution_method:
-            for poly in [x for x in self.polygons.keys() if "convring" in x]:
-                geovector = Geovector(poly,
-                                      gs_min_cas=gs_min_cas,
-                                      gs_max_cas=gs_max_cas,
-                                      poly=self.polygons[poly])
-                self.geovectors.append(geovector)
+        elif "METHOD2" in self.resolution_method:
+            merge_area = self.polygons["mergecorwedge"].difference(
+                self.polygons["corridor"]
+            )
+            cor_area = self.polygons["corridor"].difference(
+                self.polygons["divspd_box"]
+            )
+            div_area = self.polygons["divcorwedge"].intersection(
+                self.polygons["divspd_box"]
+            )
 
-        elif "CONCDIVERGE" in self.resolution_method:
-            for poly in [x for x in self.polygons.keys() if "divring" in x]:
-                geovector = Geovector(poly,
-                                      gs_min_cas=gs_min_cas,
-                                      gs_max_cas=gs_max_cas,
-                                      poly=self.polygons[poly])
-                self.geovectors.append(geovector)
+            geovector = Geovector("MERGE",
+                                  gs_min_cas=269,
+                                  gs_max_cas=269,
+                                  poly=merge_area)
+            self.geovectors.append(geovector)
+            geovector = Geovector("CORRIDOR",
+                                  crs_min=355,
+                                  crs_max=5,
+                                  gs_min_cas=269,
+                                  gs_max_cas=269,
+                                  poly=cor_area)
+            self.geovectors.append(geovector)
+            geovector = Geovector("DIVERGE",
+                                  gs_min_cas=276,
+                                  gs_max_cas=276,
+                                  poly=div_area)
+            self.geovectors.append(geovector)
 
-        elif "DIVSPD" in self.resolution_method:
-            for poly in [x for x in self.polygons.keys() if "divspdring" in x]:
-                geovector = Geovector(poly,
-                                      gs_min_cas=gs_min_cas,
-                                      gs_max_cas=gs_max_cas,
-                                      poly=self.polygons[poly])
-                self.geovectors.append(geovector)
+        elif "METHOD3" in self.resolution_method:
+            convring80 = Geovector("convring_80",
+                                   gs_min_cas=262,
+                                   gs_max_cas=276,
+                                   poly=self.polygons["convring_80"])
+            convring60 = Geovector("convring_60",
+                                   gs_min_cas=264,
+                                   gs_max_cas=274,
+                                   poly=self.polygons["convring_60"])
+            convring40 = Geovector("convring_40",
+                                   gs_min_cas=266,
+                                   gs_max_cas=272,
+                                   poly=self.polygons["convring_40"].difference(
+                                       self.polygons["corridor"]))
+            corridor = Geovector("corridor",
+                                 gs_min_cas=269,
+                                 gs_max_cas=269,
+                                 crs_min=355,
+                                 crs_max=5,
+                                 poly=self.polygons["corridor"])
+            divring40 = Geovector("divring_40",
+                                  gs_min_cas=262,
+                                  gs_max_cas=276,
+                                   poly=self.polygons["divring_40"].difference(
+                                       self.polygons["corridor"]))
+            divring60 = Geovector("divring_60",
+                                  gs_min_cas=264,
+                                  gs_max_cas=274,
+                                  poly=self.polygons["divring_60"])
+            divring80 = Geovector("divring_80",
+                                  gs_min_cas=262,
+                                  gs_max_cas=276,
+                                  poly=self.polygons["divring_80"])
+
+            self.geovectors.append(convring40)
+            self.geovectors.append(convring60)
+            self.geovectors.append(convring80)
+            self.geovectors.append(corridor)
+            self.geovectors.append(divring40)
+            self.geovectors.append(divring60)
+            self.geovectors.append(divring80)
+
+        # elif "CONCMERGE" in self.resolution_method:
+        #     convring80 = Geovector("convring_80",
+        #                            gs_min_cas=262,
+        #                            gs_max_cas=276,
+        #                            poly=self.polygons["convring_80"])
+        #     convring60 = Geovector("convring_60",
+        #                            gs_min_cas=264,
+        #                            gs_max_cas=274,
+        #                            poly=self.polygons["convring_60"])
+        #     convring40 = Geovector("convring_40",
+        #                            gs_min_cas=266,
+        #                            gs_max_cas=272,
+        #                            poly=self.polygons["convring_40"].difference(
+        #                                self.polygons["corridor"]))
+        #     corridor = Geovector("corridor",
+        #                          gs_min_cas=269,
+        #                          gs_max_cas=269,
+        #                          crs_min=359,
+        #                          crs_max=1,
+        #                          poly=self.polygons["corridor"])
+
+        #     self.geovectors.append(convring40)
+        #     self.geovectors.append(convring60)
+        #     self.geovectors.append(convring80)
+        #     self.geovectors.append(corridor)
+
+        elif "METHOD4" in self.resolution_method:
+            # Corridor area
+            cor_area = self.polygons["corridor"].difference(
+                self.polygons["divspd_box"]
+            )
+            corridor = Geovector("corridor",
+                                 gs_min_cas=269,
+                                 gs_max_cas=269,
+                                 crs_min=355,
+                                 crs_max=5,
+                                 poly=cor_area)
+            self.geovectors.append(corridor)
+
+            # Diverging area
+            div_area = self.polygons["divspdring_45"]
+            geovector = Geovector("DIVERGE",
+                                  gs_min_cas=276,
+                                  gs_max_cas=276,
+                                  poly=div_area)
+            self.geovectors.append(geovector)
+
+            # Merging zone
+            # 80-60 NM ring
+            ring80_tri0 = self.polygons["radtri_0"].intersection(self.polygons["convring_80"])
+            ring80_tri1 = self.polygons["radtri_1"].intersection(self.polygons["convring_80"])
+            ring80_tri2 = self.polygons["radtri_2"].intersection(self.polygons["convring_80"])
+            ring80_tri3 = self.polygons["radtri_3"].intersection(self.polygons["convring_80"])
+            r80t0 = Geovector("ring80_tri0",
+                              gs_min_cas=262, gs_max_cas=276,
+                              crs_min=325, crs_max=327,
+                              poly=ring80_tri0)
+            self.geovectors.append(r80t0)
+            r80t1 = Geovector("ring80_tri1",
+                              gs_min_cas=262, gs_max_cas=276,
+                              crs_min=348, crs_max=349,
+                              poly=ring80_tri1)
+            self.geovectors.append(r80t1)
+            r80t2 = Geovector("ring80_tri2",
+                              gs_min_cas=262, gs_max_cas=276,
+                              crs_min=11, crs_max=12,
+                              poly=ring80_tri2)
+            self.geovectors.append(r80t2)
+            r80t3 = Geovector("ring80_tri3",
+                              gs_min_cas=262, gs_max_cas=276,
+                              crs_min=33, crs_max=35,
+                              poly=ring80_tri3)
+            self.geovectors.append(r80t3)
+
+            # 60-40 NM ring
+            ring60_tri0 = self.polygons["radtri_0"].intersection(self.polygons["convring_60"])
+            ring60_tri1 = self.polygons["radtri_1"].intersection(self.polygons["convring_60"])
+            ring60_tri2 = self.polygons["radtri_2"].intersection(self.polygons["convring_60"])
+            ring60_tri3 = self.polygons["radtri_3"].intersection(self.polygons["convring_60"])
+            r60t0 = Geovector("ring60_tri0",
+                              gs_min_cas=264, gs_max_cas=274,
+                              crs_min=325, crs_max=327,
+                              poly=ring60_tri0)
+            self.geovectors.append(r60t0)
+            r60t1 = Geovector("ring60_tri1",
+                              gs_min_cas=264, gs_max_cas=274,
+                              crs_min=348, crs_max=349,
+                              poly=ring60_tri1)
+            self.geovectors.append(r60t1)
+            r60t2 = Geovector("ring60_tri2",
+                              gs_min_cas=264, gs_max_cas=274,
+                              crs_min=11, crs_max=12,
+                              poly=ring60_tri2)
+            self.geovectors.append(r60t2)
+            r60t3 = Geovector("ring60_tri3",
+                              gs_min_cas=264, gs_max_cas=274,
+                              crs_min=33, crs_max=35,
+                              poly=ring60_tri3)
+            self.geovectors.append(r60t3)
+
+            # 40 NM ring
+            ring40_tri0 = self.polygons["radtri_0"].intersection(self.polygons["convring_40"])
+            ring40_tri1 = self.polygons["radtri_1"].intersection(self.polygons["convring_40"])
+            ring40_tri2 = self.polygons["radtri_2"].intersection(self.polygons["convring_40"])
+            ring40_tri3 = self.polygons["radtri_3"].intersection(self.polygons["convring_40"])
+
+            r40t0 = Geovector("ring40_tri0",
+                              gs_min_cas=266, gs_max_cas=272,
+                              crs_min=325, crs_max=327,
+                              poly=ring40_tri0)
+            self.geovectors.append(r40t0)
+            r40t1 = Geovector("ring40_tri1",
+                              gs_min_cas=266, gs_max_cas=272,
+                              crs_min=348, crs_max=349,
+                              poly=ring40_tri1)
+            self.geovectors.append(r40t1)
+            r40t2 = Geovector("ring40_tri2",
+                              gs_min_cas=266, gs_max_cas=272,
+                              crs_min=11, crs_max=12,
+                              poly=ring40_tri2)
+            self.geovectors.append(r40t2)
+            r40t3 = Geovector("ring40_tri3",
+                              gs_min_cas=266, gs_max_cas=272,
+                              crs_min=33, crs_max=35,
+                              poly=ring40_tri3)
+            self.geovectors.append(r40t3)
+
+            # For debugging purposes
+            # plt.plot(*ring40_tri0.exterior.xy)
+            # plt.plot(*ring40_tri1.exterior.xy)
+            # plt.plot(*ring40_tri2.exterior.xy)
+            # plt.plot(*ring40_tri3.exterior.xy)
+            # plt.plot(*ring60_tri0.exterior.xy)
+            # plt.plot(*ring60_tri1.exterior.xy)
+            # plt.plot(*ring60_tri2.exterior.xy)
+            # plt.plot(*ring60_tri3.exterior.xy)
+            # plt.plot(*ring80_tri0.exterior.xy)
+            # plt.plot(*ring80_tri1.exterior.xy)
+            # plt.plot(*ring80_tri2.exterior.xy)
+            # plt.plot(*ring80_tri3.exterior.xy)
+            # plt.show()
 
     def create_swarm_zones(self):
         """
