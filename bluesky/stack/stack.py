@@ -1237,7 +1237,7 @@ def ic(filename=''):
             scenname, _ = os.path.splitext(os.path.basename(filename))
 
             # Remember this filename in IC.scn in scenario folder
-            with open(settings.scenario_path+"/"+"ic.scn", "w") as keepicfile:
+            with open(settings.scenario_path+"/"+"IC.scn", "w") as keepicfile:
                 keepicfile.write(
                     "# This file is used by BlueSky to save the last used scenario file\n")
                 keepicfile.write(
