@@ -44,7 +44,9 @@ settings.set_variable_defaults(asas_dt=1.0,
                                asas_pzr=5.0,
                                asas_pzh=1000.0,
                                asas_vmin=200.0,
-                               asas_vmax=500.0)
+                               asas_vmax=500.0,
+                               log_start=1800,
+                               log_end=9000)
 
 # Header for logfiles written by ASAS module
 ASASLOG_HEADER = ("simt [s], "
@@ -650,7 +652,7 @@ class ASAS(TrafficArrays):
         self.lospairs_unique = lospairs_unique
 
         # Update conflict and los tracker variables
-        if bs.sim.simt >= 1800 and bs.sim.simt <= 9000:
+        if bs.sim.simt >= settings.log_start and bs.sim.simt <= settings.log_end:
             for pair in confpairs_unique:
                 if pair not in self.conf_tracker.keys():
                     (id1, id2) = tuple(pair)
@@ -678,7 +680,7 @@ class ASAS(TrafficArrays):
 
         # Pairs that are no longer in conflict or los are logged
         # and deleted from the tracker dictionaries
-        if bs.sim.simt >= 1800 and bs.sim.simt <= 9000:
+        if bs.sim.simt >= settings.log_start and bs.sim.simt <= settings.log_end:
             for pair in list(self.conf_tracker.keys()):
                 if pair not in confpairs_unique:
                     (id1, id2) = tuple(pair)
@@ -722,7 +724,7 @@ class ASAS(TrafficArrays):
                     del self.los_tracker[pair]
 
         # Only log conflict positions for t between 1800 and 3600 seconds
-        if bs.sim.simt >= 1800 and bs.sim.simt <= 3600:  # 1800:
+        if bs.sim.simt >= settings.log_start and bs.sim.simt <= settings.log_end:
             for (ac1, ac2) in self.confpairs_unique:
                 idx1 = bs.traf.id2idx(ac1)
                 idx2 = bs.traf.id2idx(ac2)

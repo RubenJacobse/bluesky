@@ -7,12 +7,17 @@ and
 import os
 import csv
 
+# BlueSky imports
+from bluesky import settings
+settings.set_variable_defaults(log_start=1800,
+                               log_end=9000)
+
 # Module level constants
 PZ_RADIUS = 5.0 * 1852  # Protected zone radius in meters
 
 # Discard all data outside logging interval
-T_LOG_INTERVAL_START = 1800  # [s]
-T_LOG_INTERVAL_END = 16200  # [s]
+T_LOG_INTERVAL_START = settings.log_start # [s]
+T_LOG_INTERVAL_END = settings.log_end # [s]
 
 
 class LogListParser:
@@ -439,7 +444,7 @@ class FLSTLogOccurrenceParser(LogListParser):
             del_time = float(row[0])
             spawn_time = float(row[2])
 
-            # Do not log if outside logging interval
+            # Skip if outside logging interval
             if (spawn_time < T_LOG_INTERVAL_START
                     or del_time > T_LOG_INTERVAL_END):
                 continue
