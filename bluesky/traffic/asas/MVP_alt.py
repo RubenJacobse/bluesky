@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Created on Tue Mar 03 16:50:19 2015
+Altered MVP resolve calculation that explicitly returns
+a tuple instead of writing to asas or traf directly. Used
+only as a helper module imported by various separation methods.
 
-@author: Jerom Maas
+Based on MVP.py by Jerom Maas.
 """
 
 import numpy as np

@@ -542,8 +542,9 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             yrange = df[column].max() - df[column].min()
 
             # Set resolution method plotting orders
-            reso_methods = ["OFF", "MVP", "EBY", "LF", "LFFT", "SWARM",
-                            "SWARM-V3", "GV-SPD", "GV-CRS", "GV-BOTH"]
+            reso_methods = ["OFF", "MVP", "EBY", "LFFT", "VEL_AVG",
+                            "GV-METHOD1", "GV-METHOD2",
+                            "GV-METHOD3", "GV-METHOD4"]
             reso_order = [method for method in reso_methods
                           if method in df["resolution method"].unique()]
             level_order = df["traffic level"].unique().sort()
