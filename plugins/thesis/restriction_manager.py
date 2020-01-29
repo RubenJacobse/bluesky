@@ -590,7 +590,7 @@ class AreaRestrictionManager(TrafficArrays):
         # with that area
         for area_idx in range(self.num_areas):
             ac_indices = [ac for ac, area in conflict_pairs
-                          if area == area_idx]
+                          if (area == area_idx and not self.is_inside[area_idx, ac])]
 
             if ac_indices:
                 self.calculate_resolutions_for_single_area(area_idx, ac_indices)
