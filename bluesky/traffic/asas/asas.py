@@ -945,8 +945,14 @@ class ASAS(TrafficArrays):
                 # Waypoint recovery after conflict: Find the next active waypoint
                 # and send the aircraft to that waypoint.
                 idx_act_wpt = bs.traf.ap.route[idx].iactwp
+
+                # Check if active waypoint has already been passed
                 if bs.traf.lat[idx] > bs.traf.ap.route[idx].wplat[idx_act_wpt]:
-                    iwpid = idx_act_wpt + 1 # If past waypoint, direct to next
+                    # Go to next waypoint if current waypoint is not the last
+                    if not idx_act_wpt == len(bs.traf.ap.route[idx].wplat) - 1:
+                        iwpid = idx_act_wpt + 1
+                    else:
+                        iwpid = idx_act_wpt
                 else:
                     iwpid = bs.traf.ap.route[idx].findact(idx)
 
