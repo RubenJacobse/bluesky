@@ -86,6 +86,8 @@ class AreaRestrictionManager(TrafficArrays):
 
             # Intrusion variables
             self.is_inside = np.array([[]], dtype=bool)
+            self.prev_inconf = np.array([[]], dtype=bool)
+            self.prev_inside = np.array([[]], dtype=bool)
             self.time_to_intrusion = np.array([[]])  # [s]
 
             # ======================================================
@@ -101,6 +103,12 @@ class AreaRestrictionManager(TrafficArrays):
             self.idx_next_wp = np.array([], dtype=int)
             # Compass courses to waypoints on route in [deg]
             self.crs_to_dest_wp = np.array([])
+
+            # Intrusion parameters for logging (via plugins/area.py)
+            self.num_area_conflicts = np.array([], dtype=int)
+            self.num_area_intrusions = np.array([], dtype=int)
+            self.tot_time_in_conf = np.array([], dtype=int)
+            self.tot_time_in_area = np.array([], dtype=int)
 
             # =======================
             # Traffic parameter lists
@@ -508,6 +516,7 @@ class AreaRestrictionManager(TrafficArrays):
         for ac_idx in range(self.num_traf):
             if self.is_inside[area_idx, ac_idx]:
                 t_int = 0  # If this happens, area avoidance has failed!...
+                self.tot_time_in_area[ac_idx] += 1
             elif self.state_in_conflict[area_idx, ac_idx]:
                 # Find intersection points of the relative vector with the area
                 # and use the distance to the closest point to calculate time to
@@ -528,6 +537,7 @@ class AreaRestrictionManager(TrafficArrays):
                 intr_dist_m = intr_dist_nm * NM_TO_M
 
                 t_int = intr_dist_m / bs.traf.gs[ac_idx]
+                self.tot_time_in_conf[ac_idx] += 1
             else:
                 t_int = -1
 
@@ -538,7 +548,24 @@ class AreaRestrictionManager(TrafficArrays):
                                           self.area_ids[area_idx],
                                           int(t_int),
                                           f"{bs.traf.lat[ac_idx]:.4f}",
-                                          f"{bs.traf.lon[ac_idx]:.4f}")
+                                          f"{bs.traf.lon[ac_idx]:.4f}",
+                                          )
+
+            # If ac in conflict with area in previous time step but not
+            # in current, increment area conflict counter by 1
+            if (self.prev_inconf[area_idx, ac_idx]
+                 and not self.state_in_conflict[area_idx, ac_idx]):
+                self.num_area_conflicts[ac_idx] += 1
+
+            # If ac inside area in previous time step but not
+            # in current, increment area intrusion counter by 1
+            if (self.prev_inside[area_idx, ac_idx]
+                    and not self.is_inside[area_idx, ac_idx]):
+                self.num_area_intrusions[ac_idx] += 1
+
+        # Store for next time step
+        self.prev_inconf = np.copy(self.state_in_conflict)
+        self.prev_inside = np.copy(self.is_inside)
 
     def calculate_area_resolution_vectors(self):
         """
@@ -575,8 +602,8 @@ class AreaRestrictionManager(TrafficArrays):
                           if area_idx is not None]
         pilot_conflict_pairs = [(ac_idx, area_idx) for (area_idx, ac_idx)
                                 in zip(*np.where(self.pilot_in_conflict))]
-        state_conflict_ids = [bs.traf.id[ac_idx] for (ac_idx, _) in conflict_pairs]
-        pilot_conflict_ids = [bs.traf.id[ac_idx] for (ac_idx, _) in pilot_conflict_pairs]
+        # state_conflict_ids = [bs.traf.id[ac_idx] for (ac_idx, _) in conflict_pairs]
+        # pilot_conflict_ids = [bs.traf.id[ac_idx] for (ac_idx, _) in pilot_conflict_pairs]
 
         # Join pilot_conflict_pairs and conflict_pairs
         conflict_pairs.extend(x for x in pilot_conflict_pairs

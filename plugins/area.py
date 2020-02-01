@@ -9,39 +9,47 @@ from bluesky.tools import datalog, areafilter, \
 from bluesky.tools import geo
 from bluesky.tools.aero import ft
 from bluesky import settings
+from bluesky import stack
+
+settings.set_variable_defaults(log_start=1800, log_end=9000)
 
 # Log parameters for the flight statistics log
-header = \
-    ("Deletion time [s], "
-     + "Callsign [-], "
-     + "Spawn time [s], "
-     + "Flight time [s], "
-     + "Nominal Distance 2D [m],"
-     + "Actual Distance 2D [m], "
-    #  + "Actual Distance 3D [m], "
-    #  + "Work Done [J], "
-     + "Dist to last waypoint [m], "
-     + "Latitude [deg], "
-     + "Longitude [deg], "
-    #  + "Altitude [m], "
-    #  + "TAS [m/s], "
-    #  + "Vertical Speed [m/s], "
-    #  + "Heading [deg], "
-     + "Time in conflict [s], "
-     + "Time in LoS [s], "
-     + "Time in resolution [s], "
-     + "Num conflicts [-],"
-     + "Num LoS [-]"
-     # + "Origin Lat [deg], "
-     # + "Origin Lon [deg], "
-     # + "Destination Lat [deg], "
-     # + "Destination Lon [deg], "
-     # + "ASAS Active [bool], "
-     # + "Pilot ALT [m], "
-     # + "Pilot SPD (TAS) [m/s], "
-     # + "Pilot HDG [deg], "
-     # + "Pilot VS [m/s]"
-     )
+FLSTLOG_HEADER = (
+    "Deletion time [s],"
+    + "Callsign [-],"
+    + "Spawn time [s],"
+    + "Flight time [s],"
+    + "Extrapolated time [s],"
+    + "Nominal Distance 2D [m],"
+    + "Actual Distance 2D [m],"
+    #  + "Actual Distance 3D [m],"
+    + "Dist to last waypoint [m],"
+    + "Latitude [deg],"
+    + "Longitude [deg],"
+   #  + "Altitude [m],"
+   #  + "Vertical Speed [m/s],"
+    + "Time in conflict [s],"
+    + "Time in LoS [s],"
+    + "Time in resolution [s],"
+    + "Num conflicts [-],"
+    + "Num LoS [-],"
+    + "Num area conflicts [-],"
+    + "Num area intrusions [-],"
+    + "Time in area conflict [s],"
+    + "Time in area intrusion [s],"
+    + "ASAS Active [bool],"
+    + "TAS [m/s],"
+    + "Heading [deg],"
+    + "Work Done [J],"
+    + "Origin Lat [deg],"
+    + "Origin Lon [deg],"
+    + "Destination Lat [deg],"
+    + "Destination Lon [deg],"
+    + "Pilot SPD (TAS) [m/s],"
+    + "Pilot HDG [deg],"
+   # + "Pilot ALT [m],"
+   # + "Pilot VS [m/s]"
+)
 
 # Global data
 area = None
@@ -92,13 +100,15 @@ class Area(TrafficArrays):
         super(Area, self).__init__()
         # Parameters of area
         self.active = False
-        self.dt     = 0.5     # [s] frequency of area check (simtime)
+        self.dt     = 1    # [s] frequency of area check (simtime)
         self.name   = None
         self.swtaxi = True  # Default OFF: Doesn't do anything. See comments of set_taxi fucntion below.
         self.swtaxialt = 1500.  # Default OFF: Doesn't do anything. See comments of set_taxi fucntion below.
 
+        self.avg_ntraf = 0 # Average number of aircraft in scenario
+
         # The FLST logger
-        self.logger = datalog.crelog('FLSTLOG', None, header)
+        self.logger = datalog.crelog('FLSTLOG', None, FLSTLOG_HEADER)
 
         with RegisterElementParameters(self):
             self.inside      = np.array([],dtype = np.bool) # In test area or not
@@ -136,7 +146,10 @@ class Area(TrafficArrays):
         else:
             delidxalt = []
 
-
+        # Update average traffic count
+        if sim.simt > settings.log_start and sim.simt <= settings.log_end:
+            t_log = sim.simt - settings.log_start # [s] time passed since start of logging
+            self.avg_ntraf = self.avg_ntraf * (t_log-1)/t_log + traf.ntraf / t_log
 
         # Find out which aircraft are currently inside the experiment area, and
         # determine which aircraft need to be deleted.
@@ -158,41 +171,49 @@ class Area(TrafficArrays):
                                             traf.ap.route[ac_idx].wplat[-1],
                                             traf.ap.route[ac_idx].wplon[-1])
 
-                if (self.create_time[ac_idx] >= 1800
-                      and self.create_time[ac_idx] <= 9000):
-                    self.logger.log(
-                        f"{traf.id[ac_idx]}",
-                        f"{self.create_time[ac_idx]}",
-                        f"{(sim.simt - self.create_time[ac_idx]):.0f}",
-                        f"{routedist:.0f}",
-                        f"{self.distance2D[ac_idx]:.0f}",
-                        # f"{self.distance3D[ac_idx]:.0f}",
-                        # f"{self.work[ac_idx]:.0f}",
-                        f"{lastwpdist:.0f}",
-                        f"{traf.lat[ac_idx]:.4f}",
-                        f"{traf.lon[ac_idx]:.4f}",
-                        # f"{traf.alt[ac_idx]:.0f}",
-                        # f"{traf.tas[ac_idx]:.0f}",
-                        # f"{traf.vs[ac_idx]:.0f}",
-                        # f"{traf.hdg[ac_idx]:.0f}",
-                        f"{traf.asas.tot_time_inconf[ac_idx]:.0f}",
-                        f"{traf.asas.tot_time_inlos[ac_idx]:.0f}",
-                        f"{traf.asas.tot_time_inreso[ac_idx]:.0f}",
-                        f"{traf.asas.num_tot_conf[ac_idx]}",
-                        f"{traf.asas.num_tot_los[ac_idx]}",
-                        # traf.ap.origlat[ac_idx],
-                        # traf.ap.origlon[ac_idx],
-                        # traf.ap.destlat[ac_idx],
-                        # traf.ap.destlon[ac_idx],
-                        # traf.asas.active[ac_idx],
-                        # traf.pilot.alt[ac_idx],
-                        # traf.pilot.tas[ac_idx],
-                        # traf.pilot.vs[ac_idx],
-                        # traf.pilot.hdg[ac_idx]
-                    )
+                self.logger.log(
+                    f"{traf.id[ac_idx]}",
+                    f"{self.create_time[ac_idx]}",
+                    f"{(sim.simt - self.create_time[ac_idx]):.0f}",
+                    f"{(sim.simt - self.create_time[ac_idx] + lastwpdist/traf.tas[ac_idx]):.0f}",
+                    f"{routedist:.0f}",
+                    f"{self.distance2D[ac_idx]:.0f}",
+                    # f"{self.distance3D[ac_idx]:.0f}",
+                    f"{lastwpdist:.0f}",
+                    f"{traf.lat[ac_idx]:.5f}",
+                    f"{traf.lon[ac_idx]:.5f}",
+                    # f"{traf.alt[ac_idx]:.0f}",
+                    # f"{traf.vs[ac_idx]:.0f}",
+                    f"{traf.asas.tot_time_inconf[ac_idx]:.0f}",
+                    f"{traf.asas.tot_time_inlos[ac_idx]:.0f}",
+                    f"{traf.asas.tot_time_inreso[ac_idx]:.0f}",
+                    f"{traf.asas.num_tot_conf[ac_idx]:.0f}",
+                    f"{traf.asas.num_tot_los[ac_idx]:.0f}",
+                    f"{traf.restrictions.num_area_conflicts[ac_idx]:.0f}",
+                    f"{traf.restrictions.num_area_intrusions[ac_idx]:.0f}",
+                    f"{traf.restrictions.tot_time_in_conf[ac_idx]:.0f}",
+                    f"{traf.restrictions.tot_time_in_area[ac_idx]:.0f}",
+                    f"{traf.asas.active[ac_idx]}",
+                    f"{traf.tas[ac_idx]:.1f}",
+                    f"{traf.hdg[ac_idx]:.1f}",
+                    f"{self.work[ac_idx]:.0f}",
+                    f"{traf.ap.route[ac_idx].wplat[0]:.5f}",
+                    f"{traf.ap.route[ac_idx].wplon[0]:.5f}",
+                    f"{traf.ap.route[ac_idx].wplat[-1]:.5f}",
+                    f"{traf.ap.route[ac_idx].wplon[-1]:.5f}",
+                    f"{traf.pilot.tas[ac_idx]:.1f}",
+                    f"{traf.pilot.hdg[ac_idx]:.1f}",
+                    # traf.pilot.alt[ac_idx],
+                    # traf.pilot.vs[ac_idx]
+                )
+
             # delete all aicraft in self.delidx
             traf.delete(delidx)
 
+            # Last aircraft has been deleted, log average number of aircraft
+            # in scenario during logging interval
+            if not traf.ntraf:
+                self.logger.log("avg ntraf", self.avg_ntraf)
 
         # Delete all aicraft in self.delidxalt
         if len(delidxalt) > 0:

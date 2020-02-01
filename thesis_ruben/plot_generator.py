@@ -451,14 +451,14 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             df_geometry = df[df["#geometry"] == geometry]
             # self.make_single_figure(geometry,
             #                         df_geometry,
-            #                         "conflict duration [s]",
+            #                         "duration [s]",
             #                         "conflict_duration")
 
             df_LoS_sev = df[(df["#geometry"] == geometry)
                             & (df["is LoS [-]"] == True)]
             # self.make_single_figure(geometry,
             #                         df_LoS_sev,
-            #                         "conflict duration [s]",
+            #                         "duration [s]",
             #                         "los_duration")
             self.make_single_figure(geometry,
                                     df_LoS_sev,
@@ -510,12 +510,16 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
                                     "t_in_reso")
             self.make_single_figure(geometry,
                                     df_geometry,
-                                    "num tot conf [-]",
+                                    "num conf per ac [-]",
                                     "ac_conf")
             self.make_single_figure(geometry,
                                     df_geometry,
-                                    "num tot los [-]",
+                                    "num los per ac [-]",
                                     "ac_los")
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "num ac conf per/ac/dist [1/m]",
+                                    "conf_per_dist")
 
             # Make figures based on data in flstlog_occurence.csv
             df = pd.read_csv(os.path.join(self.batch_dir,

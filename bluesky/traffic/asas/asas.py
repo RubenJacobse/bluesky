@@ -49,21 +49,34 @@ settings.set_variable_defaults(asas_dt=1.0,
                                log_end=9000)
 
 # Header for logfiles written by ASAS module
-ASASLOG_HEADER = ("simt [s], "
-                  + "ac1, "
-                  + "ac2, "
-                  + "LoS [-], "
-                  + "Sev [-], "
-                  + "duration [-], "
-                  + "delta v [kts], "
-                  + "delta trk [deg]")
-ASASPOS_HEADER = ("simt [s], "
-                  + "LoS [-], "
-                  + "lat [deg], "
-                  + "lon [deg]")
+ASASLOG_HEADER = (
+    "simt [s],"
+    + "ac1,"
+    + "ac2,"
+    + "is LoS [-],"
+    + "duration [s],"
+    + "dist min [m],"
+    + "dcpa min [m],"
+    + "tcpa min [s],"
+    + "tcpa init [s],"
+    + "tLoS init [s],"
+    + "dcpa init [m],"
+    + "ac1 lat init [deg],"
+    + "ac1 lon init [deg],"
+    + "ac2 lat init [deg],"
+    + "ac2 lon init [deg],"
+    + "ac1 gseast init [m/s],"
+    + "ac1 gsnorth init [m/s],"
+    + "ac2 gseast init [m/s],"
+    + "ac2 gsnorth init [m/s]"
+)
+ASASPOS_HEADER = (
+    "simt [s],"
+    + "LoS [-],"
+    + "lat [deg],"
+    + "lon [deg]"
+)
 
-# Constants
-MPS_TO_KTS = 1.94384449
 
 class ASAS(TrafficArrays):
     """
@@ -656,27 +669,78 @@ class ASAS(TrafficArrays):
         # Update conflict and los tracker variables
         if bs.sim.simt >= settings.log_start and bs.sim.simt <= settings.log_end:
             for pair in confpairs_unique:
+                pair_idx = self.confpairs.index(tuple(pair))
+                dist = self.dist[pair_idx]
+                tcpa = self.tcpa[pair_idx]
+                dcpa = self.dcpa[pair_idx]
                 if pair not in self.conf_tracker.keys():
                     (id1, id2) = tuple(pair)
-                    self.conf_tracker[pair] = {"duration": 1}
+                    idx1 = bs.traf.id2idx(id1)
+                    idx2 = bs.traf.id2idx(id2)
+                    self.conf_tracker[pair] = {
+                        "duration": 1,
+                        "dist min": dist,
+                        "dcpa min": dcpa,
+                        "tcpa min": tcpa,
+                        "tcpa init": tcpa,
+                        "tLOS init": self.tLOS[pair_idx],
+                        "dcpa init": dcpa,
+                        "ac1 lat init": bs.traf.lat[idx1],
+                        "ac1 lon init": bs.traf.lon[idx1],
+                        "ac2 lat init": bs.traf.lat[idx2],
+                        "ac2 lon init": bs.traf.lon[idx2],
+                        "ac1 gseast init": bs.traf.gseast[idx1],
+                        "ac1 gsnorth init": bs.traf.gsnorth[idx1],
+                        "ac2 gseast init": bs.traf.gseast[idx2],
+                        "ac2 gsnorth init": bs.traf.gsnorth[idx2],
+                    }
                     self.num_tot_conf[bs.traf.id2idx(id1)] += 1
                     self.num_tot_conf[bs.traf.id2idx(id2)] += 1
                 else:
                     self.conf_tracker[pair]["duration"] += 1
+                    if dist < self.conf_tracker[pair]["dcpa min"]:
+                        self.conf_tracker[pair]["dcpa min"] = dist
+                    if tcpa < self.conf_tracker[pair]["tcpa min"]:
+                        self.conf_tracker[pair]["tcpa min"] = tcpa
+                    if dcpa < self.conf_tracker[pair]["dcpa min"]:
+                        self.conf_tracker[pair]["dcpa min"] = dcpa
 
             for pair in lospairs_unique:
-                pair_idx = self.confpairs.index(tuple(pair))
-                severity = (self.R - self.dist[pair_idx]) / self.R
+                pair_idx = self.lospairs.index(tuple(pair))
+                dist = self.dist[pair_idx]
+                tcpa = self.tcpa[pair_idx]
+                dcpa = self.dcpa[pair_idx]
                 if pair not in self.los_tracker.keys():
                     (id1, id2) = tuple(pair)
-                    self.los_tracker[pair] = {"duration": 1,
-                                              "severity": severity}
+                    idx1 = bs.traf.id2idx(id1)
+                    idx2 = bs.traf.id2idx(id2)
+                    self.los_tracker[pair] = {
+                        "duration": 1,
+                        "dist min": dist,
+                        "dcpa min": dcpa,
+                        "tcpa min": tcpa,
+                        "tcpa init": tcpa,
+                        "tLOS init": self.tLOS[pair_idx],
+                        "dcpa init": dcpa,
+                        "ac1 lat init": bs.traf.lat[idx1],
+                        "ac1 lon init": bs.traf.lon[idx1],
+                        "ac2 lat init": bs.traf.lat[idx2],
+                        "ac2 lon init": bs.traf.lon[idx2],
+                        "ac1 gseast init": bs.traf.gseast[idx1],
+                        "ac1 gsnorth init": bs.traf.gsnorth[idx1],
+                        "ac2 gseast init": bs.traf.gseast[idx2],
+                        "ac2 gsnorth init": bs.traf.gsnorth[idx2],
+                    }
                     self.num_tot_los[bs.traf.id2idx(id1)] += 1
                     self.num_tot_los[bs.traf.id2idx(id2)] += 1
                 else:
                     self.los_tracker[pair]["duration"] += 1
-                    if severity < self.los_tracker[pair]["severity"]:
-                        self.los_tracker[pair]["severity"] = severity
+                    if dist < self.los_tracker[pair]["dist min"]:
+                        self.los_tracker[pair]["dist min"] = dist
+                    if tcpa < self.los_tracker[pair]["tcpa min"]:
+                        self.los_tracker[pair]["tcpa min"] = tcpa
+                    if dcpa < self.los_tracker[pair]["dcpa min"]:
+                        self.los_tracker[pair]["dcpa min"] = dcpa
 
         self.resume_navigation()
 
@@ -689,18 +753,26 @@ class ASAS(TrafficArrays):
                     idx1 = bs.traf.id2idx(id1)
                     idx2 = bs.traf.id2idx(id2)
 
-                    delta_v = [bs.traf.gseast[idx1] - bs.traf.gseast[idx2],
-                               bs.traf.gsnorth[idx1] - bs.traf.gsnorth[idx2]]
-                    delta_v_abs = np.linalg.norm(delta_v)
-                    delta_trk = crs_diff(bs.traf.trk[idx1], bs.traf.trk[idx2])
-
-                    self.conf_logger.log(id1,
-                                         id2,
-                                         0,
-                                         0,
-                                         self.conf_tracker[pair]["duration"],
-                                         f"{(delta_v_abs * MPS_TO_KTS):.1f}",
-                                         f"{abs(delta_trk):.1f}")
+                    self.conf_logger.log(
+                        id1,
+                        id2,
+                        0,
+                        f"{self.conf_tracker[pair]['duration']:.0f}",
+                        f"{self.conf_tracker[pair]['dist min']:.0f}",
+                        f"{self.conf_tracker[pair]['dcpa min']:.0f}",
+                        f"{self.conf_tracker[pair]['tcpa min']:.0f}",
+                        f"{self.conf_tracker[pair]['tcpa init']:.0f}",
+                        f"{self.conf_tracker[pair]['tLOS init']:.0f}",
+                        f"{self.conf_tracker[pair]['dcpa init']:.0f}",
+                        f"{self.conf_tracker[pair]['ac1 lat init']:.5f}",
+                        f"{self.conf_tracker[pair]['ac1 lon init']:.5f}",
+                        f"{self.conf_tracker[pair]['ac2 lat init']:.5f}",
+                        f"{self.conf_tracker[pair]['ac2 lon init']:.5f}",
+                        f"{self.conf_tracker[pair]['ac1 gseast init']:.1f}",
+                        f"{self.conf_tracker[pair]['ac1 gsnorth init']:.1f}",
+                        f"{self.conf_tracker[pair]['ac2 gseast init']:.1f}",
+                        f"{self.conf_tracker[pair]['ac2 gsnorth init']:.1f}",
+                    )
                     del self.conf_tracker[pair]
 
             for pair in list(self.los_tracker.keys()):
@@ -709,23 +781,29 @@ class ASAS(TrafficArrays):
                     idx1 = bs.traf.id2idx(id1)
                     idx2 = bs.traf.id2idx(id2)
 
-                    delta_v = [bs.traf.gseast[idx1] - bs.traf.gseast[idx2],
-                               bs.traf.gsnorth[idx1] - bs.traf.gsnorth[idx2]]
-                    delta_v_abs = np.linalg.norm(delta_v)
-                    delta_trk = crs_diff(bs.traf.trk[idx1], bs.traf.trk[idx2])
-
                     self.conf_logger.log(
                         id1,
                         id2,
                         1,
-                        f"{self.los_tracker[pair]['severity']:.4f}",
-                        self.los_tracker[pair]["duration"],
-                        f"{(delta_v_abs * MPS_TO_KTS):.1f}",
-                        f"{abs(delta_trk):.1f}"
+                        f"{self.los_tracker[pair]['duration']:.0f}",
+                        f"{self.los_tracker[pair]['dist min']:.0f}",
+                        f"{self.los_tracker[pair]['dcpa min']:.0f}",
+                        f"{self.los_tracker[pair]['tcpa min']:.0f}",
+                        f"{self.los_tracker[pair]['tcpa init']:.0f}",
+                        f"{self.los_tracker[pair]['tLOS init']:.0f}",
+                        f"{self.los_tracker[pair]['dcpa init']:.0f}",
+                        f"{self.los_tracker[pair]['ac1 lat init']:.5f}",
+                        f"{self.los_tracker[pair]['ac1 lon init']:.5f}",
+                        f"{self.los_tracker[pair]['ac2 lat init']:.5f}",
+                        f"{self.los_tracker[pair]['ac2 lon init']:.5f}",
+                        f"{self.los_tracker[pair]['ac1 gseast init']:.1f}",
+                        f"{self.los_tracker[pair]['ac1 gsnorth init']:.1f}",
+                        f"{self.los_tracker[pair]['ac2 gseast init']:.1f}",
+                        f"{self.los_tracker[pair]['ac2 gsnorth init']:.1f}",
                     )
                     del self.los_tracker[pair]
 
-        # Only log conflict positions for t between 1800 and 3600 seconds
+        # Only log conflict positions during logging interval
         if bs.sim.simt >= settings.log_start and bs.sim.simt <= settings.log_end:
             for (ac1, ac2) in self.confpairs_unique:
                 idx1 = bs.traf.id2idx(ac1)
@@ -862,15 +940,3 @@ class ASAS(TrafficArrays):
 
         # Remove pairs that are past CPA or have deleted aircraft from the list
         self.resopairs -= delpairs
-
-
-def crs_diff(crs_a, crs_b):
-    """
-    Returns the absolute difference per element between two course vectors crs_a
-    and crs_b.
-    """
-
-    # Calculate absolute angle difference between both courses and the reference
-    diff = np.remainder(crs_b - crs_a + 180, 360) - 180
-
-    return diff

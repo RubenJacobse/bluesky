@@ -6,6 +6,13 @@ and
 # Python imports
 import os
 import csv
+import sys
+
+# Third-party imports
+import numpy as np
+
+# Enable BlueSky imports by adding the project folder to the path
+sys.path.append(os.path.abspath(os.path.join('..')))
 
 # BlueSky imports
 from bluesky import settings
@@ -14,6 +21,7 @@ settings.set_variable_defaults(log_start=1800,
 
 # Module level constants
 PZ_RADIUS = 5.0 * 1852  # Protected zone radius in meters
+MPS_TO_KTS = 1.94384449  # Conversion factor from m/s to kts
 
 # Discard all data outside logging interval
 T_LOG_INTERVAL_START = settings.log_start # [s]
@@ -259,7 +267,15 @@ class ASASLogSummaryParser(LogListParser):
         num_conf = 0
 
         for row in log_data:
-            [simt, _, _, is_los, _, _, _, _] = row
+            # # Last row of FLSTLOG contains only time-averaged number
+            # # of aircraft in scenario during logging period
+            # if row[1] == "avg ntraf":
+            #     avg_ntraf = float(row[2])
+            #     break
+
+            [simt, id1, id2, is_los, duration, dist_min, dcpa_min, tcpa_min,
+             tcpa_init, tlos_init, dcpa_init, lat1, lon1, lat2, lon2,
+             gseast1, gsnorth1, gseast2, gsnorth2] = row
             simt = int(float(simt))
             is_los = int(is_los)
 
@@ -349,30 +365,47 @@ class ASASLogOccurrenceParser(LogListParser):
         # Loop over all rows and create a dictionary with each conflict
         # and its parameters listed once
         for row in log_data:
-            [simt, ac1_id, ac2_id, is_los, los_severity, duration, delta_v,
-             delta_trk] = row
-            simt = int(float(simt))
+            # # Last row of FLSTLOG contains only time-averaged number
+            # # of aircraft in scenario during logging period
+            # if row[1] == "avg ntraf":
+            #     break
 
+            [simt, id1, id2, is_los, duration, dist_min, dcpa_min, tcpa_min,
+             tcpa_init, tlos_init, dcpa_init, lat1, lon1, lat2, lon2,
+             gseast1, gsnorth1, gseast2, gsnorth2] = row
+
+            simt = int(float(simt))
             if simt < T_LOG_INTERVAL_START or simt > T_LOG_INTERVAL_END:
                 continue
 
-            confpair = f"{ac1_id}-{ac2_id}"
-            is_los = str(bool(int(is_los)))
-            los_severity = float(los_severity)
+            confpair = f"{id1}-{id2}"
+            is_los = int(is_los)
+            los_severity = (PZ_RADIUS - float(dist_min)) / PZ_RADIUS
             duration = int(duration)
             start = simt - duration
             end = simt
+            gseast1 = float(gseast1)
+            gsnorth1 = float(gsnorth1)
+            gseast2 = float(gseast2)
+            gsnorth2 = float(gsnorth2)
+
+            # Relative velocity and track at start of conflict/los
+            delta_v = [gseast1 - gseast2, gsnorth1 - gsnorth2]
+            delta_v_abs = np.linalg.norm(delta_v) * MPS_TO_KTS
+            trk1 = np.degrees(np.arctan2(gseast1, gsnorth1)) % 360
+            trk2 = np.degrees(np.arctan2(gseast2, gsnorth2)) % 360
+            delta_trk = abs(crs_diff(trk1, trk2))
 
             outputlines.append(f"{geometry},{reso_method},{traffic_level},"
                                + f"{scenario},{confpair},{duration},{is_los},"
                                + f"{los_severity:0.4f},{start},{end},"
-                               + f"{delta_v},{delta_trk}")
+                               + f"{delta_v_abs:.1f},{delta_trk:.1f}")
 
         self.write_lines_to_output_file(outputlines)
 
     def set_header(self):
         self.header = ("geometry,resolution method,traffic level,scenario,"
-                       + "confpair,conflict duration [s],is LoS [-],"
+                       + "confpair,duration [s],is LoS [-],"
                        + "LoS severity [-],t start [s],t end [s],delta v [kts],"
                        + "delta trk [deg]")
 
@@ -407,7 +440,7 @@ class ASASPosLocationParser(LogListParser):
 
             lat = float(lat)
             lon = float(lon)
-            is_los = str(bool(int(is_los)))
+            is_los = int(is_los)
 
             # Write lines for ac1 and ac2 at once
             outputlines.append(f"{geometry},{reso_method},{traffic_level},"
@@ -418,7 +451,7 @@ class ASASPosLocationParser(LogListParser):
 
     def set_header(self):
         self.header = ("geometry,resolution method,traffic level,scenario,"
-                       + "ac lat [deg],ac lon[deg],is LoS [-]")
+                       + "ac lat [deg],ac lon [deg],is LoS [-]")
 
 
 class FLSTLogOccurrenceParser(LogListParser):
@@ -441,7 +474,13 @@ class FLSTLogOccurrenceParser(LogListParser):
 
         outputlines = []
         for row in log_data:
+            # Last row of FLSTLOG contains only time-averaged number
+            # of aircraft in scenario during logging period
+            if row[1] == "avg ntraf":
+                break
+
             del_time = float(row[0])
+            ac_id = row[1]
             spawn_time = float(row[2])
 
             # Skip if outside logging interval
@@ -449,26 +488,38 @@ class FLSTLogOccurrenceParser(LogListParser):
                     or del_time > T_LOG_INTERVAL_END):
                 continue
 
-            ac_id = row[1]
             flight_time = float(row[3])
-            nominal_dist = float(row[4])
-            actual_dist = float(row[5])
-            dist_to_last_wp = float(row[6])
-            time_in_conf = float(row[9])
-            time_in_los = float(row[10])
-            time_in_reso = float(row[11])
-            num_tot_conf = int(row[12])
-            num_tot_los = int(row[13])
+            #extrap_time = float(row[4]) # total to dest
+            nominal_dist = float(row[5])
+            actual_dist = float(row[6])
+            dist_to_last_wp = float(row[7])
+            # lat = float(row[8])
+            # lon = float(row[9])
+            time_in_conf = float(row[10])
+            time_in_los = float(row[11])
+            time_in_reso = float(row[12])
+            num_tot_conf = float(row[13])
+            num_tot_los = float(row[14])
+            num_tot_area_conf = int(row[15])
+            num_tot_area_int = int(row[16])
+            time_in_area_conf = float(row[17])
+            time_in_area_int = float(row[18])
 
             route_efficiency = nominal_dist / (actual_dist + dist_to_last_wp)
             perc_time_in_conf = time_in_conf / flight_time * 100
             perc_time_in_los = time_in_los / flight_time * 100
             perc_time_in_reso = time_in_reso / flight_time * 100
+            perc_time_in_area_conf = time_in_area_conf / flight_time * 100
+            perc_time_in_area_int = time_in_area_int / flight_time * 100
 
             line = (f"{geometry},{reso_method},{traffic_level},{scenario},"
                     + f"{ac_id},{route_efficiency:0.3f},"
                     + f"{perc_time_in_conf:0.3f},{perc_time_in_los:0.3f},"
-                    + f"{perc_time_in_reso:0.3f},{num_tot_conf},{num_tot_los}")
+                    + f"{perc_time_in_reso:0.3f},{num_tot_conf},{num_tot_los},"
+                    + f"{num_tot_conf/actual_dist:0.10f},"
+                    + f"{perc_time_in_area_conf:0.3f},"
+                    + f"{perc_time_in_area_int:0.3f},"
+                    + f"{num_tot_area_conf},{num_tot_area_int}")
             outputlines.append(line)
 
         self.write_lines_to_output_file(outputlines)
@@ -476,7 +527,10 @@ class FLSTLogOccurrenceParser(LogListParser):
     def set_header(self):
         self.header = ("geometry,resolution method,traffic level,scenario,"
                        + "ac id,route efficiency [-],t in conf [%],t in los [%],"
-                       + "t in reso [%],num tot conf [-],num tot los [-]")
+                       + "t in reso [%],num conf per ac [-],num los per ac [-],"
+                       + "num ac conf per/ac/dist [1/m],t in area conf [%],"
+                       + "t in area intrusion [%],num area conf per ac [-],"
+                       + "num area int per ac [-]")
 
 
 class FLSTLogSummaryParser(LogListParser):
@@ -500,21 +554,39 @@ class FLSTLogSummaryParser(LogListParser):
         num_turnaround = 0
 
         for row in log_data:
+            # Last row of FLSTLOG contains only time-averaged number
+            # of aircraft in scenario during logging period
+            if row[1] == "avg ntraf":
+                avg_ntraf = float(row[2])
+                break
+
             del_time = float(row[0])
             spawn_time = float(row[2])
             if (spawn_time < T_LOG_INTERVAL_START
                     or del_time > T_LOG_INTERVAL_END):
                 continue
 
-            lat = float(row[7])
+            lat = float(row[8])
 
             if lat < 0:
                 num_turnaround += 1
 
         outputline = (f"{geometry},{reso_method},{traffic_level},{scenario},"
-                      + f"{num_turnaround}")
+                      + f"{num_turnaround},{avg_ntraf:.1f}")
         self.write_to_output_file(outputline)
 
     def set_header(self):
         self.header = ("geometry,resolution method,traffic level,scenario,"
-                       + "num turnaround [-]")
+                       + "num turnaround [-],avg num ac [-]")
+
+
+def crs_diff(crs_a, crs_b):
+    """
+    Returns the absolute difference per element between two course vectors crs_a
+    and crs_b.
+    """
+
+    # Calculate absolute angle difference between both courses and the reference
+    diff = np.remainder(crs_b - crs_a + 180, 360) - 180
+
+    return diff
