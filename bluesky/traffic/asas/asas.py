@@ -206,6 +206,8 @@ class ASAS(TrafficArrays):
         # NOTE: Should this also be moved to inside clear_conflict_database()?
         self.dcpa = np.array([])  # CPA distance
 
+        self.avg_ntraf = 0 # Average number of aircraft in scenario
+
     def clear_conflict_database(self):
         """
         Clear the ASAS conflict database and reset the intial state.
@@ -265,6 +267,13 @@ class ASAS(TrafficArrays):
                 self.noresolst.remove(ac_id)
 
         super(ASAS, self).delete(idx)
+
+        # Last aircraft to be deleted, log average number of aircraft
+        # in scenario during logging interval (last line of logfile).
+        # We test against ntraf == 1 because the Traffic object first calls
+        # delete() on its children before deleting its own traffic elements.
+        if bs.traf.ntraf == 1:
+            self.conf_logger.log("avg ntraf", self.avg_ntraf)
 
     def toggle(self, flag=None):
         """
@@ -818,6 +827,12 @@ class ASAS(TrafficArrays):
                 self.pos_logger.log(is_los,
                                     f"{bs.traf.lat[idx2]:.4f}",
                                     f"{bs.traf.lon[idx2]:.4f}")
+
+        # Update average traffic count
+        if bs.sim.simt > settings.log_start and bs.sim.simt <= settings.log_end:
+            # [s] time passed since start of logging
+            t_log = bs.sim.simt - settings.log_start
+            self.avg_ntraf = self.avg_ntraf * (t_log-1)/t_log + bs.traf.ntraf / t_log
 
     def resume_navigation(self):
         """

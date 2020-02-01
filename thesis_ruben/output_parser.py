@@ -267,11 +267,11 @@ class ASASLogSummaryParser(LogListParser):
         num_conf = 0
 
         for row in log_data:
-            # # Last row of FLSTLOG contains only time-averaged number
-            # # of aircraft in scenario during logging period
-            # if row[1] == "avg ntraf":
-            #     avg_ntraf = float(row[2])
-            #     break
+            # Last row of ASASLOG contains only time-averaged number
+            # of aircraft in scenario during logging period
+            if row[1] == "avg ntraf":
+                avg_ntraf = float(row[2])
+                break
 
             [simt, id1, id2, is_los, duration, dist_min, dcpa_min, tcpa_min,
              tcpa_init, tlos_init, dcpa_init, lat1, lon1, lat2, lon2,
@@ -295,7 +295,8 @@ class ASASLogSummaryParser(LogListParser):
                          "scenario": scenario,
                          "num_conf": num_conf,
                          "num_los": num_los,
-                         "int_prev_rate": int_prev_rate}
+                         "int_prev_rate": int_prev_rate,
+                         "avg_ntraf": avg_ntraf}
 
         self.summary_list.append(current_stats)
 
@@ -317,7 +318,8 @@ class ASASLogSummaryParser(LogListParser):
             outputline = (f'{scen["geometry"]},{scen["reso_method"]},'
                           + f'{scen["traffic_level"]},{scen["scenario"]},'
                           + f'{scen["num_conf"]},{scen["num_los"]},'
-                          + f'{scen["int_prev_rate"]:.3f},{scen["dep"]:.3f}')
+                          + f'{scen["int_prev_rate"]:.3f},{scen["dep"]:.3f},'
+                          + f'{scen["avg_ntraf"]:.2f}')
             self.write_to_output_file(outputline)
 
     def get_baseline_stats(self, geometry, traffic_level, scenario):
@@ -339,7 +341,8 @@ class ASASLogSummaryParser(LogListParser):
 
     def set_header(self):
         self.header = ("geometry,resolution method,traffic level,scenario,"
-                       + "num conflicts [-],num LoS [-],IPR [-],DEP [-]")
+                       + "num conflicts [-],num LoS [-],IPR [-],DEP [-],"
+                       + "avg num ac [-]")
 
 
 class ASASLogOccurrenceParser(LogListParser):
@@ -365,10 +368,10 @@ class ASASLogOccurrenceParser(LogListParser):
         # Loop over all rows and create a dictionary with each conflict
         # and its parameters listed once
         for row in log_data:
-            # # Last row of FLSTLOG contains only time-averaged number
-            # # of aircraft in scenario during logging period
-            # if row[1] == "avg ntraf":
-            #     break
+            # Last row of ASASLOG contains only time-averaged number
+            # of aircraft in scenario during logging period
+            if row[1] == "avg ntraf":
+                break
 
             [simt, id1, id2, is_los, duration, dist_min, dcpa_min, tcpa_min,
              tcpa_init, tlos_init, dcpa_init, lat1, lon1, lat2, lon2,
@@ -474,11 +477,6 @@ class FLSTLogOccurrenceParser(LogListParser):
 
         outputlines = []
         for row in log_data:
-            # Last row of FLSTLOG contains only time-averaged number
-            # of aircraft in scenario during logging period
-            if row[1] == "avg ntraf":
-                break
-
             del_time = float(row[0])
             ac_id = row[1]
             spawn_time = float(row[2])
@@ -554,12 +552,6 @@ class FLSTLogSummaryParser(LogListParser):
         num_turnaround = 0
 
         for row in log_data:
-            # Last row of FLSTLOG contains only time-averaged number
-            # of aircraft in scenario during logging period
-            if row[1] == "avg ntraf":
-                avg_ntraf = float(row[2])
-                break
-
             del_time = float(row[0])
             spawn_time = float(row[2])
             if (spawn_time < T_LOG_INTERVAL_START
@@ -572,12 +564,12 @@ class FLSTLogSummaryParser(LogListParser):
                 num_turnaround += 1
 
         outputline = (f"{geometry},{reso_method},{traffic_level},{scenario},"
-                      + f"{num_turnaround},{avg_ntraf:.1f}")
+                      + f"{num_turnaround}")
         self.write_to_output_file(outputline)
 
     def set_header(self):
         self.header = ("geometry,resolution method,traffic level,scenario,"
-                       + "num turnaround [-],avg num ac [-]")
+                       + "num turnaround [-]")
 
 
 def crs_diff(crs_a, crs_b):

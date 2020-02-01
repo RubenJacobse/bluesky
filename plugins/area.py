@@ -105,8 +105,6 @@ class Area(TrafficArrays):
         self.swtaxi = True  # Default OFF: Doesn't do anything. See comments of set_taxi fucntion below.
         self.swtaxialt = 1500.  # Default OFF: Doesn't do anything. See comments of set_taxi fucntion below.
 
-        self.avg_ntraf = 0 # Average number of aircraft in scenario
-
         # The FLST logger
         self.logger = datalog.crelog('FLSTLOG', None, FLSTLOG_HEADER)
 
@@ -145,11 +143,6 @@ class Area(TrafficArrays):
             self.oldalt = traf.alt
         else:
             delidxalt = []
-
-        # Update average traffic count
-        if sim.simt > settings.log_start and sim.simt <= settings.log_end:
-            t_log = sim.simt - settings.log_start # [s] time passed since start of logging
-            self.avg_ntraf = self.avg_ntraf * (t_log-1)/t_log + traf.ntraf / t_log
 
         # Find out which aircraft are currently inside the experiment area, and
         # determine which aircraft need to be deleted.
@@ -209,11 +202,6 @@ class Area(TrafficArrays):
 
             # delete all aicraft in self.delidx
             traf.delete(delidx)
-
-            # Last aircraft has been deleted, log average number of aircraft
-            # in scenario during logging interval
-            if not traf.ntraf:
-                self.logger.log("avg ntraf", self.avg_ntraf)
 
         # Delete all aicraft in self.delidxalt
         if len(delidxalt) > 0:
