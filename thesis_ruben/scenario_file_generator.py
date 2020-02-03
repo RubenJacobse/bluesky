@@ -142,7 +142,7 @@ class ScenarioGenerator():
         if "GV" in self.resolution_method:
             self.create_geovectors()
         self.swarm_zones = []
-        if "SWARM-V3" in self.resolution_method:
+        if "VEL_AVG" in self.resolution_method:
             self.create_swarm_zones()
 
         # Create aircraft and store for further use
