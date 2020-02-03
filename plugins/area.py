@@ -9,7 +9,6 @@ from bluesky.tools import datalog, areafilter, \
 from bluesky.tools import geo
 from bluesky.tools.aero import ft
 from bluesky import settings
-from bluesky import stack
 
 settings.set_variable_defaults(log_start=1800, log_end=9000)
 

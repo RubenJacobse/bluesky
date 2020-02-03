@@ -129,11 +129,6 @@ class ASAS(TrafficArrays):
             # ASAS info per aircraft:
             self.inconf = np.array([], dtype=bool)  # In-conflict flag
             self.inlos = np.array([], dtype=bool)  # In loss of separation flag
-            self.tot_time_inconf = np.array([])  # Total time spent in conflict
-            self.tot_time_inlos = np.array([])  # Total time spent in LoS
-            self.tot_time_inreso = np.array([])  # Total time spent in resolutions
-            self.num_tot_conf = np.array([], dtype=int)  # Total number of conflicts
-            self.num_tot_los = np.array([], dtype=int)  # Total number of LoS
             self.tcpamax = np.array([])  # Maximum time to CPA for aircraft in conflict
             self.active = np.array([], dtype=bool)  # whether the autopilot follows ASAS or not
             self.trk = np.array([])  # heading provided by the ASAS [deg]
@@ -141,7 +136,14 @@ class ASAS(TrafficArrays):
             self.alt = np.array([])  # alt provided by the ASAS [m]
             self.vs = np.array([])  # vspeed provided by the ASAS [m/s]
 
-        # Create a new conflict logger
+            # Logging statistics per aircraft
+            self.tot_time_inconf = np.array([])  # Total time spent in conflict
+            self.tot_time_inlos = np.array([])  # Total time spent in LoS
+            self.tot_time_inreso = np.array([])  # Total time spent in resolutions
+            self.num_tot_conf = np.array([], dtype=int)  # Total number of conflicts
+            self.num_tot_los = np.array([], dtype=int)  # Total number of LoS
+
+        # Create conflict and position loggers
         self.conf_logger = datalog.crelog("ASASLOG", None, ASASLOG_HEADER)
         self.conf_logger.start()
         self.pos_logger = datalog.crelog("ASASPOS", None, ASASPOS_HEADER)
@@ -703,8 +705,8 @@ class ASAS(TrafficArrays):
                         "ac2 gseast init": bs.traf.gseast[idx2],
                         "ac2 gsnorth init": bs.traf.gsnorth[idx2],
                     }
-                    self.num_tot_conf[bs.traf.id2idx(id1)] += 1
-                    self.num_tot_conf[bs.traf.id2idx(id2)] += 1
+                    self.num_tot_conf[idx1] += 1
+                    self.num_tot_conf[idx2] += 1
                 else:
                     self.conf_tracker[pair]["duration"] += 1
                     if dist < self.conf_tracker[pair]["dcpa min"]:
@@ -740,8 +742,8 @@ class ASAS(TrafficArrays):
                         "ac2 gseast init": bs.traf.gseast[idx2],
                         "ac2 gsnorth init": bs.traf.gsnorth[idx2],
                     }
-                    self.num_tot_los[bs.traf.id2idx(id1)] += 1
-                    self.num_tot_los[bs.traf.id2idx(id2)] += 1
+                    self.num_tot_los[idx1] += 1
+                    self.num_tot_los[idx2] += 1
                 else:
                     self.los_tracker[pair]["duration"] += 1
                     if dist < self.los_tracker[pair]["dist min"]:
@@ -867,7 +869,6 @@ class ASAS(TrafficArrays):
 
             # Save for use in next timestep
             self.prev_in_swarming_area = id_in_swarming_area
-
 
     def resume_navigation_old(self):
         """

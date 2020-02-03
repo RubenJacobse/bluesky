@@ -36,6 +36,7 @@ CONFLICT_MARKER_COLOR = "blue"
 # Save figures as following type
 FIGURE_FILETYPE = "png"
 
+
 def make_batch_figures(timestamp):
     """
     Generate the figures for the batch with given timestamp.
