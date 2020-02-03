@@ -339,7 +339,7 @@ class ScenarioGenerator():
                             (min_lat, max_lon),
                             (self.corridor["south_lat"], max_lon)]
         merge_box_poly = Polygon(merge_box_coords)
-        merge_ring_poly = ring_polygon(CENTER_LON, CENTER_LON, 90)
+        merge_ring_poly = ring_polygon(CENTER_LON, CENTER_LON, 80)
         merge_circle_poly = merge_box_poly.intersection(merge_ring_poly)
         merge_wedge_poly = merge_circle_poly.difference(left_poly).difference(right_poly)
         self.polygons["merge_wedge"] = merge_wedge_poly
@@ -353,7 +353,7 @@ class ScenarioGenerator():
                           (max_lat, min_lon),
                           (self.corridor["north_lat"], min_lon)]
         div_box_poly = Polygon(div_box_coords)
-        div_ring_poly = ring_polygon(CENTER_LON, CENTER_LON, 90)
+        div_ring_poly = ring_polygon(CENTER_LON, CENTER_LON, 80)
         div_circle_poly = div_box_poly.intersection(div_ring_poly)
         div_wedge_poly = div_circle_poly.difference(left_poly).difference(right_poly)
         self.polygons["diverge_wedge"] = div_wedge_poly
@@ -478,7 +478,7 @@ class ScenarioGenerator():
             merge_area = self.polygons["mergecorwedge"].difference(
                 self.polygons["divspd_box"]
             )
-            div_area = self.polygons["divcorwedge"].intersection(
+            div_area = self.polygons["divspdring_45"].intersection(
                 self.polygons["divspd_box"]
             )
 
@@ -488,8 +488,8 @@ class ScenarioGenerator():
                                   poly=merge_area)
             self.geovectors.append(geovector)
             geovector = Geovector("DIVERGE",
-                                  gs_min_cas=276,
-                                  gs_max_cas=276,
+                                  gs_min_cas=275,
+                                  gs_max_cas=275,
                                   poly=div_area)
             self.geovectors.append(geovector)
 
@@ -500,7 +500,7 @@ class ScenarioGenerator():
             cor_area = self.polygons["corridor"].difference(
                 self.polygons["divspd_box"]
             )
-            div_area = self.polygons["divcorwedge"].intersection(
+            div_area = self.polygons["divspdring_45"].intersection(
                 self.polygons["divspd_box"]
             )
 
@@ -517,8 +517,8 @@ class ScenarioGenerator():
                                   poly=cor_area)
             self.geovectors.append(geovector)
             geovector = Geovector("DIVERGE",
-                                  gs_min_cas=276,
-                                  gs_max_cas=276,
+                                  gs_min_cas=275,
+                                  gs_max_cas=275,
                                   poly=div_area)
             self.geovectors.append(geovector)
 
