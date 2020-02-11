@@ -155,15 +155,16 @@ def find_lf_status(traf, tLOS, idx_ownship, idx_intruder):
                / (np.linalg.norm(dxy_in) * np.linalg.norm(dxy_r)))
 
     # Determine status and mode of ac1
-    if delta_crs >= np.pi/2:
+    if delta_crs >= np.pi/4:
         intruder_status = "leader"
         intruder_mode = "MVP"
-    elif cos_phi >= 0:
-        intruder_status = "leader"
-        intruder_mode = "LF"
-    elif cos_phi < 0:
-        intruder_status = "follower"
-        intruder_mode = "LF"
+    else:
+        if cos_phi >= 0:
+            intruder_status = "leader"
+            intruder_mode = "LF"
+        else:
+            intruder_status = "follower"
+            intruder_mode = "LF"
 
     return intruder_mode, intruder_status
 

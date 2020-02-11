@@ -657,7 +657,7 @@ class ASAS(TrafficArrays):
         # Conflict resolution only if there are conflicts or if swarming /
         # leader-following with follow through is used (does not require a
         # conflict for 'preventative' resolution)
-        if self.confpairs or self.cr_name in ["SWARM-V2", "LFFT", "VEL_AVG"]:
+        if self.confpairs or self.cr_name in ["LFFT", "VEL_AVG"]:
             self.cr.resolve(self, bs.traf)
 
         # Add new conflicts to resopairs and confpairs_all and new losses to lospairs_all
