@@ -220,3 +220,9 @@ class CSVLogger:
             return self.addvars(list(args[1:]))
 
         return True
+
+    def flush(self):
+        """ Force a buffer flush if the logfile is open. """
+
+        if self.file:
+            self.file.flush()

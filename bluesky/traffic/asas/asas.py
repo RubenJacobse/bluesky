@@ -275,6 +275,7 @@ class ASAS(TrafficArrays):
         # delete() on its children before deleting its own traffic elements.
         if bs.traf.ntraf == 1:
             self.conf_logger.log("avg ntraf", self.avg_ntraf)
+            self.conf_logger.flush() # Need to flush to ensure printing
 
     def toggle(self, flag=None):
         """
