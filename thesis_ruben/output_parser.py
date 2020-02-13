@@ -287,7 +287,12 @@ class ASASLogSummaryParser(LogListParser):
             else:
                 num_conf += 1
 
-        int_prev_rate = (num_conf - num_los) / num_conf
+        # Intrusion prevention rate not defined if baseline has zero
+        # conflicts (divide by zero)
+        if num_conf:
+            int_prev_rate = f"{(num_conf - num_los) / num_conf:.3f}"
+        else:
+            int_prev_rate = "NaN"
 
         current_stats = {"geometry": geometry,
                          "reso_method": reso_method,
@@ -313,12 +318,19 @@ class ASASLogSummaryParser(LogListParser):
                 basescen = self.get_baseline_stats(scen["geometry"],
                                                    scen["traffic_level"],
                                                    scen["scenario"])
-                scen["dep"] = (scen["num_conf"] / basescen["num_conf"]) - 1
+
+                # Domino Effect Parameter not defined if baseline has
+                # zero conflicts (divide by zero)
+                if basescen["num_conf"]:
+                    scen_dep = (scen["num_conf"] / basescen["num_conf"]) - 1
+                    scen["dep"] = f"{scen_dep:.3f}"
+                else:
+                    scen["dep"] = "NaN"
 
             outputline = (f'{scen["geometry"]},{scen["reso_method"]},'
                           + f'{scen["traffic_level"]},{scen["scenario"]},'
                           + f'{scen["num_conf"]},{scen["num_los"]},'
-                          + f'{scen["int_prev_rate"]:.3f},{scen["dep"]:.3f},'
+                          + f'{scen["int_prev_rate"]},{scen["dep"]},'
                           + f'{scen["avg_ntraf"]:.2f}')
             self.write_to_output_file(outputline)
 

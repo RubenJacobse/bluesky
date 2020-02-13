@@ -42,10 +42,12 @@ def make_batch_figures(timestamp):
     Generate the figures for the batch with given timestamp.
     """
 
-    # BoxPlotFigureGenerator(timestamp)
-    # AREAGeoFigureGenerator(timestamp)
-    # ASASGeoFigureGenerator(timestamp)
+    BoxPlotFigureGenerator(timestamp)
+    AREAGeoFigureGenerator(timestamp)
+    ASASGeoFigureGenerator(timestamp)
     ASASConflictFigureGenerator(timestamp)
+
+    # # Can be uncommented for violin or strip plot creation
     # ViolinPlotFigureGenerator(timestamp)
     # StripPlotFigureGenerator(timestamp)
 
@@ -471,6 +473,7 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
                                           "logfiles_summary",
                                           "asaslog_summary.csv"))
             df_geometry = df[df["#geometry"] == geometry]
+            print(df_geometry)
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "num conflicts [-]",
@@ -547,7 +550,7 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             yrange = df[column].max() - df[column].min()
 
             # Set resolution method plotting orders
-            reso_methods = ["OFF", "MVP", "EBY", "LFFT", "VEL_AVG",
+            reso_methods = ["OFF", "MVP", "EBY", "VEL_AVG",
                             "GV-METHOD1", "GV-METHOD2",
                             "GV-METHOD3", "GV-METHOD4"]
             reso_order = [method for method in reso_methods
