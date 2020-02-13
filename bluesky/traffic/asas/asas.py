@@ -253,6 +253,7 @@ class ASAS(TrafficArrays):
 
         if isinstance(idx, Collection):
             idx = np.sort(idx)
+            num_ac_del = len(idx)
 
             for ac_idx in idx:
                 ac_id = bs.traf.id[ac_idx]
@@ -262,6 +263,8 @@ class ASAS(TrafficArrays):
                     self.noresolst.remove(ac_id)
         else:
             ac_id = bs.traf.id[idx]
+            num_ac_del = 1
+
             if ac_id in self.resoofflst:
                 self.resoofflst.remove(ac_id)
             if ac_id in self.noresolst:
@@ -271,11 +274,11 @@ class ASAS(TrafficArrays):
 
         # Last aircraft to be deleted, log average number of aircraft
         # in scenario during logging interval (last line of logfile).
-        # We test against ntraf == 1 because the Traffic object first calls
+        # We test against ntraf == num_ac_del because the Traffic object calls
         # delete() on its children before deleting its own traffic elements.
-        if bs.traf.ntraf == 1:
+        if bs.traf.ntraf == num_ac_del:
             self.conf_logger.log("avg ntraf", self.avg_ntraf)
-            self.conf_logger.flush() # Need to flush to ensure printing
+            self.conf_logger.flush() # Flush buffer to ensure log printing
 
     def toggle(self, flag=None):
         """
