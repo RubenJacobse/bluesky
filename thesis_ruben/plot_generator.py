@@ -23,7 +23,7 @@ sys.path.append(os.path.abspath(os.path.join("..")))
 import bluesky.tools.geo as bsgeo
 
 # Local imports
-import extra_plot
+# import extra_plot
 
 # Geo plot element colors
 RESTRICTION_FACECOLOR = "xkcd:pale pink"
@@ -705,10 +705,10 @@ class ASASConflictFigureGenerator(FigureGeneratorBase):
                                                geometry,
                                                method,
                                                level)
-                    self.make_2D_boxplot_figure(df_figure,
-                                                geometry,
-                                                method,
-                                                level)
+                    # self.make_2D_boxplot_figure(df_figure,
+                    #                             geometry,
+                    #                             method,
+                    #                             level)
                     self.make_dual_boxplot_figure(df_figure,
                                                   geometry,
                                                   method,
@@ -800,36 +800,36 @@ class ASASConflictFigureGenerator(FigureGeneratorBase):
         except RuntimeError:
             print(f"Plot generator failed to create {plt_filename}")
 
-    def make_2D_boxplot_figure(self, df, geometry, method, level):
-        """
-        Make a single boxplot figure for a given geometry. The data used
-        is specified in a pandas dataframe 'df', 'column' is the column used
-        for the plot and 'namestr' is the last part of the figure file name.
-        """
+    # def make_2D_boxplot_figure(self, df, geometry, method, level):
+    #     """
+    #     Make a single boxplot figure for a given geometry. The data used
+    #     is specified in a pandas dataframe 'df', 'column' is the column used
+    #     for the plot and 'namestr' is the last part of the figure file name.
+    #     """
 
-        try:
-            # Set column labels to be used for data on x and y axes
-            x_axis = "delta trk [deg]"
-            y_axis = "delta v [kts]"
+    #     try:
+    #         # Set column labels to be used for data on x and y axes
+    #         x_axis = "delta trk [deg]"
+    #         y_axis = "delta v [kts]"
 
-            # Create and save figure
-            plt.figure(figsize=(16, 9))
-            ax = plt.axes()
+    #         # Create and save figure
+    #         plt.figure(figsize=(16, 9))
+    #         ax = plt.axes()
 
-            df_plot = df[df["is LoS [-]"] == False]
-            x = np.asarray(df_plot[x_axis])
-            y = np.asarray(df_plot[y_axis])
+    #         df_plot = df[df["is LoS [-]"] == False]
+    #         x = np.asarray(df_plot[x_axis])
+    #         y = np.asarray(df_plot[y_axis])
 
-            extra_plot.boxplot_2d(x, y, ax)
-            plt.xlabel(x_axis)
-            plt.ylabel(y_axis)
-            plt.axis([0, 180, 0, 1100])
-            plt_filename = f"2box_{geometry}_{method}_{level}.{FIGURE_FILETYPE}"
-            plt_filepath = os.path.join(self.figure_dir, plt_filename)
-            plt.savefig(plt_filepath, dpi=300, bbox_inches="tight")
-            plt.close()
-        except RuntimeError:
-            print(f"Plot generator failed to create {plt_filename}")
+    #         extra_plot.boxplot_2d(x, y, ax)
+    #         plt.xlabel(x_axis)
+    #         plt.ylabel(y_axis)
+    #         plt.axis([0, 180, 0, 1100])
+    #         plt_filename = f"2box_{geometry}_{method}_{level}.{FIGURE_FILETYPE}"
+    #         plt_filepath = os.path.join(self.figure_dir, plt_filename)
+    #         plt.savefig(plt_filepath, dpi=300, bbox_inches="tight")
+    #         plt.close()
+    #     except RuntimeError:
+    #         print(f"Plot generator failed to create {plt_filename}")
 
     def make_dual_boxplot_figure(self, df, geometry, method, level):
         """
