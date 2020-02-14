@@ -473,7 +473,6 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
                                           "logfiles_summary",
                                           "asaslog_summary.csv"))
             df_geometry = df[df["#geometry"] == geometry]
-            print(df_geometry)
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "num conflicts [-]",
@@ -863,6 +862,7 @@ class ASASConflictFigureGenerator(FigureGeneratorBase):
             plt_filename = f"dual_{geometry}_{method}_{level}.{FIGURE_FILETYPE}"
             plt_filepath = os.path.join(self.figure_dir, plt_filename)
             plt.savefig(plt_filepath, dpi=300, bbox_inches="tight")
+            plt.clf()
             plt.close()
         except RuntimeError:
             print(f"Plot generator failed to create {plt_filename}")
