@@ -550,7 +550,7 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             yrange = df[column].max() - df[column].min()
 
             # Set resolution method plotting orders
-            reso_methods = ["OFF", "MVP", "EBY", "VEL_AVG",
+            reso_methods = ["OFF", "MVP", "EBY", "VELAVG",
                             "GV-METHOD1", "GV-METHOD2",
                             "GV-METHOD3", "GV-METHOD4"]
             reso_order = [method for method in reso_methods

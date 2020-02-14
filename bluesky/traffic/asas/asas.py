@@ -34,7 +34,7 @@ from . import SSD
 from . import LF
 from . import LFFT
 from . import Swarm_alt
-from . import VEL_AVG
+from . import VELAVG
 from . import MVP_PRIO
 
 # Register default settings
@@ -94,7 +94,7 @@ class ASAS(TrafficArrays):
                   "EBY": Eby,
                   "SWARM": Swarm,
                   "SWARM-V2": Swarm_alt,
-                  "VEL_AVG": VEL_AVG,
+                  "VELAVG": VELAVG,
                   "LF": LF,
                   "LFFT": LFFT,
                   "MVP-PRIO": MVP_PRIO}  # MVP + priority - experimental
@@ -661,7 +661,7 @@ class ASAS(TrafficArrays):
         # Conflict resolution only if there are conflicts or if swarming /
         # leader-following with follow through is used (does not require a
         # conflict for 'preventative' resolution)
-        if self.confpairs or self.cr_name in ["LFFT", "VEL_AVG"]:
+        if self.confpairs or self.cr_name in ["LFFT", "VELAVG"]:
             self.cr.resolve(self, bs.traf)
 
         # Add new conflicts to resopairs and confpairs_all and new losses to lospairs_all
@@ -845,7 +845,7 @@ class ASAS(TrafficArrays):
         """
         self.resume_navigation_old()
 
-        if "VEL_AVG" in self.cr_name:
+        if "VELAVG" in self.cr_name:
             in_swarming_area = areafilter.checkInside("SWARMING_ZONE",
                                                       bs.traf.lat,
                                                       bs.traf.lon,
