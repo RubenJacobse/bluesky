@@ -862,7 +862,6 @@ class ASASConflictFigureGenerator(FigureGeneratorBase):
             plt_filename = f"dual_{geometry}_{method}_{level}.{FIGURE_FILETYPE}"
             plt_filepath = os.path.join(self.figure_dir, plt_filename)
             plt.savefig(plt_filepath, dpi=300, bbox_inches="tight")
-            plt.clf()
-            plt.close()
+            plt.close("all")
         except RuntimeError:
             print(f"Plot generator failed to create {plt_filename}")
