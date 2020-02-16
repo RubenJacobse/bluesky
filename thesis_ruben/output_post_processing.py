@@ -27,7 +27,7 @@ def summarize_logfiles(timestamp):
             os.makedirs(folder)
 
     # Copy the BlueSky logfiles that are part of the batch to the folder
-    # /post_processing/<timestamp>/log
+    # /post_processing/<timestamp>/logfiles_raw
     source_files = [filename for filename in os.listdir(source_dir)
                     if timestamp in filename]
     for logfile in source_files:
@@ -38,6 +38,7 @@ def summarize_logfiles(timestamp):
     # Process the AREA log files
     arealogfiles = [os.path.join(logfile_save_dir, filename)
                     for filename in logfiles if "AREALOG" in filename]
+    arealogfiles.sort()
     output_parser.AREALogSummaryParser(
         arealogfiles,
         os.path.join(summary_save_dir, "arealog_summary.csv")
@@ -50,6 +51,7 @@ def summarize_logfiles(timestamp):
     # Process the FLST log files
     flstlogfiles = [os.path.join(logfile_save_dir, filename)
                     for filename in logfiles if "FLSTLOG" in filename]
+    flstlogfiles.sort()
     output_parser.FLSTLogOccurrenceParser(
         flstlogfiles,
         os.path.join(summary_save_dir, "flstlog_occurence.csv")
@@ -62,6 +64,7 @@ def summarize_logfiles(timestamp):
     # Process the ASAS log files
     asaslogfiles = [os.path.join(logfile_save_dir, filename)
                     for filename in logfiles if "ASASLOG" in filename]
+    asaslogfiles.sort()
     output_parser.ASASLogSummaryParser(
         asaslogfiles,
         os.path.join(summary_save_dir, "asaslog_summary.csv")
@@ -74,11 +77,13 @@ def summarize_logfiles(timestamp):
     # Process the ASAS pos files
     asasposfiles = [os.path.join(logfile_save_dir, filename)
                     for filename in logfiles if "ASASPOS" in filename]
+    asasposfiles.sort()
     output_parser.ASASPosLocationParser(
         asasposfiles,
         os.path.join(summary_save_dir, "asaslog_locations.csv")
     )
 
+    print("Finished summarizing logfiles")
 
 if __name__ == "__main__":
     timestamp = "20190701-034019"
