@@ -1032,8 +1032,11 @@ class ScenarioGenerator():
 
         with open(geofile_path, "w+") as geofile:
             # Write experiment area parameters to file
-            geofile.write("{},{},{},{}\n".format(
-                "ring", CENTER_LAT, CENTER_LON, AREA_RADIUS))
+            coords = [x for (lat, lon)
+                      in self.polygons["experiment_area"].exterior.coords
+                      for x in (lat, lon)]
+            ring_coords_str = ",".join(str(f"{x:.6f}") for x in coords)
+            geofile.write(f"ring,{ring_coords_str}\n")
 
             # Write restriction coordinates to file
             for idx, area in enumerate(self.airspace_restrictions):

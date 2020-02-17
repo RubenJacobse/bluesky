@@ -152,8 +152,9 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
         for geometry in self.combination_dict:
             # Load the data for the current geometry
             geo_source_file_name = f"{self.timestamp}_{geometry}_geo.csv"
-            geo_source_file = os.path.join("scenario",
+            geo_source_file = os.path.join("post_processing",
                                            self.timestamp,
+                                           "geomfiles",
                                            geo_source_file_name)
             geo_data = load_csv_data(geo_source_file)
 
@@ -183,25 +184,21 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
         """
 
         # Generate ring polygon
-        ring_data = geo_data[0]
-        ring_name = ring_data[0]
-        ring_lat = float(ring_data[1])
-        ring_lon = float(ring_data[2])
-        ring_radius = float(ring_data[3])
-        ring_coords = [bsgeo.qdrpos(ring_lat, ring_lon, angle, ring_radius)
-                       for angle in range(0, 361)]
+        ring_name = geo_data[0][0]
+        ring_coords = [(float(lon), float(lat)) for (lat, lon)
+                       in zip(geo_data[0][1::2], geo_data[0][2::2])]
         ring_polygon = Polygon(ring_coords)
 
         # Generate polygon for restriction on left side of corridor
         left_res_name = geo_data[1][0]
         left_res_coords = [(float(lon), float(lat)) for (lat, lon)
-                           in zip(geo_data[1][1:8:2], geo_data[1][2:9:2])]
+                           in zip(geo_data[1][1::2], geo_data[1][2::2])]
         left_res_polygon = Polygon(left_res_coords)
 
         # Generate polygon for restriction on right side of corridor
         right_res_name = geo_data[2][0]
         right_res_coords = [(float(lon), float(lat)) for (lat, lon)
-                            in zip(geo_data[2][1:8:2], geo_data[2][2:9:2])]
+                            in zip(geo_data[2][1::2], geo_data[2][2::2])]
         right_res_polygon = Polygon(right_res_coords)
 
         # Calculate the intersections of the restriction polygons

@@ -17,23 +17,34 @@ def summarize_logfiles(timestamp):
     """
 
     # Set the source folder and create target folders if necessary
-    source_dir = "output"
+    log_source_dir = "output"
+    geom_source_dir = os.path.join("scenario", timestamp + os.sep)
     batch_save_dir = os.path.join("post_processing", timestamp + os.sep)
     logfile_save_dir = os.path.join(batch_save_dir, "logfiles_raw" + os.sep)
+    geomfile_save_dir = os.path.join(batch_save_dir, "geomfiles" + os.sep)
     summary_save_dir = os.path.join(batch_save_dir, "logfiles_summary" + os.sep)
 
-    for folder in [batch_save_dir, logfile_save_dir, summary_save_dir]:
+    for folder in [batch_save_dir, logfile_save_dir,
+                   summary_save_dir, geomfile_save_dir]:
         if not os.path.isdir(folder):
             os.makedirs(folder)
 
     # Copy the BlueSky logfiles that are part of the batch to the folder
     # /post_processing/<timestamp>/logfiles_raw
-    source_files = [filename for filename in os.listdir(source_dir)
+    source_files = [filename for filename in os.listdir(log_source_dir)
                     if timestamp in filename]
     for logfile in source_files:
-        shutil.copy2(os.path.join(source_dir, logfile),
+        shutil.copy2(os.path.join(log_source_dir, logfile),
                      os.path.join(logfile_save_dir, logfile))
     logfiles = [filename for filename in os.listdir(logfile_save_dir)]
+
+    # Copy the geometry files that are part of the batch to the folder
+    # /post_processing/<timestamp>/geomfiles
+    geom_files = [filename for filename in os.listdir(geom_source_dir)
+                  if timestamp in filename and filename.endswith(".csv")]
+    for geomfile in geom_files:
+        shutil.copy2(os.path.join(geom_source_dir, geomfile),
+                     os.path.join(geomfile_save_dir, geomfile))
 
     # Process the AREA log files
     arealogfiles = [os.path.join(logfile_save_dir, filename)
