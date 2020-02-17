@@ -10,6 +10,7 @@ import sys
 
 # Third-party imports
 import numpy as np
+from shapely.geometry.polygon import Polygon
 
 # Enable BlueSky imports by adding the project folder to the path
 sys.path.append(os.path.abspath(os.path.join('..')))
@@ -22,6 +23,7 @@ settings.set_variable_defaults(log_start=1800,
 # Module level constants
 PZ_RADIUS = 5.0 * 1852  # Protected zone radius in meters
 MPS_TO_KTS = 1.94384449  # Conversion factor from m/s to kts
+R_EARTH = 6371000 # Approximate Earth radius in meters
 
 # Discard all data outside logging interval
 T_LOG_INTERVAL_START = settings.log_start # [s]
@@ -294,6 +296,28 @@ class ASASLogSummaryParser(LogListParser):
         else:
             int_prev_rate = "NaN"
 
+        # Calculate area available to traffic
+        timestamp = logfile.split(os.sep)[1]
+        geomfile_dir = os.path.join(*logfile.split(os.sep)[:2],
+                                    "geomfiles" + os.sep)
+        geom_csv_file = os.path.join(geomfile_dir,
+                                     f"{timestamp}_{geometry}_geo.csv")
+        area_list = []
+        with open(geom_csv_file) as geom_csv:
+            # Calculate the areas of each polygon in NM^2
+            for line in geom_csv:
+                coords = line[:-1].split(",")[1:]
+                coord_pairs = [(float(lat), float(lon)) for (lat, lon)
+                               in zip(coords[0::2], coords[1::2])]
+                coord_pairs_rad = [(np.radians(lat), np.radians(lon))
+                                   for (lat, lon) in coord_pairs]
+                # Next line assumes flat Earth and polygon near lat, lon = 0,0
+                metric_pairs = [(R_EARTH * lat, R_EARTH * lon * np.cos(lat))
+                                for (lat, lon) in coord_pairs_rad]
+                poly = Polygon(metric_pairs)
+                area_list.append(poly.area / 1852**2)  # convert to NM^2
+        traf_area = area_list[0] - sum(area_list[1:])
+
         current_stats = {"geometry": geometry,
                          "reso_method": reso_method,
                          "traffic_level": traffic_level,
@@ -301,7 +325,8 @@ class ASASLogSummaryParser(LogListParser):
                          "num_conf": num_conf,
                          "num_los": num_los,
                          "int_prev_rate": int_prev_rate,
-                         "avg_ntraf": avg_ntraf}
+                         "avg_ntraf": avg_ntraf,
+                         "traf_area": traf_area}
 
         self.summary_list.append(current_stats)
 
@@ -331,7 +356,8 @@ class ASASLogSummaryParser(LogListParser):
                           + f'{scen["traffic_level"]},{scen["scenario"]},'
                           + f'{scen["num_conf"]},{scen["num_los"]},'
                           + f'{scen["int_prev_rate"]},{scen["dep"]},'
-                          + f'{scen["avg_ntraf"]:.2f}')
+                          + f'{scen["avg_ntraf"]:.2f},'
+                          + f'{scen["avg_ntraf"]/scen["traf_area"]:.10f}')
             self.write_to_output_file(outputline)
 
     def get_baseline_stats(self, geometry, traffic_level, scenario):
@@ -354,7 +380,7 @@ class ASASLogSummaryParser(LogListParser):
     def set_header(self):
         self.header = ("geometry,resolution method,traffic level,scenario,"
                        + "num conflicts [-],num LoS [-],IPR [-],DEP [-],"
-                       + "avg num ac [-]")
+                       + "avg num ac [-], avg density [ac/NM^2]")
 
 
 class ASASLogOccurrenceParser(LogListParser):
