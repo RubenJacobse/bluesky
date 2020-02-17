@@ -442,7 +442,8 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "num intrusions",
-                                    "area_intrusions")
+                                    "area_intrusions",
+                                    showfliers=True)
 
             # Make figures based on data in asaslog_occurence.csv
             df = pd.read_csv(os.path.join(self.batch_dir,
@@ -463,7 +464,8 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             self.make_single_figure(geometry,
                                     df_LoS_sev,
                                     "LoS severity [-]",
-                                    "los_severity")
+                                    "los_severity",
+                                    showbase=False)
 
             # Make figures based on data in asaslog_summary.csv
             df = pd.read_csv(os.path.join(self.batch_dir,
@@ -481,11 +483,13 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "IPR [-]",
-                                    "IPR")
+                                    "IPR",
+                                    showbase=False)
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "DEP [-]",
-                                    "DEP")
+                                    "DEP",
+                                    showbase=False)
 
             # Make figures based on data in flstlog_occurence.csv
             df = pd.read_csv(os.path.join(self.batch_dir,
@@ -503,7 +507,8 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "t in los [%]",
-                                    "t_in_los")
+                                    "t_in_los",
+                                    showbase=False)
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "t in reso [%]",
@@ -515,7 +520,8 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "num los per ac [-]",
-                                    "ac_los")
+                                    "ac_los",
+                                    showfliers=True)
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "num ac conf per/ac/dist [1/m]",
@@ -531,7 +537,8 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
                                     "num turnaround [-]",
                                     "num_turnaround")
 
-    def make_single_figure(self, geometry, df, column, namestr):
+    def make_single_figure(self, geometry, df, column, namestr,
+                           showfliers=False, showbase=True):
         """
         Make a single boxplot figure for a given geometry. The data used
         is specified in a pandas dataframe 'df', 'column' is the column used
@@ -546,9 +553,10 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             yrange = df[column].max() - df[column].min()
 
             # Set resolution method plotting orders
-            reso_methods = ["OFF", "MVP", "EBY", "VELAVG",
-                            "GV-METHOD1", "GV-METHOD2",
-                            "GV-METHOD3", "GV-METHOD4"]
+            base_method = ["OFF"] if showbase else []
+            reso_methods = base_method + ["MVP", "EBY", "VELAVG",
+                                          "GV-METHOD1", "GV-METHOD2",
+                                          "GV-METHOD3", "GV-METHOD4"]
             reso_order = [method for method in reso_methods
                           if method in df["resolution method"].unique()]
             level_order = df["traffic level"].unique().sort()
@@ -563,7 +571,7 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
                                   hue="traffic level",
                                   hue_order=level_order,
                                   linewidth=0.5,
-                                #   showfliers=False,
+                                  showfliers=showfliers,
                                   palette="Blues")
             plt.ticklabel_format(axis="y", style="sci", scilimits=(0, 4))
             ax.legend(title="Traffic rate [aircraft/hr]",
