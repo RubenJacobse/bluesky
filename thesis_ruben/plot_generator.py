@@ -546,6 +546,10 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
         """
 
         try:
+            # If not showbase, do not include resolution method "OFF"
+            if not showbase:
+                df = df[(df["resolution method"] != "OFF")]
+
             # Use the min and max of the unfiltered column in the dataframe
             # to ensure all figures using this column have the same y-axis limits
             ymin = df[column].min()
@@ -579,6 +583,8 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
                       ncol=num_levels,
                       bbox_to_anchor=(0.5, 1))
             ax.set(xticklabels=reso_order)
+            # Next three lines are useful to ensure the same plot types have
+            # the same axes when comparing different geometries
             yminplot = ymin - 0.05 * yrange
             ymaxplot = ymax + 0.05 * yrange
             ax.set_ylim(yminplot, ymaxplot)
