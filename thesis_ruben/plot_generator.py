@@ -45,7 +45,7 @@ def make_batch_figures(timestamp):
     BoxPlotFigureGenerator(timestamp)
     AREAGeoFigureGenerator(timestamp)
     ASASGeoFigureGenerator(timestamp)
-    ASASConflictFigureGenerator(timestamp)
+    # ASASConflictFigureGenerator(timestamp)
 
     # # Can be uncommented for violin or strip plot creation
     # ViolinPlotFigureGenerator(timestamp)
@@ -455,17 +455,25 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             #                         "duration [s]",
             #                         "conflict_duration")
 
-            df_LoS_sev = df[(df["#geometry"] == geometry)
-                            & (df["is LoS [-]"] == True)]
+            df_los = df[(df["#geometry"] == geometry)
+                        & (df["is LoS [-]"] == True)]
             # self.make_single_figure(geometry,
-            #                         df_LoS_sev,
+            #                         df_los,
             #                         "duration [s]",
             #                         "los_duration")
             self.make_single_figure(geometry,
-                                    df_LoS_sev,
+                                    df_los,
                                     "LoS severity [-]",
                                     "los_severity",
                                     showbase=False)
+            self.make_single_figure(geometry,
+                                    df_los,
+                                    "delta v [kts]",
+                                    "los_delta_v")
+            self.make_single_figure(geometry,
+                                    df_los,
+                                    "delta trk [deg]",
+                                    "los_delta_trk")
 
             # Make figures based on data in asaslog_summary.csv
             df = pd.read_csv(os.path.join(self.batch_dir,
