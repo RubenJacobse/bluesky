@@ -357,7 +357,7 @@ class ASASLogSummaryParser(LogListParser):
                           + f'{scen["num_conf"]},{scen["num_los"]},'
                           + f'{scen["int_prev_rate"]},{scen["dep"]},'
                           + f'{scen["avg_ntraf"]:.2f},'
-                          + f'{scen["avg_ntraf"]/scen["traf_area"]:.10f}')
+                          + f'{1e4 * scen["avg_ntraf"]/scen["traf_area"]:.4f}')
             self.write_to_output_file(outputline)
 
     def get_baseline_stats(self, geometry, traffic_level, scenario):
@@ -380,7 +380,7 @@ class ASASLogSummaryParser(LogListParser):
     def set_header(self):
         self.header = ("geometry,resolution method,traffic level,scenario,"
                        + "num conflicts [-],num LoS [-],IPR [-],DEP [-],"
-                       + "avg num ac [-], avg density [ac/NM^2]")
+                       + "avg num ac [-],avg density [ac/1e4NM^2]")
 
 
 class ASASLogOccurrenceParser(LogListParser):

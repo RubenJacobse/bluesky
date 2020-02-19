@@ -6,6 +6,7 @@ Generate figures showing conflict locations.
 import os
 import sys
 import csv
+import itertools
 
 # Third-party imports
 import numpy as np
@@ -15,6 +16,8 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 from shapely.geometry import Polygon
+from sklearn.metrics import mean_squared_error
+from sklearn.model_selection import train_test_split
 
 # Enable BlueSky imports by adding the project folder to the path
 sys.path.append(os.path.abspath(os.path.join("..")))
@@ -46,6 +49,7 @@ def make_batch_figures(timestamp):
     AREAGeoFigureGenerator(timestamp)
     ASASGeoFigureGenerator(timestamp)
     # ASASConflictFigureGenerator(timestamp)
+    CAMDAFigureGenerator(timestamp)
 
     # # Can be uncommented for violin or strip plot creation
     # ViolinPlotFigureGenerator(timestamp)
@@ -678,6 +682,88 @@ class StripPlotFigureGenerator(ComparisonFigureGeneratorBase):
         return sbn.stripplot(**kwargs, dodge=True, jitter=True)
 
 
+class CAMDAFigureGenerator(FigureGeneratorBase):
+    def __init__(self, timestamp):
+        super().__init__(timestamp)
+        self.load_conflict_data()
+        self.generate_figure()
+
+    def create_figure_dir_if_not_exists(self):
+        """
+        Ensures that the subdirectory in which all geo figures will be
+        saved is created in case it does not exist yet.
+        """
+
+        self.figure_dir = os.path.join(self.figure_dir, "camda")
+        if not os.path.isdir(self.figure_dir):
+            os.makedirs(self.figure_dir)
+
+    def load_conflict_data(self):
+        """
+        Load the locations of all conflicts from file.
+        """
+
+        summary_dir = os.path.join(self.batch_dir, "logfiles_summary")
+        asaslog_file = os.path.join(summary_dir, "asaslog_summary.csv")
+        self.df = pd.read_csv(asaslog_file)
+
+    def generate_figure(self, geometry):
+        df = self.df[((self.df["resolution method"] != "OFF")
+                      & (self.df["#geometry"] == geometry))]
+
+        reso_methods = ["MVP", "EBY", "VELAVG",
+                        "GV-METHOD1", "GV-METHOD2",
+                        "GV-METHOD3", "GV-METHOD4"]
+        reso_order = [method for method in reso_methods
+                      if method in df["resolution method"].unique()]
+        num_reso_methods = df["resolution method"].nunique()
+        marker = itertools.cycle(("o", "v", "s", "H", "D", "<", ">"))
+
+        plt.figure(figsize=(16, 9))
+        for method in reso_order:
+            # Perform least squares regression for each method
+            df_method = df[(df["resolution method"] == method)]
+            rho = df_method["avg density [ac/1e4NM^2]"].to_numpy()
+            dep = df_method["DEP [-]"].to_numpy()
+
+            # Split into training and test sets
+            rho_train, rho_test, dep_train, dep_test = train_test_split(
+                rho, dep, test_size=0.4, random_state=1
+            )
+
+            # Linearize and perform least-squares on training set
+            x = 1 / rho_train
+            y = 1 / dep_train + 1
+            A = np.vstack([x]).T
+            params, _, _, _ = np.linalg.lstsq(A, y, rcond=None)
+            est_rho_max = params[0]
+            print(f"{method}\n\trho_max_est: {est_rho_max:.3f}")
+
+            # Calculate Mean Squared Error for both training and test data
+            dep_model_train = dep_func(rho_train, est_rho_max)
+            dep_model_test = dep_func(rho_test, est_rho_max)
+            mse_train = mean_squared_error(dep_model_train, dep_train)
+            mse_test = mean_squared_error(dep_model_test, dep_test)
+            print(f"\tMSE train: {mse_train}, MSE test: {mse_test}")
+
+            # Make figure
+            rho_model = np.linspace(0, 75, 50)
+            dep_model = dep_func(rho_model, est_rho_max)
+            plt.scatter(rho, dep, label=method, marker=next(marker))
+            plt.plot(rho_model, dep_model, c='k', label="_nolegend_")
+
+        plt.xlabel("Density [ac / 10,000 NM^2]")
+        plt.ylabel("DEP [-]")
+        plt.legend(title="Conflict prevention and resolution method",
+                   loc="lower center",
+                   ncol=num_reso_methods,
+                   bbox_to_anchor=(0.5, 1))
+        plt_filename = f"camda_{geometry}.{FIGURE_FILETYPE}"
+        plt_filepath = os.path.join(self.figure_dir, plt_filename)
+        plt.savefig(plt_filepath, dpi=300, bbox_inches="tight")
+        plt.close()
+
+
 class ASASConflictFigureGenerator(FigureGeneratorBase):
 
     def __init__(self, timestamp):
@@ -884,3 +970,7 @@ class ASASConflictFigureGenerator(FigureGeneratorBase):
             plt.close("all")
         except RuntimeError:
             print(f"Plot generator failed to create {plt_filename}")
+
+
+def dep_func(rho, rho_max):
+    return rho / (rho_max - rho)
