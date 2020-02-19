@@ -686,7 +686,8 @@ class CAMDAFigureGenerator(FigureGeneratorBase):
     def __init__(self, timestamp):
         super().__init__(timestamp)
         self.load_conflict_data()
-        self.generate_figure()
+        for geometry in self.combination_dict:
+            self.generate_figure(geometry)
 
     def create_figure_dir_if_not_exists(self):
         """
