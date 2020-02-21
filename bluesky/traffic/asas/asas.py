@@ -723,7 +723,10 @@ class ASAS(TrafficArrays):
                 # held in all tests so far). We use the assertion as a reminder
                 # to force a crash if false during any situation (even though
                 # this is technically redudant since the indexing will fail)
-                assert pair in confpairs_unique
+                try:
+                    assert pair in confpairs_unique
+                except:
+                    print(f"Assertion fail in: {bs.stack.get_scenname()}")
 
                 pair_idx = self.confpairs.index(tuple(pair))
                 dist = self.dist[pair_idx]
