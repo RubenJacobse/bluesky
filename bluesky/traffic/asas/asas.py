@@ -719,7 +719,13 @@ class ASAS(TrafficArrays):
                         self.conf_tracker[pair]["dcpa min"] = dcpa
 
             for pair in lospairs_unique:
-                pair_idx = self.lospairs.index(tuple(pair))
+                # Following condition may not be guaranteed (although it
+                # held in all tests so far). We use the assertion as a reminder
+                # to force a crash if false during any situation (even though
+                # this is technically redudant since the indexing will fail)
+                assert pair in confpairs_unique
+
+                pair_idx = self.confpairs.index(tuple(pair))
                 dist = self.dist[pair_idx]
                 tcpa = self.tcpa[pair_idx]
                 dcpa = self.dcpa[pair_idx]
@@ -750,7 +756,7 @@ class ASAS(TrafficArrays):
                     self.los_tracker[pair]["duration"] += 1
                     if dist < self.los_tracker[pair]["dist min"]:
                         self.los_tracker[pair]["dist min"] = dist
-                    if tcpa < self.los_tracker[pair]["tcpa min"]:
+                    if 0 <= tcpa < self.los_tracker[pair]["tcpa min"]:
                         self.los_tracker[pair]["tcpa min"] = tcpa
                     if dcpa < self.los_tracker[pair]["dcpa min"]:
                         self.los_tracker[pair]["dcpa min"] = dcpa
