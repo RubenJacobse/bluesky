@@ -38,6 +38,7 @@ CONFLICT_MARKER_COLOR = "blue"
 
 # Save figures as following type
 FIGURE_FILETYPE = "png"
+FIGURE_SIZE = (16, 9)
 
 
 def make_batch_figures(timestamp):
@@ -579,7 +580,7 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             num_levels = df["traffic level"].nunique()
 
             # Make figure
-            plt.figure(figsize=(16, 9))
+            plt.figure(figsize=FIGURE_SIZE)
             ax = self.create_plot(x="resolution method",
                                   y=column,
                                   data=df,
@@ -720,7 +721,7 @@ class CAMDAFigureGenerator(FigureGeneratorBase):
         num_reso_methods = df["resolution method"].nunique()
         marker = itertools.cycle(("o", "v", "s", "H", "D", "<", ">"))
 
-        plt.figure(figsize=(16, 9))
+        plt.figure(figsize=FIGURE_SIZE)
         for method in reso_order:
             # Perform least squares regression for each method
             df_method = df[(df["resolution method"] == method)]
@@ -834,7 +835,7 @@ class ASASConflictFigureGenerator(FigureGeneratorBase):
 
             # Generate figure for each traffic level
             for level in histplot_dict.keys():
-                plt.figure(figsize=(16, 9))
+                plt.figure(figsize=FIGURE_SIZE)
                 x_axis = "delta trk [deg]"
 
                 # Get data for current traffic level
@@ -890,7 +891,7 @@ class ASASConflictFigureGenerator(FigureGeneratorBase):
             y_axis = "delta v [kts]"
 
             # Create and save figure
-            plt.figure(figsize=(16, 9))
+            plt.figure(figsize=FIGURE_SIZE)
             plt.scatter(x=x_axis,
                         y=y_axis,
                         data=df[df["is LoS [-]"] == False],
@@ -921,7 +922,7 @@ class ASASConflictFigureGenerator(FigureGeneratorBase):
     #         y_axis = "delta v [kts]"
 
     #         # Create and save figure
-    #         plt.figure(figsize=(16, 9))
+    #         plt.figure(figsize=FIGURE_SIZE)
     #         ax = plt.axes()
 
     #         df_plot = df[df["is LoS [-]"] == False]
@@ -954,7 +955,7 @@ class ASASConflictFigureGenerator(FigureGeneratorBase):
 
             # Create and save figure
             plt.figure()
-            # plt.figure(figsize=(16, 9))
+            # plt.figure(figsize=FIGURE_SIZE)
             _, (ax1, ax2) = plt.subplots(1, 2)
             sbn.boxplot(y=x_axis, data=df_plot, orient="v", ax=ax1)
             ax1.set_ylim((0, 180))
