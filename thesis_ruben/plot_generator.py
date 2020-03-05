@@ -724,7 +724,9 @@ class CAMDAFigureGenerator(FigureGeneratorBase):
         plt.figure(figsize=FIGURE_SIZE)
         for method in reso_order:
             # Perform least squares regression for each method
-            df_method = df[(df["resolution method"] == method)]
+            # Ignore DEP == 0 to avoid zero division during linearization
+            df_method = df[(df["resolution method"] == method)
+                           & (df["DEP [-]"] != 0)]
             rho = df_method["avg density [ac/1e4NM^2]"].to_numpy()
             dep = df_method["DEP [-]"].to_numpy()
 
