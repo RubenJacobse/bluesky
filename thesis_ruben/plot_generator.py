@@ -558,51 +558,51 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
         for the plot and 'namestr' is the last part of the figure file name.
         """
 
+        # If not showbase, do not include resolution method "OFF"
+        if not showbase:
+            df = df[(df["resolution method"] != "OFF")]
+
+        # Use the min and max of the unfiltered column in the dataframe
+        # to ensure all figures using this column have the same y-axis limits
+        ymin = df[column].min()
+        ymax = df[column].max()
+        yrange = df[column].max() - df[column].min()
+
+        # Set resolution method plotting orders
+        base_method = ["OFF"] if showbase else []
+        reso_methods = base_method + ["MVP", "EBY", "VELAVG",
+                                        "GV-METHOD1", "GV-METHOD2",
+                                        "GV-METHOD3", "GV-METHOD4"]
+        reso_order = [method for method in reso_methods
+                        if method in df["resolution method"].unique()]
+        level_order = df["traffic level"].unique().sort()
+        num_levels = df["traffic level"].nunique()
+
+        # Make figure
+        plt.figure(figsize=FIGURE_SIZE)
+        ax = self.create_plot(x="resolution method",
+                              y=column,
+                              data=df,
+                              order=reso_order,
+                              hue="traffic level",
+                              hue_order=level_order,
+                              linewidth=0.5,
+                              showfliers=showfliers,
+                              palette="Blues")
+        plt.ticklabel_format(axis="y", style="sci", scilimits=(0, 4))
+        ax.legend(title="Traffic rate [aircraft/hr]",
+                  loc="lower center",
+                  ncol=num_levels,
+                  bbox_to_anchor=(0.5, 1))
+        ax.set(xticklabels=reso_order)
+        # Next three lines are useful to ensure the same plot types have
+        # the same axes when comparing different geometries
+        yminplot = ymin - 0.05 * yrange
+        ymaxplot = ymax + 0.05 * yrange
+        ax.set_ylim(yminplot, ymaxplot)
+        plt_filename = f"{geometry}_{namestr}.{FIGURE_FILETYPE}"
+        plt_filepath = os.path.join(self.figure_dir, plt_filename)
         try:
-            # If not showbase, do not include resolution method "OFF"
-            if not showbase:
-                df = df[(df["resolution method"] != "OFF")]
-
-            # Use the min and max of the unfiltered column in the dataframe
-            # to ensure all figures using this column have the same y-axis limits
-            ymin = df[column].min()
-            ymax = df[column].max()
-            yrange = df[column].max() - df[column].min()
-
-            # Set resolution method plotting orders
-            base_method = ["OFF"] if showbase else []
-            reso_methods = base_method + ["MVP", "EBY", "VELAVG",
-                                          "GV-METHOD1", "GV-METHOD2",
-                                          "GV-METHOD3", "GV-METHOD4"]
-            reso_order = [method for method in reso_methods
-                          if method in df["resolution method"].unique()]
-            level_order = df["traffic level"].unique().sort()
-            num_levels = df["traffic level"].nunique()
-
-            # Make figure
-            plt.figure(figsize=FIGURE_SIZE)
-            ax = self.create_plot(x="resolution method",
-                                  y=column,
-                                  data=df,
-                                  order=reso_order,
-                                  hue="traffic level",
-                                  hue_order=level_order,
-                                  linewidth=0.5,
-                                  showfliers=showfliers,
-                                  palette="Blues")
-            plt.ticklabel_format(axis="y", style="sci", scilimits=(0, 4))
-            ax.legend(title="Traffic rate [aircraft/hr]",
-                      loc="lower center",
-                      ncol=num_levels,
-                      bbox_to_anchor=(0.5, 1))
-            ax.set(xticklabels=reso_order)
-            # Next three lines are useful to ensure the same plot types have
-            # the same axes when comparing different geometries
-            yminplot = ymin - 0.05 * yrange
-            ymaxplot = ymax + 0.05 * yrange
-            ax.set_ylim(yminplot, ymaxplot)
-            plt_filename = f"{geometry}_{namestr}.{FIGURE_FILETYPE}"
-            plt_filepath = os.path.join(self.figure_dir, plt_filename)
             plt.savefig(plt_filepath, dpi=300, bbox_inches="tight")
             plt.close()
         except ValueError:
