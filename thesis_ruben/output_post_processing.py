@@ -5,6 +5,7 @@ import shutil
 # Local imports
 import output_parser
 from plot_generator import make_batch_figures
+from statistics_generator import make_batch_statistics
 
 
 def summarize_logfiles(timestamp):
@@ -97,6 +98,7 @@ def summarize_logfiles(timestamp):
     print("Finished summarizing logfiles")
 
 if __name__ == "__main__":
-    timestamp = "20190701-034019"
+    timestamp = "20200221-134518"
     summarize_logfiles(timestamp)
     make_batch_figures(timestamp)
+    make_batch_statistics(timestamp)
