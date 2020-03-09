@@ -296,7 +296,9 @@ class NormalityTableGenerator(TableGeneratorBase):
                 data = df_combination[column]
 
                 try:
-                    _, pval_ks = stats.kstest(data, "norm")
+                    mean, stdev = stats.norm.fit(data)
+                    ndist = stats.norm(loc=mean, scale=stdev)
+                    _, pval_ks = stats.kstest(data, ndist.cdf)
                     pval_ks_str = flt_to_latex(pval_ks)
                     if pval_ks < SIGNIFICANCE_LEVEL:
                         pval_ks_str = f"\\underline{{{pval_ks_str}}}"
@@ -304,7 +306,11 @@ class NormalityTableGenerator(TableGeneratorBase):
                 except ValueError:
                     print(f"\tValueError in Kolomogorov-Smirnov test!")
                     print(f"\t{column}, {method}, {level}")
-                    pval_ks_df.at[level, method] = "NaN"
+                    pval_ks_df.at[level, method] = "-"
+                except RuntimeError:
+                    print(f"\tRunTimeError in Kolomogorov-Smirnov test!")
+                    print(f"\t{column}, {method}, {level}")
+                    pval_ks_df.at[level, method] = "-"
 
                 try:
                     _, pval_sw = stats.shapiro(data)
@@ -315,14 +321,15 @@ class NormalityTableGenerator(TableGeneratorBase):
                 except ValueError:
                     print(f"\tValueError in Shapiro-Wilk test!")
                     print(f"\t{column}, {method}, {level}")
-                    pval_sw_df.at[level, method] = "NaN"
+                    pval_sw_df.at[level, method] = "-"
 
             caption = ("P-values for the Kolmogorov-Smirnov (top) and the "
                        + "Shapiro-Wilk (bottom) normality tests for "
                        + f"{namestr.replace('_', ' ')}")
             table_df = pd.concat([pval_ks_df, pval_sw_df])
             latex_str = table_df.to_latex(buf=None, escape=False, caption=caption,
-                                          column_format="c" * (len(reso_order) + 1))
+                                          column_format="c"*(len(reso_order) + 1))
+            latex_str = latex_str.replace("GV-METHOD", "GV-M")
             self.tex_table_list.append(latex_str)
         except Exception as e:
             print(f"Table generator failed to create {table_filename}")
@@ -378,8 +385,8 @@ class ComparisonTableGeneratorBase(TableGeneratorBase):
                 except ValueError as e:
                     print(f"\tValueError!")
                     print(f"\t{column}, {method}, {level}")
-                    pval_df.at[level, method] = "NaN"
-                    stat_df.at[level, method] = "NaN"
+                    pval_df.at[level, method] = "-"
+                    stat_df.at[level, method] = "-"
 
             caption = ("Test statistic (top) and p-values (bottom) for "
                        + f"{self.test_name} tests for {namestr.replace('_', ' ')}")
