@@ -27,15 +27,13 @@ def make_batch_statistics(timestamp):
     """
 
     # Generate tables with normality statistics
-    print("\nKolmogorov:")
-    KolmogorovTableGenerator(timestamp)
-    print("\nShapiro:")
-    ShapiroTableGenerator(timestamp)
+    print("\nNormality:")
+    NormalityTableGenerator(timestamp)
 
     # Generate tables with comparative statistics
-    print("\nWilcoxon")
+    print("\nWilcoxon:")
     WilcoxonTableGenerator(timestamp)
-    print("\nMannWhitney")
+    print("\nMannWhitney:")
     MannWhitneyTableGenerator(timestamp)
 
 
@@ -243,11 +241,26 @@ class TableGeneratorBase:
                                    "num turnaround [-]",
                                    "num_turnaround")
 
-    def make_single_table(self, *args):
+    def make_single_table(self, geometry, df, column, namestr):
         raise NotImplementedError
 
 
-class NormalityTableGeneratorBase(TableGeneratorBase):
+class NormalityTableGenerator(TableGeneratorBase):
+
+    def __init__(self, timestamp):
+        super().__init__(timestamp)
+        self.test_name = "combined"
+        self.table_subdir = os.path.join(self.table_dir, "norm_" + self.test_name)
+        create_dir_if_not_exists(self.table_subdir)
+        tex_summary_file = os.path.join(self.table_subdir, "summary.tex")
+
+        with open(tex_summary_file, 'w') as tex_summary:
+            self.generate_all_tables()
+
+            tex_summary.write(TEX_HEADER_STR)
+            for tex_table in self.tex_table_list:
+                tex_summary.write("\n" + tex_table)
+            tex_summary.write(TEX_FOOTER_STR)
 
     def make_single_table(self, geometry, df, column, namestr):
         """
@@ -261,7 +274,7 @@ class NormalityTableGeneratorBase(TableGeneratorBase):
         table_texpath = os.path.join(self.table_subdir, table_filename + ".tex")
 
         try:
-            # Set table column and row orders
+            # Set resolution method plotting orders
             reso_methods = ["OFF", "MVP", "EBY", "VELAVG",
                             "GV-METHOD1", "GV-METHOD2",
                             "GV-METHOD3", "GV-METHOD4"]
@@ -271,8 +284,9 @@ class NormalityTableGeneratorBase(TableGeneratorBase):
             level_order.sort()
             num_levels = df["traffic level"].nunique()
 
-            # Set up empty dataframe for table
-            table_df = pd.DataFrame(index=level_order, columns=reso_order)
+            # Set up empty dataframes for tables
+            pval_ks_df = pd.DataFrame(index=level_order, columns=reso_order)
+            pval_sw_df = pd.DataFrame(index=level_order, columns=reso_order)
 
             # For each method-level combination add p-value to dataframe
             combinations = list(itertools.product(reso_order, level_order))
@@ -282,31 +296,37 @@ class NormalityTableGeneratorBase(TableGeneratorBase):
                 data = df_combination[column]
 
                 try:
-                    test_stat, p_val = self.stat_test(data)
-                    p_val_str = flt_to_latex(p_val)
-                    if p_val < SIGNIFICANCE_LEVEL:
-                        p_val_str = f"\\underline{{{p_val_str}}}"
-                    table_df.at[level, method] = p_val_str
+                    _, pval_ks = stats.kstest(data, "norm")
+                    pval_ks_str = flt_to_latex(pval_ks)
+                    if pval_ks < SIGNIFICANCE_LEVEL:
+                        pval_ks_str = f"\\underline{{{pval_ks_str}}}"
+                    pval_ks_df.at[level, method] = pval_ks_str
                 except ValueError:
-                    print(f"\tValueError!")
+                    print(f"\tValueError in Kolomogorov-Smirnov test!")
                     print(f"\t{column}, {method}, {level}")
-                    table_df.at[level, method] = "NaN"
+                    pval_ks_df.at[level, method] = "NaN"
 
-            caption = f"P-values for {self.test_name} tests for {namestr.replace('_', ' ')}"
-            # table_df.reset_index().to_csv(table_csvpath, index=False,
-            #                               header=True, decimal='.', sep=',',
-            #                               float_format="%.3E")
-            table_df.to_latex(table_texpath, escape=False, caption=caption)
+                try:
+                    _, pval_sw = stats.shapiro(data)
+                    pval_sw_str = flt_to_latex(pval_sw)
+                    if pval_sw < SIGNIFICANCE_LEVEL:
+                        pval_sw_str = f"\\underline{{{pval_sw_str}}}"
+                    pval_sw_df.at[level, method] = pval_sw_str
+                except ValueError:
+                    print(f"\tValueError in Shapiro-Wilk test!")
+                    print(f"\t{column}, {method}, {level}")
+                    pval_sw_df.at[level, method] = "NaN"
+
+            caption = ("P-values for the Kolmogorov-Smirnov (top) and the "
+                       + "Shapiro-Wilk (bottom) normality tests for "
+                       + f"{namestr.replace('_', ' ')}")
+            table_df = pd.concat([pval_ks_df, pval_sw_df])
             latex_str = table_df.to_latex(buf=None, escape=False, caption=caption,
-            column_format="c" * (len(reso_order) + 1))
+                                          column_format="c" * (len(reso_order) + 1))
             self.tex_table_list.append(latex_str)
         except Exception as e:
             print(f"Table generator failed to create {table_filename}")
             raise e
-
-    @staticmethod
-    def stat_test(*args):
-        raise NotImplementedError
 
 
 class ComparisonTableGeneratorBase(TableGeneratorBase):
@@ -377,50 +397,6 @@ class ComparisonTableGeneratorBase(TableGeneratorBase):
     @staticmethod
     def stat_test(*args):
         raise NotImplementedError
-
-
-class KolmogorovTableGenerator(NormalityTableGeneratorBase):
-
-    def __init__(self, timestamp):
-        super().__init__(timestamp)
-        self.test_name = "kolmogorov"
-        self.table_subdir = os.path.join(self.table_dir, "norm_" + self.test_name)
-        create_dir_if_not_exists(self.table_subdir)
-        tex_summary_file = os.path.join(self.table_subdir, "summary.tex")
-
-        with open(tex_summary_file, 'w') as tex_summary:
-            self.generate_all_tables()
-
-            tex_summary.write(TEX_HEADER_STR)
-            for tex_table in self.tex_table_list:
-                tex_summary.write("\n" + tex_table)
-            tex_summary.write(TEX_FOOTER_STR)
-
-    @staticmethod
-    def stat_test(x):
-        return stats.kstest(x, "norm")
-
-
-class ShapiroTableGenerator(NormalityTableGeneratorBase):
-
-    def __init__(self, timestamp):
-        super().__init__(timestamp)
-        self.test_name = "shapiro"
-        self.table_subdir = os.path.join(self.table_dir, "norm_" + self.test_name)
-        create_dir_if_not_exists(self.table_subdir)
-        tex_summary_file = os.path.join(self.table_subdir, "summary.tex")
-
-        with open(tex_summary_file, 'w') as tex_summary:
-            self.generate_all_tables()
-
-            tex_summary.write(TEX_HEADER_STR)
-            for tex_table in self.tex_table_list:
-                tex_summary.write("\n" + tex_table)
-            tex_summary.write(TEX_FOOTER_STR)
-
-    @staticmethod
-    def stat_test(x):
-        return stats.shapiro(x)
 
 
 class WilcoxonTableGenerator(ComparisonTableGeneratorBase):
