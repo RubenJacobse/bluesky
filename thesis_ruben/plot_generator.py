@@ -42,7 +42,7 @@ FIGURE_FILETYPE = "png"
 FIGURE_SIZE = (16, 9)
 
 # Various
-RHOMAX_GUESS_INIT = 60
+PARAM_GUESS_INIT = [1000, 100] # Initial guess for CAMDA ['rho_max', 'k']
 
 def make_batch_figures(timestamp):
     """
@@ -691,7 +691,6 @@ class CAMDAFigureGenerator(FigureGeneratorBase):
         super().__init__(timestamp)
         self.load_conflict_data()
         for geometry in self.combination_dict:
-            self.generate_split_figures(geometry)
             self.generate_summary_figure(geometry)
 
     def create_figure_dir_if_not_exists(self):
@@ -713,93 +712,6 @@ class CAMDAFigureGenerator(FigureGeneratorBase):
         asaslog_file = os.path.join(summary_dir, "asaslog_summary.csv")
         self.df = pd.read_csv(asaslog_file)
 
-    def generate_split_figures(self, geometry):
-        df = self.df[((self.df["resolution method"] != "OFF")
-                      & (self.df["#geometry"] == geometry))]
-
-        reso_methods = ["MVP", "EBY", "VELAVG",
-                        "GV-METHOD1", "GV-METHOD2",
-                        "GV-METHOD3", "GV-METHOD4"]
-        reso_order = [method for method in reso_methods
-                      if method in df["resolution method"].unique()]
-        num_reso_methods = df["resolution method"].nunique()
-        marker = itertools.cycle(("o", "v", "s", "H", "D", "<", ">"))
-
-        for method in reso_order:
-            # Perform least squares regression for each method
-            # Ignore DEP == 0 to avoid zero division during linearization
-            df_method = df[(df["resolution method"] == method)
-                           & (df["DEP [-]"] != 0)]
-            rho = df_method["avg density [ac/1e4NM^2]"].to_numpy()
-            dep = df_method["DEP [-]"].to_numpy()
-
-            # Split into training and test sets
-            rho_train, rho_test, dep_train, dep_test = train_test_split(
-                rho, dep, test_size=0.4, random_state=1
-            )
-
-            # Linearize and perform least-squares on training set
-            x_train = 1 / rho_train
-            y_train = 1 / dep_train + 1
-            x_test = 1 / rho_test
-            y_test = 1 / dep_test + 1
-            A = np.vstack([x_train]).T
-            params, _, _, _ = np.linalg.lstsq(A, y_train, rcond=None)
-            est_rho_max_lin = params[0]
-
-            params, _ = optimize.curve_fit(dep_func, rho_train, dep_train, p0=RHOMAX_GUESS_INIT)
-            est_rho_max = params[0]
-            print(params)
-
-            # Calculate Mean Squared Error for both training and test data
-            dep_model_train = dep_func(rho_train, est_rho_max)
-            dep_model_test = dep_func(rho_test, est_rho_max)
-            mse_train = mean_squared_error(dep_model_train, dep_train)
-            mse_test = mean_squared_error(dep_model_test, dep_test)
-
-            # Models for plotting
-            rho_model = np.linspace(0, 75, 1000)
-            dep_model = dep_func(rho_model, est_rho_max)
-            x_model = np.linspace(0, 0.1, 2)
-            y_model = est_rho_max * x_model
-
-            dep_model_lin = dep_func(rho_model, est_rho_max_lin)
-            y_model_lin = est_rho_max_lin * x_model
-
-            # Make figure
-            plt.figure(figsize=FIGURE_SIZE)
-
-            plt.subplot(1, 2, 1)
-            plt.scatter(x_train, y_train, c="b", alpha=0.1)
-            plt.scatter(x_test, y_test, c="r", alpha=0.1)
-            plt.plot(x_model, y_model, c="b",
-                     label=f"nonlinear parameter fitting, rho_max={est_rho_max:.1f}")
-            plt.plot(x_model, y_model_lin, c="k",
-                     label=f"linearized least-squares, rho_max={est_rho_max_lin:.1f}")
-            plt.legend()
-            plt.xlabel("1 / density")
-            plt.ylabel("(1 / DEP) + 1")
-
-            plt.subplot(1, 2, 2)
-            plt.scatter(rho_train, dep_train, c="b",
-                        label="training set", alpha=0.1)
-            plt.scatter(rho_test, dep_test, c="r",
-                        label="test set", alpha=0.1)
-            plt.plot(rho_model, dep_model, c="b", label="_nolegend_")
-            plt.plot(rho_model, dep_model_lin, c="k", label="_nolegend_")
-            plt.xlim(0, 70)
-            plt.ylim(-1, 100)
-            plt.xlabel("Density [ac / 10,000 NM^2]")
-            plt.ylabel("DEP [-]")
-            plt.legend(title="Data set",
-                       loc="lower center",
-                       ncol=num_reso_methods,
-                       bbox_to_anchor=(0.5, 1))
-            plt_filename = f"camda_{geometry}_{method}.{FIGURE_FILETYPE}"
-            plt_filepath = os.path.join(self.figure_dir, plt_filename)
-            plt.savefig(plt_filepath, dpi=300, bbox_inches="tight")
-            plt.close()
-
     def generate_summary_figure(self, geometry):
         df = self.df[((self.df["resolution method"] != "OFF")
                       & (self.df["#geometry"] == geometry))]
@@ -812,13 +724,16 @@ class CAMDAFigureGenerator(FigureGeneratorBase):
         num_reso_methods = df["resolution method"].nunique()
         marker = itertools.cycle(("o", "v", "s", "H", "D", "<", ">"))
 
+        # Set up empty dataframe for test and validation rmse values
+        df_rmse = pd.DataFrame(columns=["method", "rmse", "type"])
+
         plt.figure(figsize=FIGURE_SIZE)
         ax = plt.gca()
+        lines = []
+        line_labels = []
         for method in reso_order:
-            # Perform least squares regression for each method
             # Ignore DEP == 0 to avoid zero division during linearization
-            df_method = df[(df["resolution method"] == method)
-                           & (df["DEP [-]"] != 0)]
+            df_method = df[(df["resolution method"] == method)]
             rho = df_method["avg density [ac/1e4NM^2]"].to_numpy()
             dep = df_method["DEP [-]"].to_numpy()
 
@@ -827,49 +742,78 @@ class CAMDAFigureGenerator(FigureGeneratorBase):
                 rho, dep, test_size=0.4, random_state=1
             )
 
-            # Linearize and perform least-squares on training set
-            x = 1 / rho_train
-            y = 1 / dep_train + 1
-            A = np.vstack([x]).T
-            params, _, _, _ = np.linalg.lstsq(A, y, rcond=None)
-            est_rho_max = params[0]
-            print(f"{method}\n\told rho_max_est: {est_rho_max:.3f}")
+            # Perform non-linear curve fitting
+            params, _ = optimize.curve_fit(dep_func_multi, rho_train, dep_train,
+                                           p0=PARAM_GUESS_INIT)
+            (est_rho_max, est_k) = params
 
-            # Calculate Mean Squared Error for both training and test data
-            dep_model_train = dep_func(rho_train, est_rho_max)
-            dep_model_test = dep_func(rho_test, est_rho_max)
-            mse_train = mean_squared_error(dep_model_train, dep_train)
-            mse_test = mean_squared_error(dep_model_test, dep_test)
-            print(f"\tMSE train: {mse_train}, MSE test: {mse_test}")
+            # Calculate Root Mean Squared Error for both training and test data
+            dep_model_train = dep_func_multi(rho_train, est_rho_max, est_k)
+            dep_model_test = dep_func_multi(rho_test, est_rho_max, est_k)
+            rmse_train = np.sqrt(mean_squared_error(dep_model_train, dep_train))
+            rmse_test = np.sqrt(mean_squared_error(dep_model_test, dep_test))
 
-            # Use non-linear curve fitting
-            params, _ = optimize.curve_fit(dep_func, rho_train, dep_train, p0=RHOMAX_GUESS_INIT)
-            est_rho_max = params[0]
-            print(f"\tnew rho_max_est: {est_rho_max:.3f}")
+            # Add RMSE values to dataframe
+            df_rmse = df_rmse.append(
+                {"method": method, "rmse": rmse_train, "type": "training"},
+                ignore_index=True
+            )
+            df_rmse = df_rmse.append(
+                {"method": method, "rmse": rmse_test, "type": "validation"},
+                ignore_index=True
+            )
 
-            # Calculate Mean Squared Error for both training and test data
-            dep_model_train = dep_func(rho_train, est_rho_max)
-            dep_model_test = dep_func(rho_test, est_rho_max)
-            mse_train = mean_squared_error(dep_model_train, dep_train)
-            mse_test = mean_squared_error(dep_model_test, dep_test)
-            print(f"\tMSE train: {mse_train}, MSE test: {mse_test}")
+            # Calculate RMSE for full data set
+            dep_model_full = dep_func_multi(rho, est_rho_max, est_k)
+            rms_full = np.sqrt(mean_squared_error(dep, dep_model_full))
 
-            # Make figure
+            # Add scatter plot and model curve to figure
             rho_model = np.linspace(0, 75, 1000)
-            dep_model = dep_func(rho_model, est_rho_max)
+            dep_model = dep_func_multi(rho_model, est_rho_max, est_k)
             color = next(ax._get_lines.prop_cycler)['color']
-            plt.scatter(rho, dep, label=method, marker=next(marker), alpha=0.1, c=color)
-            plt.plot(rho_model, dep_model, c=color, label="_nolegend_")
+            plt.scatter(rho, dep, label=method, marker=next(marker),
+                        alpha=0.2, c=color)
+            line, = plt.plot(rho_model, dep_model, c=color, label="_nolegend_")
+            line_label = (f"$\\rho_{{max}}$={est_rho_max:.1E}, $k$={est_k:.1E}, "
+                          + f"($RMSE$={rms_full:.1f})")
+            lines.append(line)
+            line_labels.append(line_label)
 
-        plt.xlabel("Density [ac / 10,000 NM^2]")
+        # Set figure attributes and save
+        plt.xlabel("Density [ac / 10,000 NM$^2$]")
         plt.ylabel("DEP [-]")
         plt.xlim(0, 70)
         plt.ylim(-1, 100)
-        plt.legend(title="Conflict prevention and resolution method",
-                   loc="lower center",
-                   ncol=num_reso_methods,
-                   bbox_to_anchor=(0.5, 1))
+        ax.text(58, 88, ("Regression model:\n$DEP\\left(\\rho\\right) = k "
+                         + "\\cdot \\frac{{\\rho}}{{\\rho_{{max}}-\\rho}}$"),
+                fontsize="15")
+        legend1 = plt.legend(lines, line_labels, loc=2)
+        leg = plt.legend(title="Conflict prevention and resolution method",
+                         loc="lower center",
+                         ncol=num_reso_methods,
+                         bbox_to_anchor=(0.5, 1))
+        plt.gca().add_artist(legend1)
+        for handle in leg.legendHandles:
+            handle.set_alpha(1)
         plt_filename = f"camda_{geometry}.{FIGURE_FILETYPE}"
+        plt_filepath = os.path.join(self.figure_dir, plt_filename)
+        plt.savefig(plt_filepath, dpi=300, bbox_inches="tight")
+        plt.close()
+
+        # Create and save figure with RMS values
+        plt.figure(figsize=FIGURE_SIZE)
+        sbn.barplot(x="method",
+                    y="rmse",
+                    hue="type",
+                    data=df_rmse,
+                    palette="Blues",
+                    linewidth=0.5)
+        plt.legend(loc="lower center",
+                   ncol=2,
+                   bbox_to_anchor=(0.5, 1))
+        plt.xlabel("Separation method")
+        plt.ylabel("RMS Error DEP [-]")
+        plt_filename = f"camda_rms_{geometry}.{FIGURE_FILETYPE}"
         plt_filepath = os.path.join(self.figure_dir, plt_filename)
         plt.savefig(plt_filepath, dpi=300, bbox_inches="tight")
         plt.close()
@@ -1085,3 +1029,7 @@ class ASASConflictFigureGenerator(FigureGeneratorBase):
 
 def dep_func(rho, rho_max):
     return rho / (rho_max - rho)
+
+def dep_func_multi(rho, *params):
+    (rho_max, k) = params
+    return k * rho / (rho_max - rho)
