@@ -506,6 +506,10 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
                                     "DEP [-]",
                                     "DEP",
                                     showbase=False)
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "avg num ac [-]",
+                                    "avg_num_ac")
 
             # Make figures based on data in flstlog_occurence.csv
             df = pd.read_csv(os.path.join(self.batch_dir,
@@ -732,7 +736,6 @@ class CAMDAFigureGenerator(FigureGeneratorBase):
         lines = []
         line_labels = []
         for method in reso_order:
-            # Ignore DEP == 0 to avoid zero division during linearization
             df_method = df[(df["resolution method"] == method)]
             rho = df_method["avg density [ac/1e4NM^2]"].to_numpy()
             dep = df_method["DEP [-]"].to_numpy()
