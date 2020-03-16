@@ -74,6 +74,13 @@ def load_csv_data(filename, delimiter=",", comment_token="#"):
     return data
 
 
+def create_dir_if_not_exists(directory: str) -> None:
+    """ Creates the directory if it does not exist yet. """
+
+    if not os.path.isdir(directory):
+        os.makedirs(directory)
+
+
 class FigureGeneratorBase:
     """
     Base class that defines the directory in which all figures will be saved
@@ -168,16 +175,35 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
 
             # Create and save the base plot with geometry only
             geo_plot = self.make_geo_base_figure(geo_data)
-            geo_plot_filename = os.path.join(self.figure_dir,
+            base_dirpath = os.path.join(self.figure_dir[:-5], "base")
+            create_dir_if_not_exists(base_dirpath)
+            geo_plot_filename = os.path.join(base_dirpath,
                                              f"{geometry}.{FIGURE_FILETYPE}")
             geo_plot.savefig(geo_plot_filename, dpi=300, bbox_inches="tight")
             geo_plot.close()
 
             # Create the plots showing the conflict and intrusion locations
             for method in self.combination_dict[geometry]:
+                # Create and save base plot with geovector areas only
+                if method.startswith("GV-"):
+                    gv_source_file_name = (f"{self.timestamp}_{geometry}_RESO-"
+                                               + f"{method}_geovector.csv")
+                    gv_source_file = os.path.join("post_processing",
+                                                  self.timestamp,
+                                                  "geomfiles",
+                                                  gv_source_file_name)
+                    gv_data = load_csv_data(gv_source_file)
+
+                    gv_plot = self.make_geovec_figure(geo_data, gv_data)
+                    plt_filename = (f"{geometry}_{method}.{FIGURE_FILETYPE}")
+                    plt_filepath = os.path.join(base_dirpath, plt_filename)
+                    gv_plot.savefig(plt_filepath, dpi=300, bbox_inches="tight")
+                    gv_plot.close()
+
+                # Make area conflict figures for all traffic levels
                 for level in self.combination_dict[geometry][method]:
-                    # Make area conflict figures. Valid location_type
-                    # settings: "conflict", "intrusion", "both"
+                    # Valid location_type settings: "conflict",
+                    # "intrusion", "both"
                     self.make_geo_location_figure(geo_data,
                                                   geometry,
                                                   method,
