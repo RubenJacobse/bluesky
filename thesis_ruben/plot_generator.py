@@ -333,8 +333,9 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
             # Load the geovector data for the current geometry
             geovec_source_file_name = (f"{self.timestamp}_{geometry}_RESO-"
                                        + f"{separation_method}_geovector.csv")
-            geovec_source_file = os.path.join("scenario",
+            geovec_source_file = os.path.join("post_processing",
                                               self.timestamp,
+                                              "geomfiles",
                                               geovec_source_file_name)
             geovec_data = load_csv_data(geovec_source_file)
 
@@ -840,6 +841,7 @@ class CAMDAFigureGenerator(FigureGeneratorBase):
         plt.legend(loc="lower center",
                    ncol=2,
                    bbox_to_anchor=(0.5, 1))
+        plt.ylim(0, 14)
         plt.xlabel("Separation method")
         plt.ylabel("RMS Error DEP [-]")
         plt_filename = f"camda_rms_{geometry}.{FIGURE_FILETYPE}"
