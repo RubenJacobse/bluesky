@@ -1,5 +1,5 @@
 """
-Generate figures showing conflict locations.
+Generate all relevant figures
 """
 
 # Python imports
@@ -43,6 +43,7 @@ FIGURE_SIZE = (16, 9)
 
 # Various
 PARAM_GUESS_INIT = [1000, 100] # Initial guess for CAMDA ['rho_max', 'k']
+ASAS_FIGURE_SCENARIOS = ["031", "088"] # Scenarios used in ASAS location figures
 
 def make_batch_figures(timestamp):
     """
@@ -71,6 +72,20 @@ def load_csv_data(filename, delimiter=",", comment_token="#"):
         data = [row for row in list(reader)
                 if not row[0].startswith(comment_token)]
 
+    return data
+
+
+def iterload_csv_data(filename, delimiter=",", comment_token="#"):
+    """
+    Loads the csv data from filename and returns a list that contains lists
+    of row elements in string format.
+    """
+
+    with open(filename) as csv_file:
+        reader = csv.reader(csv_file, delimiter=delimiter)
+        data = [row for row in reader
+                if (not row[0].startswith(comment_token)
+                    and row[3] in ASAS_FIGURE_SCENARIOS)]
     return data
 
 
@@ -416,7 +431,7 @@ class ASASGeoFigureGenerator(GeoFigureGeneratorBase):
 
         summary_dir = os.path.join(self.batch_dir, "logfiles_summary")
         asaslog_file = os.path.join(summary_dir, "asaslog_locations.csv")
-        self.location_list = load_csv_data(asaslog_file)
+        self.location_list = iterload_csv_data(asaslog_file)
 
 
 class AREAGeoFigureGenerator(GeoFigureGeneratorBase):
