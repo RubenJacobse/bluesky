@@ -321,7 +321,7 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
         for row in self.location_list:
             if row[0:3] == [geometry, separation_method, traffic_level]:
                 [ac_lat, ac_lon, is_los] = row[4:7]
-                if is_los == "True":
+                if is_los == "1":
                     intrusion_locations[0].append(float(ac_lon))
                     intrusion_locations[1].append(float(ac_lat))
                 else:
