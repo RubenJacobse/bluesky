@@ -26,9 +26,6 @@ sys.path.append(os.path.abspath(os.path.join("..")))
 # BlueSky imports
 import bluesky.tools.geo as bsgeo
 
-# Local imports
-# import extra_plot
-
 # Geo plot element colors
 RESTRICTION_FACECOLOR = "xkcd:pale pink"
 RESTRICTION_EDGECOLOR = "xkcd:brick red"
@@ -38,8 +35,8 @@ INTRUSION_MARKER_COLOR = "red"
 CONFLICT_MARKER_COLOR = "blue"
 
 # Save figures as following type
-FIGURE_FILETYPE = "png"
-FIGURE_SIZE = (16, 9)
+FIGURE_FILETYPE = "pdf"
+FIGURE_SIZE = (8, 4.5)
 
 # Various
 PARAM_GUESS_INIT = [1000, 100] # Initial guess for CAMDA ['rho_max', 'k']
@@ -50,9 +47,9 @@ def make_batch_figures(timestamp):
     Generate the figures for the batch with given timestamp.
     """
 
-    BoxPlotFigureGenerator(timestamp)
-    AREAGeoFigureGenerator(timestamp)
-    ASASGeoFigureGenerator(timestamp)
+    # BoxPlotFigureGenerator(timestamp)
+    # AREAGeoFigureGenerator(timestamp)
+    # ASASGeoFigureGenerator(timestamp)
     # ASASConflictFigureGenerator(timestamp)
     CAMDAFigureGenerator(timestamp)
 
@@ -270,8 +267,8 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
                  label="_nolegend_",
                  zorder=0)
         plt.axis("scaled")
-        plt.xlabel("longitude [deg]")
-        plt.ylabel("latitude [deg]")
+        plt.xlabel("Longitude [deg]")
+        plt.ylabel("Latitude [deg]")
 
         return plt
 
@@ -487,11 +484,11 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             df_geometry = df[df["#geometry"] == geometry]
             self.make_single_figure(geometry,
                                     df_geometry,
-                                    "num conflicts",
+                                    "num area conflicts [-]",
                                     "area_conflicts")
             self.make_single_figure(geometry,
                                     df_geometry,
-                                    "num intrusions",
+                                    "num area intrusions [-]",
                                     "area_intrusions",
                                     showfliers=True)
 
@@ -514,8 +511,7 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             self.make_single_figure(geometry,
                                     df_los,
                                     "LoS severity [-]",
-                                    "los_severity",
-                                    showbase=False)
+                                    "los_severity")
             self.make_single_figure(geometry,
                                     df_los,
                                     "delta v [kts]",
@@ -569,8 +565,7 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "t in los [%]",
-                                    "t_in_los",
-                                    showbase=False)
+                                    "t_in_los")
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "t in reso [%]",
@@ -600,7 +595,7 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
                                     "num_turnaround")
 
     def make_single_figure(self, geometry, df, column, namestr,
-                           showfliers=False, showbase=True):
+                           showfliers=False, showbase=False):
         """
         Make a single boxplot figure for a given geometry. The data used
         is specified in a pandas dataframe 'df', 'column' is the column used
@@ -611,19 +606,20 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
         if not showbase:
             df = df[(df["resolution method"] != "OFF")]
 
-        # Use the min and max of the unfiltered column in the dataframe
-        # to ensure all figures using this column have the same y-axis limits
-        ymin = df[column].min()
-        ymax = df[column].max()
-        yrange = df[column].max() - df[column].min()
+        # # Use the min and max of the unfiltered column in the dataframe
+        # # to ensure all figures using this column have the same y-axis limits
+        # ymin = df[column].min()
+        # ymax = df[column].max()
+        # yrange = df[column].max() - df[column].min()
 
         # Set resolution method plotting orders
         base_method = ["OFF"] if showbase else []
-        reso_methods = base_method + ["MVP", "EBY", "VELAVG",
-                                        "GV-METHOD1", "GV-METHOD2",
-                                        "GV-METHOD3", "GV-METHOD4"]
+        reso_methods = base_method + ["MVP", "VELAVG",
+                                      "GV-METHOD1", "GV-METHOD2",
+                                      "GV-METHOD3", "GV-METHOD4"]
         reso_order = [method for method in reso_methods
                         if method in df["resolution method"].unique()]
+        reso_label = base_method + ["MVP", "VELAVG", "GV-1", "GV-2", "GV-3", "GV-4"]
         level_order = df["traffic level"].unique().sort()
         num_levels = df["traffic level"].nunique()
 
@@ -643,12 +639,14 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
                   loc="lower center",
                   ncol=num_levels,
                   bbox_to_anchor=(0.5, 1))
-        ax.set(xticklabels=reso_order)
+        ax.set(xticklabels=reso_label)
+        plt.xlabel("Resolution method")
+        # plt.setp(ax.get_xticklabels(), rotation=30, horizontalalignment='right')
         # Next three lines are useful to ensure the same plot types have
         # the same axes when comparing different geometries
-        yminplot = ymin - 0.05 * yrange
-        ymaxplot = ymax + 0.05 * yrange
-        ax.set_ylim(yminplot, ymaxplot)
+        # yminplot = ymin - 0.05 * yrange
+        # ymaxplot = ymax + 0.05 * yrange
+        # ax.set_ylim(yminplot, ymaxplot)
         plt_filename = f"{geometry}_{namestr}.{FIGURE_FILETYPE}"
         plt_filepath = os.path.join(self.figure_dir, plt_filename)
         try:
@@ -762,11 +760,12 @@ class CAMDAFigureGenerator(FigureGeneratorBase):
         df = self.df[((self.df["resolution method"] != "OFF")
                       & (self.df["#geometry"] == geometry))]
 
-        reso_methods = ["MVP", "EBY", "VELAVG",
+        reso_methods = ["MVP", "VELAVG",
                         "GV-METHOD1", "GV-METHOD2",
                         "GV-METHOD3", "GV-METHOD4"]
         reso_order = [method for method in reso_methods
                       if method in df["resolution method"].unique()]
+        reso_labels = ["MVP", "VELAVG", "GV-1", "GV-2", "GV-3", "GV-4"]
         num_reso_methods = df["resolution method"].nunique()
         marker = itertools.cycle(("o", "v", "s", "H", "D", "<", ">"))
 
@@ -777,7 +776,7 @@ class CAMDAFigureGenerator(FigureGeneratorBase):
         ax = plt.gca()
         lines = []
         line_labels = []
-        for method in reso_order:
+        for (method, method_label) in zip(reso_order, reso_labels):
             df_method = df[(df["resolution method"] == method)]
             rho = df_method["avg density [ac/1e4NM^2]"].to_numpy()
             dep = df_method["DEP [-]"].to_numpy()
@@ -800,11 +799,11 @@ class CAMDAFigureGenerator(FigureGeneratorBase):
 
             # Add RMSE values to dataframe
             df_rmse = df_rmse.append(
-                {"method": method, "rmse": rmse_train, "type": "training"},
+                {"method": method_label, "rmse": rmse_train, "type": "training"},
                 ignore_index=True
             )
             df_rmse = df_rmse.append(
-                {"method": method, "rmse": rmse_test, "type": "validation"},
+                {"method": method_label, "rmse": rmse_test, "type": "validation"},
                 ignore_index=True
             )
 
@@ -816,22 +815,23 @@ class CAMDAFigureGenerator(FigureGeneratorBase):
             rho_model = np.linspace(0, 75, 1000)
             dep_model = dep_func_multi(rho_model, est_rho_max, est_k)
             color = next(ax._get_lines.prop_cycler)['color']
-            plt.scatter(rho, dep, label=method, marker=next(marker),
+            plt.scatter(rho, dep, label=method_label, marker=next(marker),
                         alpha=0.2, c=color)
             line, = plt.plot(rho_model, dep_model, c=color, label="_nolegend_")
-            line_label = (f"$\\rho_{{max}}$={est_rho_max:.1E}, $k$={est_k:.1E}, "
-                          + f"($RMSE$={rms_full:.1f})")
+            # line_label = (f"$\\rho_{{max}}$={est_rho_max:.1E}, $k$={est_k:.1E}, "
+            #               + f"($RMSE$={rms_full:.1f})")
+            line_label = (f"$\\rho_{{max}}$={est_rho_max:.1E}, $k$={est_k:.1E}")
             lines.append(line)
             line_labels.append(line_label)
 
         # Set figure attributes and save
-        plt.xlabel("Density [ac / 10,000 NM$^2$]")
+        plt.xlabel("Average density [ac / 10,000 NM$^2$]")
         plt.ylabel("DEP [-]")
         plt.xlim(0, 70)
-        plt.ylim(-1, 100)
-        ax.text(58, 88, ("Regression model:\n$DEP\\left(\\rho\\right) = k "
+        plt.ylim(-1, 60)
+        ax.text(48, 53, ("Regression model:\n$DEP\\left(\\rho\\right) = k "
                          + "\\cdot \\frac{{\\rho}}{{\\rho_{{max}}-\\rho}}$"),
-                fontsize="15")
+                fontsize="10")
         legend1 = plt.legend(lines, line_labels, loc=2)
         leg = plt.legend(title="Conflict prevention and resolution method",
                          loc="lower center",
@@ -839,7 +839,7 @@ class CAMDAFigureGenerator(FigureGeneratorBase):
                          bbox_to_anchor=(0.5, 1))
         plt.gca().add_artist(legend1)
         for handle in leg.legendHandles:
-            handle.set_alpha(1)
+            handle.set_alpha(0.2)
         plt_filename = f"camda_{geometry}.{FIGURE_FILETYPE}"
         plt_filepath = os.path.join(self.figure_dir, plt_filename)
         plt.savefig(plt_filepath, dpi=300, bbox_inches="tight")
@@ -856,7 +856,7 @@ class CAMDAFigureGenerator(FigureGeneratorBase):
         plt.legend(loc="lower center",
                    ncol=2,
                    bbox_to_anchor=(0.5, 1))
-        plt.ylim(0, 14)
+        plt.ylim(0, 6)
         plt.xlabel("Separation method")
         plt.ylabel("RMS Error DEP [-]")
         plt_filename = f"camda_rms_{geometry}.{FIGURE_FILETYPE}"

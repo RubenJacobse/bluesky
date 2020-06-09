@@ -185,7 +185,7 @@ class AREALogSummaryParser(LogListParser):
 
     def set_header(self):
         self.header = ("geometry,resolution method,traffic level,"
-                       + "scenario,num conflicts,num intrusions")
+                       + "scenario,num area conflicts [-],num area intrusions [-]")
 
 
 class AREALogLocationParser(LogListParser):
@@ -232,7 +232,7 @@ class AREALogLocationParser(LogListParser):
 
     def set_header(self):
         self.header = ("geometry,resolution method,traffic level,scenario,"
-                       + "ac lat [deg],ac lon[deg],is intrusion [-]")
+                       + "ac lat [deg],ac lon [deg],is intrusion [-]")
 
 
 class ASASLogSummaryParser(LogListParser):
