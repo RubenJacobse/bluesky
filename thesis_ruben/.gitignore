@@ -1,6 +1,8 @@
 *.png
 *.csv
 *.scn
+*.pdf
+*.pgf
 
 *.py
 *.zip
