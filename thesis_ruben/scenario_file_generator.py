@@ -156,6 +156,7 @@ class ScenarioGenerator():
         self.write_scenfile()
         self.write_geofile()
         self.write_geovectorfile()
+        self.write_swarmzonefile()
 
     def create_airspace_restriction(self, corridor_side):
         """
@@ -545,7 +546,7 @@ class ScenarioGenerator():
             divring40 = Geovector("divring_40",
                                   gs_min_cas=262,
                                   gs_max_cas=276,
-                                   poly=self.polygons["divring_40"].difference(
+                                  poly=self.polygons["divring_40"].difference(
                                        self.polygons["corridor"]))
             divring60 = Geovector("divring_60",
                                   gs_min_cas=264,
@@ -1067,6 +1068,31 @@ class ScenarioGenerator():
                 coord_str = ",".join(str(f"{x:.6f}") for x in coords)
                 geovectorfile.write(f"GV{idx+1},{gs_min},{gs_max},"
                                     + f"{crs_min},{crs_max},{coord_str}\n")
+
+    def write_swarmzonefile(self):
+        """
+        Create csv file containing the swarm zone areas geometric parameters
+        to allow generation of figures during post-processing.
+        """
+
+        if not self.swarm_zones:
+            return
+
+        file_name = (("{}_L{}_W{}_A{}_RESO-{}_swarmzone.csv")
+                     .format(self.timestamp,
+                             self.corridor_length,
+                             self.corridor_width,
+                             self.angle,
+                             self.resolution_method))
+        file_path = os.path.join(self.target_dir, file_name)
+
+        with open(file_path, "w+") as swarmzonefile:
+            for idx, swarm_zone in enumerate(self.swarm_zones):
+                coords = [x for (lat, lon)
+                          in swarm_zone.exterior.coords
+                          for x in (lat, lon)]
+                coord_str = ",".join(str(f"{x:.6f}") for x in coords)
+                swarmzonefile.write(f"SWARMZONE{idx+1},{coord_str}\n")
 
 
 def calc_line_ring_intersection(ring_center_lat,

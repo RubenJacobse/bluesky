@@ -31,6 +31,8 @@ RESTRICTION_FACECOLOR = "xkcd:pale pink"
 RESTRICTION_EDGECOLOR = "xkcd:brick red"
 GEOVECTOR_EDGECOLOR = "xkcd:boring green"
 GEOVECTOR_FACECOLOR = "xkcd:light seafoam green"
+SWARMZONE_EDGECOLOR = "xkcd:sand"
+SWARMZONE_FACECOLOR = "xkcd:light tan"
 INTRUSION_MARKER_COLOR = "red"
 CONFLICT_MARKER_COLOR = "blue"
 
@@ -211,7 +213,21 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
                     plt_filepath = os.path.join(base_dirpath, plt_filename)
                     gv_plot.savefig(plt_filepath, dpi=300, bbox_inches="tight")
                     gv_plot.close()
+                # Create and save base plot with swarming areas only
+                elif method.startswith("VELAVG"):
+                    gv_source_file_name = (f"{self.timestamp}_{geometry}_RESO-"
+                                               + f"{method}_swarmzone.csv")
+                    gv_source_file = os.path.join("post_processing",
+                                                  self.timestamp,
+                                                  "geomfiles",
+                                                  gv_source_file_name)
+                    gv_data = load_csv_data(gv_source_file)
 
+                    gv_plot = self.make_swarm_zone_figure(geo_data, gv_data)
+                    plt_filename = (f"{geometry}_{method}.{FIGURE_FILETYPE}")
+                    plt_filepath = os.path.join(base_dirpath, plt_filename)
+                    gv_plot.savefig(plt_filepath, dpi=300, bbox_inches="tight")
+                    gv_plot.close()
                 # Make area conflict figures for all traffic levels
                 for level in self.combination_dict[geometry][method]:
                     # Valid location_type settings: "conflict",
@@ -301,7 +317,34 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
                      facecolor=GEOVECTOR_FACECOLOR,
                      linewidth=1,
                      label="_nolegend_",
-                     zorder=0)
+                     zorder=-1)
+
+        return plt
+
+    def make_swarm_zone_figure(self, geo_data, swarm_zone_data):
+        """
+        Plot the experiment area and airspace restrictions defined in
+        'geo_data' together with the geovector areas defined in 'geovec_data'.
+
+        Returns a matplotlib.pyplot object that can then be used by the caller.
+        """
+
+        # Create the base figure with experiment area and airspace restrictions
+        plt = self.make_geo_base_figure(geo_data)
+
+        # Add each geovector area to the figure
+        for row in swarm_zone_data:
+            area_coords = row[1:]
+            area_latlon = [(float(lon), float(lat)) for (lat, lon)
+                         in zip(area_coords[0:-1:2], area_coords[1::2])]
+            area_polygon = Polygon(area_latlon)
+
+            plt.fill(*area_polygon.exterior.xy,
+                     edgecolor=SWARMZONE_EDGECOLOR,
+                     facecolor=SWARMZONE_FACECOLOR,
+                     linewidth=1,
+                     label="_nolegend_",
+                     zorder=-1)
 
         return plt
 
@@ -359,6 +402,24 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
                                          facecolor=GEOVECTOR_FACECOLOR,
                                          linewidth=1,
                                          label="Geovectoring area"))
+        elif "VELAVG" in separation_method:
+            # Load the geovector data for the current geometry
+            swarm_zone_source_file_name = (f"{self.timestamp}_{geometry}_RESO-"
+                                       + f"{separation_method}_swarmzone.csv")
+            swarm_zone_source_file = os.path.join("post_processing",
+                                               self.timestamp,
+                                               "geomfiles",
+                                               swarm_zone_source_file_name)
+            swarm_zone_data = load_csv_data(swarm_zone_source_file)
+
+            # Create plot with restriction and geovector areas
+            plt = self.make_swarm_zone_figure(geo_data, swarm_zone_data)
+
+            # Add geovector to legend
+            legend_elements.append(Patch(edgecolor=SWARMZONE_EDGECOLOR,
+                                         facecolor=SWARMZONE_FACECOLOR,
+                                         linewidth=1,
+                                         label="Velocity averaging area"))
         else:
             # Create plot with only restriction areas
             plt = self.make_geo_base_figure(geo_data)
@@ -373,7 +434,8 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
                         marker=marker_plt,
                         edgecolors="none",
                         c=CONFLICT_MARKER_COLOR,
-                        label="_nolegend_")
+                        label="_nolegend_",
+                        zorder=1)
             legend_elements.append(Line2D([0], [0],
                                           linestyle="",
                                           marker=marker_plt,
@@ -386,7 +448,8 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
                         marker=marker_plt,
                         edgecolors="none",
                         c=INTRUSION_MARKER_COLOR,
-                        label="_nolegend_")
+                        label="_nolegend_",
+                        zorder=1)
             legend_elements.append(Line2D([0], [0],
                                           linestyle="",
                                           marker=marker_plt,
