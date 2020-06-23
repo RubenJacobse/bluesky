@@ -492,35 +492,6 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
                                     "area_intrusions",
                                     showfliers=True)
 
-            # Make figures based on data in asaslog_occurence.csv
-            df = pd.read_csv(os.path.join(self.batch_dir,
-                                          "logfiles_summary",
-                                          "asaslog_occurence.csv"))
-            df_geometry = df[df["#geometry"] == geometry]
-            # self.make_single_figure(geometry,
-            #                         df_geometry,
-            #                         "duration [s]",
-            #                         "conflict_duration")
-
-            df_los = df[(df["#geometry"] == geometry)
-                        & (df["is LoS [-]"] == True)]
-            # self.make_single_figure(geometry,
-            #                         df_los,
-            #                         "duration [s]",
-            #                         "los_duration")
-            self.make_single_figure(geometry,
-                                    df_los,
-                                    "LoS severity [-]",
-                                    "los_severity")
-            self.make_single_figure(geometry,
-                                    df_los,
-                                    "delta v [kts]",
-                                    "los_delta_v")
-            self.make_single_figure(geometry,
-                                    df_los,
-                                    "delta trk [deg]",
-                                    "los_delta_trk")
-
             # Make figures based on data in asaslog_summary.csv
             df = pd.read_csv(os.path.join(self.batch_dir,
                                           "logfiles_summary",
@@ -537,62 +508,49 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "IPR [-]",
-                                    "IPR",
-                                    showbase=False)
+                                    "IPR")
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "DEP [-]",
-                                    "DEP",
-                                    showbase=False)
+                                    "DEP")
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "avg num ac [-]",
                                     "avg_num_ac")
-
-            # Make figures based on data in flstlog_occurence.csv
-            df = pd.read_csv(os.path.join(self.batch_dir,
-                                          "logfiles_summary",
-                                          "flstlog_occurence.csv"))
-            df_geometry = df[df["#geometry"] == geometry]
             self.make_single_figure(geometry,
                                     df_geometry,
-                                    "route efficiency [-]",
-                                    "efficiency")
-            self.make_single_figure(geometry,
-                                    df_geometry,
-                                    "t in conf [%]",
-                                    "t_in_conf")
-            self.make_single_figure(geometry,
-                                    df_geometry,
-                                    "t in los [%]",
-                                    "t_in_los")
-            self.make_single_figure(geometry,
-                                    df_geometry,
-                                    "t in reso [%]",
-                                    "t_in_reso")
-            self.make_single_figure(geometry,
-                                    df_geometry,
-                                    "num conf per ac [-]",
-                                    "ac_conf")
-            self.make_single_figure(geometry,
-                                    df_geometry,
-                                    "num los per ac [-]",
-                                    "ac_los",
-                                    showfliers=True)
-            self.make_single_figure(geometry,
-                                    df_geometry,
-                                    "num ac conf per/ac/dist [1/m]",
-                                    "conf_per_dist")
+                                    "LoS sev stat [-]",
+                                    "avg_los_sev")
 
             # Make figures based on data in flstlog_occurence.csv
             df = pd.read_csv(os.path.join(self.batch_dir,
                                           "logfiles_summary",
                                           "flstlog_summary.csv"))
             df_geometry = df[df["#geometry"] == geometry]
+            # self.make_single_figure(geometry,
+            #                         df_geometry,
+            #                         "num turnaround [-]",
+            #                         "num_turnaround")
             self.make_single_figure(geometry,
                                     df_geometry,
-                                    "num turnaround [-]",
-                                    "num_turnaround")
+                                    "extra dist [%]",
+                                    "extra_dist")
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "time in conflict [%]",
+                                    "avg_t_in_conf")
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "time in los [%]",
+                                    "avg_t_in_los")
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "time in resolution [%]",
+                                    "avg_t_in_reso")
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "avg ac conf per dist [1/m]",
+                                    "conf_per_dist")
 
     def make_single_figure(self, geometry, df, column, namestr,
                            showfliers=False, showbase=False):

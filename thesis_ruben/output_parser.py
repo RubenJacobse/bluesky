@@ -7,6 +7,7 @@ and
 import os
 import csv
 import sys
+import statistics
 
 # Third-party imports
 import numpy as np
@@ -267,6 +268,7 @@ class ASASLogSummaryParser(LogListParser):
 
         num_los = 0
         num_conf = 0
+        los_severity_list = []
 
         for row in log_data:
             # Last row of ASASLOG contains only time-averaged number
@@ -286,6 +288,8 @@ class ASASLogSummaryParser(LogListParser):
 
             if is_los:
                 num_los += 1
+                los_severity = (PZ_RADIUS - float(dist_min)) / PZ_RADIUS
+                los_severity_list.append(los_severity)
             else:
                 num_conf += 1
 
@@ -295,6 +299,12 @@ class ASASLogSummaryParser(LogListParser):
             int_prev_rate = f"{(num_conf - num_los) / num_conf:.3f}"
         else:
             int_prev_rate = "NaN"
+
+        # Calculate summarizing statistics for entire run
+        if los_severity_list:
+            los_sev_stat = f'{statistics.mean(los_severity_list):.4f}'
+        else:
+            los_sev_stat = "NaN"
 
         # Calculate area available to traffic
         timestamp = logfile.split(os.sep)[1]
@@ -326,7 +336,8 @@ class ASASLogSummaryParser(LogListParser):
                          "num_los": num_los,
                          "int_prev_rate": int_prev_rate,
                          "avg_ntraf": avg_ntraf,
-                         "traf_area": traf_area}
+                         "traf_area": traf_area,
+                         "los_sev_stat": los_sev_stat}
 
         self.summary_list.append(current_stats)
 
@@ -357,7 +368,8 @@ class ASASLogSummaryParser(LogListParser):
                           + f'{scen["num_conf"]},{scen["num_los"]},'
                           + f'{scen["int_prev_rate"]},{scen["dep"]},'
                           + f'{scen["avg_ntraf"]:.2f},'
-                          + f'{1e4 * scen["avg_ntraf"]/scen["traf_area"]:.4f}')
+                          + f'{1e4 * scen["avg_ntraf"]/scen["traf_area"]:.4f},'
+                          + f'{scen["los_sev_stat"]}')
             self.write_to_output_file(outputline)
 
     def get_baseline_stats(self, geometry, traffic_level, scenario):
@@ -380,7 +392,8 @@ class ASASLogSummaryParser(LogListParser):
     def set_header(self):
         self.header = ("geometry,resolution method,traffic level,scenario,"
                        + "num conflicts [-],num LoS [-],IPR [-],DEP [-],"
-                       + "avg num ac [-],avg density [ac/1e4NM^2]")
+                       + "avg num ac [-],avg density [ac/1e4NM^2],"
+                       + "LoS sev stat [-]")
 
 
 class ASASLogOccurrenceParser(LogListParser):
@@ -588,6 +601,11 @@ class FLSTLogSummaryParser(LogListParser):
         """
 
         num_turnaround = 0
+        extra_dist_list = []
+        t_conf_list = []
+        t_los_list = []
+        t_reso_list = []
+        ac_conf_per_dist_list = []
 
         for row in log_data:
             del_time = float(row[0])
@@ -596,18 +614,44 @@ class FLSTLogSummaryParser(LogListParser):
                     or del_time > T_LOG_INTERVAL_END):
                 continue
 
+            flight_time = float(row[3])
             lat = float(row[8])
-
+            nominal_dist = float(row[5])
+            actual_dist = float(row[6])
+            dist_to_last_wp = float(row[7])
+            time_in_conf = float(row[10])
+            time_in_los = float(row[11])
+            time_in_reso = float(row[12])
+            num_tot_conf = float(row[13])
             if lat < 0:
                 num_turnaround += 1
+            else:
+                extra_dist = 100 * (actual_dist + dist_to_last_wp - nominal_dist) / nominal_dist
+                extra_dist_list.append(extra_dist)
+
+            t_conf_list.append(time_in_conf / flight_time * 100)
+            t_los_list.append(time_in_los / flight_time * 100)
+            t_reso_list.append(time_in_reso / flight_time * 100)
+            ac_conf_per_dist_list.append(num_tot_conf / actual_dist)
+
+        #
+        extra_dist_stat = statistics.mean(extra_dist_list)
+        t_conf_stat = statistics.mean(t_conf_list)
+        t_los_stat = statistics.mean(t_los_list)
+        t_reso_stat = statistics.mean(t_reso_list)
+        ac_conf_per_dist_stat = statistics.mean(ac_conf_per_dist_list)
 
         outputline = (f"{geometry},{reso_method},{traffic_level},{scenario},"
-                      + f"{num_turnaround}")
+                      + f"{num_turnaround},{extra_dist_stat},{t_conf_stat},"
+                      + f"{t_los_stat},{t_reso_stat}"
+                      + f"{ac_conf_per_dist_stat:.10f}")
         self.write_to_output_file(outputline)
 
     def set_header(self):
         self.header = ("geometry,resolution method,traffic level,scenario,"
-                       + "num turnaround [-]")
+                       + "num turnaround [-],extra dist [%],time in conflict [%],"
+                       + "time in los [%],time in resolution [%],"
+                       + "avg ac conf per dist [1/m]")
 
 
 def crs_diff(crs_a, crs_b):
