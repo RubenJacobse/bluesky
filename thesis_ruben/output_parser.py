@@ -643,7 +643,7 @@ class FLSTLogSummaryParser(LogListParser):
 
         outputline = (f"{geometry},{reso_method},{traffic_level},{scenario},"
                       + f"{num_turnaround},{extra_dist_stat},{t_conf_stat},"
-                      + f"{t_los_stat},{t_reso_stat}"
+                      + f"{t_los_stat},{t_reso_stat},"
                       + f"{ac_conf_per_dist_stat:.10f}")
         self.write_to_output_file(outputline)
 
