@@ -578,12 +578,14 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
                                     "DEP")
             self.make_single_figure(geometry,
                                     df_geometry,
-                                    "avg num ac [-]",
-                                    "avg_num_ac")
-            self.make_single_figure(geometry,
-                                    df_geometry,
                                     "LoS sev stat [-]",
                                     "avg_los_sev")
+            # For CAMDA assumption 2
+            self.make_single_figure(geometry,
+                                    df_geometry,
+                                    "avg num ac [-]",
+                                    "avg_num_ac",
+                                    showbase=True)
 
             # Make figures based on data in flstlog_occurence.csv
             df = pd.read_csv(os.path.join(self.batch_dir,
@@ -610,10 +612,12 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
                                     df_geometry,
                                     "time in resolution [%]",
                                     "avg_t_in_reso")
+            # For CAMDA assumption 1
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "avg ac conf per dist [1/m]",
-                                    "conf_per_dist")
+                                    "conf_per_dist",
+                                    showbase=True)
 
     def make_single_figure(self, geometry, df, column, namestr,
                            showfliers=False, showbase=False):
