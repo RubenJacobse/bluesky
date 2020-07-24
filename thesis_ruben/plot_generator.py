@@ -193,7 +193,7 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
             create_dir_if_not_exists(base_dirpath)
             geo_plot_filename = os.path.join(base_dirpath,
                                              f"{geometry}.{FIGURE_FILETYPE}")
-            geo_plot.savefig(geo_plot_filename, dpi=300, bbox_inches="tight")
+            geo_plot.savefig(geo_plot_filename, dpi=300, bbox_inches="tight", pad_inches=0)
             geo_plot.close()
 
             # Create the plots showing the conflict and intrusion locations
@@ -211,7 +211,7 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
                     gv_plot = self.make_geovec_figure(geo_data, gv_data)
                     plt_filename = (f"{geometry}_{method}.{FIGURE_FILETYPE}")
                     plt_filepath = os.path.join(base_dirpath, plt_filename)
-                    gv_plot.savefig(plt_filepath, dpi=300, bbox_inches="tight")
+                    gv_plot.savefig(plt_filepath, dpi=300, bbox_inches="tight", pad_inches=0)
                     gv_plot.close()
                 # Create and save base plot with swarming areas only
                 elif method.startswith("VELAVG"):
@@ -226,7 +226,7 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
                     gv_plot = self.make_swarm_zone_figure(geo_data, gv_data)
                     plt_filename = (f"{geometry}_{method}.{FIGURE_FILETYPE}")
                     plt_filepath = os.path.join(base_dirpath, plt_filename)
-                    gv_plot.savefig(plt_filepath, dpi=300, bbox_inches="tight")
+                    gv_plot.savefig(plt_filepath, dpi=300, bbox_inches="tight", pad_inches=0)
                     gv_plot.close()
                 # Make area conflict figures for all traffic levels
                 for level in self.combination_dict[geometry][method]:
@@ -269,7 +269,7 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
         right_res_in_ring = ring_polygon.intersection(right_res_polygon)
 
         # Create the actual plot
-        plt.figure()
+        fig = plt.figure()
         for area in [left_res_in_ring, right_res_in_ring]:
             plt.fill(*area.exterior.xy,
                      facecolor=RESTRICTION_FACECOLOR,
@@ -283,6 +283,9 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
                  label="_nolegend_",
                  zorder=0)
         plt.axis("scaled")
+        ax = plt.gca()
+        ax.set_frame_on(False)
+        ax.set_axis_off()
         plt.xlabel("Longitude [deg]")
         plt.ylabel("Latitude [deg]")
 
@@ -301,11 +304,6 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
 
         # Add each geovector area to the figure
         for row in geovec_data:
-            gv_name = row[0]
-            gv_gsmin = row[1]
-            gv_gsmax = row[2]
-            gv_trkmin = row[3]
-            gv_trkmax = row[4]
             gv_coords = row[5:]
 
             gv_latlon = [(float(lon), float(lat)) for (lat, lon)
@@ -364,10 +362,11 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
         """
 
         # Create list of elements to display in the figure legend
-        legend_elements = [Patch(facecolor=RESTRICTION_FACECOLOR,
-                                 edgecolor=RESTRICTION_EDGECOLOR,
-                                 linewidth=1,
-                                 label="Restricted area")]
+        # legend_elements = [Patch(facecolor=RESTRICTION_FACECOLOR,
+        #                          edgecolor=RESTRICTION_EDGECOLOR,
+        #                          linewidth=1,
+        #                          label="Restricted area")]
+        legend_elements = []
 
         # Store conflict and intrusion locations as list of lists
         # using the format [[lon0, lon1, ...], [lat0, lat1, ...]]
@@ -397,11 +396,11 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
             # Create plot with restriction and geovector areas
             plt = self.make_geovec_figure(geo_data, geovec_data)
 
-            # Add geovector to legend
-            legend_elements.append(Patch(edgecolor=GEOVECTOR_EDGECOLOR,
-                                         facecolor=GEOVECTOR_FACECOLOR,
-                                         linewidth=1,
-                                         label="Geovectoring area"))
+            # # Add geovector to legend
+            # legend_elements.append(Patch(edgecolor=GEOVECTOR_EDGECOLOR,
+            #                              facecolor=GEOVECTOR_FACECOLOR,
+            #                              linewidth=1,
+            #                              label="Geovectoring area"))
         elif "VELAVG" in separation_method:
             # Load the geovector data for the current geometry
             swarm_zone_source_file_name = (f"{self.timestamp}_{geometry}_RESO-"
@@ -415,11 +414,11 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
             # Create plot with restriction and geovector areas
             plt = self.make_swarm_zone_figure(geo_data, swarm_zone_data)
 
-            # Add geovector to legend
-            legend_elements.append(Patch(edgecolor=SWARMZONE_EDGECOLOR,
-                                         facecolor=SWARMZONE_FACECOLOR,
-                                         linewidth=1,
-                                         label="Velocity averaging area"))
+            # # Add geovector to legend
+            # legend_elements.append(Patch(edgecolor=SWARMZONE_EDGECOLOR,
+            #                              facecolor=SWARMZONE_FACECOLOR,
+            #                              linewidth=1,
+            #                              label="Velocity averaging area"))
         else:
             # Create plot with only restriction areas
             plt = self.make_geo_base_figure(geo_data)
@@ -456,12 +455,13 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
                                           color=INTRUSION_MARKER_COLOR,
                                           label="LoS locations"))
         # plt.title(f"Separation method: {separation_method}")
-        plt.legend(handles=legend_elements, loc="lower center",
-                   ncol=2, bbox_to_anchor=(0.5, 1))
+        if traffic_level == "150":
+            plt.legend(handles=legend_elements, loc="lower center",
+                    ncol=2, bbox_to_anchor=(0.5, 1))
         plt_filename = (f"{geometry}_{separation_method}_{traffic_level}"
                         + f"_{location_type}.{FIGURE_FILETYPE}")
         plt_filepath = os.path.join(self.figure_dir, plt_filename)
-        plt.savefig(plt_filepath, dpi=300, bbox_inches="tight")
+        plt.savefig(plt_filepath, dpi=300, bbox_inches="tight", pad_inches=0)
         plt.close()
 
 
@@ -548,11 +548,13 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "num area conflicts [-]",
-                                    "area_conflicts")
+                                    "area_conflicts",
+                                    r"$n_{area,conf}$ [-]")
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "num area intrusions [-]",
                                     "area_intrusions",
+                                    r"$n_{area,int}$ [-]",
                                     showfliers=True)
 
             # Make figures based on data in asaslog_summary.csv
@@ -563,28 +565,34 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "num conflicts [-]",
-                                    "num_conflicts")
+                                    "num_conflicts",
+                                    r"$n_{conf}$ [-]")
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "num LoS [-]",
-                                    "num_LoS")
+                                    "num_LoS",
+                                    r"$n_{LoS}$ [-]")
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "IPR [-]",
-                                    "IPR")
+                                    "IPR",
+                                    r"$IPR$ [-]")
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "DEP [-]",
-                                    "DEP")
+                                    "DEP",
+                                    r"$DEP$ [-]")
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "LoS sev stat [-]",
-                                    "avg_los_sev")
+                                    "avg_los_sev",
+                                    r"$LoS_{sev}$ [-]")
             # For CAMDA assumption 2
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "avg num ac [-]",
                                     "avg_num_ac",
+                                    r"avg num ac [-]",
                                     showbase=True)
 
             # Make figures based on data in flstlog_occurence.csv
@@ -599,28 +607,33 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "extra dist [%]",
-                                    "extra_dist")
+                                    "extra_dist",
+                                    r"$d_{extra}$ [\%]")
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "time in conflict [%]",
-                                    "avg_t_in_conf")
+                                    "avg_t_in_conf",
+                                    r"$t_{conf}$ [\%]")
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "time in los [%]",
-                                    "avg_t_in_los")
+                                    "avg_t_in_los",
+                                    r"$t_{LoS}$ [\%]")
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "time in resolution [%]",
-                                    "avg_t_in_reso")
+                                    "avg_t_in_reso",
+                                    r"$t_{reso}$ [\%]")
             # For CAMDA assumption 1
             self.make_single_figure(geometry,
                                     df_geometry,
                                     "avg ac conf per dist [1/m]",
                                     "conf_per_dist",
+                                    r"avg ac conf per dist [1/m]",
                                     showbase=True)
 
     def make_single_figure(self, geometry, df, column, namestr,
-                           showfliers=False, showbase=False):
+                           varstr, showfliers=False, showbase=False):
         """
         Make a single boxplot figure for a given geometry. The data used
         is specified in a pandas dataframe 'df', 'column' is the column used
@@ -650,6 +663,8 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
 
         # Make figure
         plt.figure(figsize=FIGURE_SIZE)
+        plt.rc('text', usetex=True)
+        plt.rc('font', size=12)
         ax = self.create_plot(x="resolution method",
                               y=column,
                               data=df,
@@ -665,7 +680,8 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
                   ncol=num_levels,
                   bbox_to_anchor=(0.5, 1))
         ax.set(xticklabels=reso_label)
-        plt.xlabel("Resolution method")
+        plt.xlabel("Separation method")
+        plt.ylabel(varstr)
         # plt.setp(ax.get_xticklabels(), rotation=30, horizontalalignment='right')
         # Next three lines are useful to ensure the same plot types have
         # the same axes when comparing different geometries
@@ -798,6 +814,8 @@ class CAMDAFigureGenerator(FigureGeneratorBase):
         df_rmse = pd.DataFrame(columns=["method", "rmse", "type"])
 
         plt.figure(figsize=FIGURE_SIZE)
+        plt.rc('text', usetex=True)
+        plt.rc('font', size=12)
         ax = plt.gca()
         lines = []
         line_labels = []
@@ -858,7 +876,7 @@ class CAMDAFigureGenerator(FigureGeneratorBase):
                          + "\\cdot \\frac{{\\rho}}{{\\rho_{{max}}-\\rho}}$"),
                 fontsize="10")
         legend1 = plt.legend(lines, line_labels, loc=2)
-        leg = plt.legend(title="Conflict prevention and resolution method",
+        leg = plt.legend(title="Separation method",
                          loc="lower center",
                          ncol=num_reso_methods,
                          bbox_to_anchor=(0.5, 1))
@@ -872,6 +890,8 @@ class CAMDAFigureGenerator(FigureGeneratorBase):
 
         # Create and save figure with RMS values
         plt.figure(figsize=FIGURE_SIZE)
+        plt.rc('text', usetex=True)
+        plt.rc('font', size=12)
         sbn.barplot(x="method",
                     y="rmse",
                     hue="type",
@@ -996,7 +1016,7 @@ class ASASConflictFigureGenerator(FigureGeneratorBase):
                 plt.ylabel("Density")
                 plt.axis("tight")
                 plt.xlim((0, 180))
-                plt.legend(title="Resolution method")
+                plt.legend(title="Separation method")
                 plt_filename = f"hist_{geometry}_{level}.{FIGURE_FILETYPE}"
                 plt_filepath = os.path.join(self.figure_dir, plt_filename)
                 plt.savefig(plt_filepath, dpi=300, bbox_inches="tight")
