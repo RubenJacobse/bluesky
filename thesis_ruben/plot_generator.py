@@ -592,7 +592,7 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
                                     df_geometry,
                                     "avg num ac [-]",
                                     "avg_num_ac",
-                                    r"avg num ac [-]",
+                                    r"instantaneous num ac [-]",
                                     showbase=True)
 
             # Make figures based on data in flstlog_occurence.csv
@@ -629,7 +629,7 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
                                     df_geometry,
                                     "avg ac conf per dist [1/m]",
                                     "conf_per_dist",
-                                    r"avg ac conf per dist [1/m]",
+                                    r"num ac conf per unit dist [1/m]",
                                     showbase=True)
 
     def make_single_figure(self, geometry, df, column, namestr,
