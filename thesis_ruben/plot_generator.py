@@ -457,7 +457,7 @@ class GeoFigureGeneratorBase(FigureGeneratorBase):
         # plt.title(f"Separation method: {separation_method}")
         if traffic_level == "150":
             plt.legend(handles=legend_elements, loc="lower center",
-                    ncol=2, bbox_to_anchor=(0.5, 1))
+                       ncol=2, bbox_to_anchor=(0.5, 1))
         plt_filename = (f"{geometry}_{separation_method}_{traffic_level}"
                         + f"_{location_type}.{FIGURE_FILETYPE}")
         plt_filepath = os.path.join(self.figure_dir, plt_filename)
@@ -657,7 +657,7 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
                                       "GV-METHOD3", "GV-METHOD4"]
         reso_order = [method for method in reso_methods
                         if method in df["resolution method"].unique()]
-        reso_label = base_method + ["MVP", "VELAVG", "GV-1", "GV-2", "GV-3", "GV-4"]
+        reso_label = base_method + ["MVP", "VELAVG", "GV-SPD", "GV-ZONES", "GV-RINGS", "GV-GRID"]
         level_order = df["traffic level"].unique().sort()
         num_levels = df["traffic level"].nunique()
 
@@ -806,7 +806,7 @@ class CAMDAFigureGenerator(FigureGeneratorBase):
                         "GV-METHOD3", "GV-METHOD4"]
         reso_order = [method for method in reso_methods
                       if method in df["resolution method"].unique()]
-        reso_labels = ["MVP", "VELAVG", "GV-1", "GV-2", "GV-3", "GV-4"]
+        reso_labels = ["MVP", "VELAVG", "GV-SPD", "GV-ZONES", "GV-RINGS", "GV-GRID"]
         num_reso_methods = df["resolution method"].nunique()
         marker = itertools.cycle(("o", "v", "s", "H", "D", "<", ">"))
 
@@ -872,14 +872,16 @@ class CAMDAFigureGenerator(FigureGeneratorBase):
         plt.ylabel("DEP [-]")
         plt.xlim(0, 70)
         plt.ylim(-1, 60)
-        ax.text(48, 53, ("Regression model:\n$DEP\\left(\\rho\\right) = k "
-                         + "\\cdot \\frac{{\\rho}}{{\\rho_{{max}}-\\rho}}$"),
-                fontsize="10")
+        # ax.text(48, 53, ("Regression model:\n$DEP\\left(\\rho\\right) = k "
+        #                  + "\\cdot \\frac{{\\rho}}{{\\rho_{{max}}-\\rho}}$"),
+        #         fontsize="10")
         legend1 = plt.legend(lines, line_labels, loc=2)
         leg = plt.legend(title="Separation method",
                          loc="lower center",
                          ncol=num_reso_methods,
-                         bbox_to_anchor=(0.5, 1))
+                         bbox_to_anchor=(0.5, 1),
+                         handletextpad=0.1,
+                         columnspacing=1)
         plt.gca().add_artist(legend1)
         for handle in leg.legendHandles:
             handle.set_alpha(0.2)
