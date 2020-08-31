@@ -14,11 +14,13 @@ import pandas as pd
 import seaborn as sbn
 import matplotlib.pyplot as plt
 from scipy import optimize
+from matplotlib import axes
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 from shapely.geometry import Polygon
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import train_test_split
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes, mark_inset
 
 # Enable BlueSky imports by adding the project folder to the path
 sys.path.append(os.path.abspath(os.path.join("..")))
@@ -192,12 +194,13 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
 
         # Set resolution method plotting orders
         base_method = []
-        reso_methods = base_method + ["VELAVG",
+        reso_methods = base_method + ["MVP", "VELAVG",
                                       "GV-METHOD1", "GV-METHOD2",
                                       "GV-METHOD3", "GV-METHOD4"] # removed MVP
         reso_order = [method for method in reso_methods
-                        if method in df["resolution method"].unique()]
-        reso_label = base_method + ["VELAVG", "GV-SPD", "GV-ZONES", "GV-RINGS", "GV-GRID"]
+                      if method in df["resolution method"].unique()]
+        reso_label = base_method + ["MVP", "VELAVG", "GV-SPD", "GV-ZONES",
+                                    "GV-RINGS", "GV-GRID"]
         level_order = df["traffic level"].unique().sort()
         num_levels = df["traffic level"].nunique()
 
@@ -228,6 +231,27 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
         # yminplot = ymin - 0.05 * yrange
         # ymaxplot = ymax + 0.05 * yrange
         # ax.set_ylim(yminplot, ymaxplot)
+
+        # Add inset in new axis
+        axins = inset_axes(ax, "70%", "58%", loc="lower center", borderpad=0.7)
+        sbn.boxplot(x="resolution method",
+                    y=column,
+                    data=df,
+                    order=reso_order,
+                    hue="traffic level",
+                    hue_order=level_order,
+                    linewidth=0.5,
+                    showfliers=showfliers,
+                    palette="Blues",
+                    ax=axins)
+        axins.get_legend().remove()
+        axins.axes.xaxis.set_visible(False)
+        axins.axes.yaxis.label.set_visible(False)
+        axins.axes.set_yticks([0.99, 1.00])
+        axins.set_xlim(0.5, 5.5)
+        axins.set_ylim(0.9895, 1.0005)
+        mark_inset(ax, axins, loc1=2, loc2=4, fc="none", ec='0.5', lw='0.5')
+
         plt_filename = f"{geometry}_{namestr}_zoomed.{FIGURE_FILETYPE}"
         plt_filepath = os.path.join(self.figure_dir, plt_filename)
         try:
