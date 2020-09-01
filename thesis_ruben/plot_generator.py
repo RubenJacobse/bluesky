@@ -39,7 +39,7 @@ CONFLICT_MARKER_COLOR = "blue"
 
 # Save figures as following type
 FIGURE_FILETYPE = "pdf"
-FIGURE_SIZE = (8, 4.5)
+FIGURE_SIZE = (6.7, 4.72) # (8, 5.393379627)
 
 # Various
 PARAM_GUESS_INIT = [1000, 100] # Initial guess for CAMDA ['rho_max', 'k']
@@ -663,7 +663,8 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
         num_levels = df["traffic level"].nunique()
 
         # Make figure
-        plt.figure(figsize=FIGURE_SIZE)
+        plt.figure(figsize=FIGURE_SIZE,
+                   tight_layout= {"rect": (-0.01, -0.02, 1.01, 1.02)})
         plt.rc('text', usetex=True)
         plt.rc('font', size=12)
         ax = self.create_plot(x="resolution method",
@@ -714,7 +715,7 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
         plt_filename = f"{geometry}_{namestr}.{FIGURE_FILETYPE}"
         plt_filepath = os.path.join(self.figure_dir, plt_filename)
         try:
-            plt.savefig(plt_filepath, dpi=300, bbox_inches="tight")
+            plt.savefig(plt_filepath, dpi=300)
             plt.close()
         except ValueError:
             print(f"Plot generator failed to create {plt_filename}")
@@ -836,7 +837,8 @@ class CAMDAFigureGenerator(FigureGeneratorBase):
         # Set up empty dataframe for test and validation rmse values
         df_rmse = pd.DataFrame(columns=["method", "rmse", "type"])
 
-        plt.figure(figsize=FIGURE_SIZE)
+        plt.figure(figsize=FIGURE_SIZE,
+                   tight_layout= {"rect": (-0.01, -0.02, 1.01, 1.02)})
         plt.rc('text', usetex=True)
         plt.rc('font', size=12)
         ax = plt.gca()
@@ -903,18 +905,19 @@ class CAMDAFigureGenerator(FigureGeneratorBase):
                          loc="lower center",
                          ncol=num_reso_methods,
                          bbox_to_anchor=(0.5, 1),
-                         handletextpad=0.1,
-                         columnspacing=1)
+                         handletextpad=-0.5,
+                         columnspacing=0)
         plt.gca().add_artist(legend1)
         for handle in leg.legendHandles:
             handle.set_alpha(0.2)
         plt_filename = f"camda_{geometry}.{FIGURE_FILETYPE}"
         plt_filepath = os.path.join(self.figure_dir, plt_filename)
-        plt.savefig(plt_filepath, dpi=300, bbox_inches="tight")
+        plt.savefig(plt_filepath, dpi=300)
         plt.close()
 
         # Create and save figure with RMS values
-        plt.figure(figsize=FIGURE_SIZE)
+        plt.figure(figsize=FIGURE_SIZE,
+                   tight_layout= {"rect": (-0.01, -0.02, 1.01, 1.02)})
         plt.rc('text', usetex=True)
         plt.rc('font', size=12)
         sbn.barplot(x="method",
@@ -931,7 +934,7 @@ class CAMDAFigureGenerator(FigureGeneratorBase):
         plt.ylabel("RMS Error DEP [-]")
         plt_filename = f"camda_rms_{geometry}.{FIGURE_FILETYPE}"
         plt_filepath = os.path.join(self.figure_dir, plt_filename)
-        plt.savefig(plt_filepath, dpi=300, bbox_inches="tight")
+        plt.savefig(plt_filepath, dpi=300)
         plt.close()
 
 
