@@ -296,7 +296,7 @@ class ASASLogSummaryParser(LogListParser):
         # Intrusion prevention rate not defined if baseline has zero
         # conflicts (divide by zero)
         if num_conf:
-            int_prev_rate = f"{(num_conf - num_los) / num_conf:.3f}"
+            int_prev_rate = f"{(num_conf - num_los) / num_conf:.5f}"
         else:
             int_prev_rate = "NaN"
 
