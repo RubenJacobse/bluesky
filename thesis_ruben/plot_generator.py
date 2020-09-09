@@ -682,8 +682,8 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
                   ncol=num_levels,
                   bbox_to_anchor=(0.5, 1))
         ax.set(xticklabels=reso_label)
-        plt.xlabel("Separation method")
-        plt.ylabel(varstr)
+        plt.xlabel("Separation method", fontsize="large")
+        plt.ylabel(varstr, fontsize="large")
         # plt.setp(ax.get_xticklabels(), rotation=30, horizontalalignment='right')
         # Next three lines are useful to ensure the same plot types have
         # the same axes when comparing different geometries
@@ -710,7 +710,7 @@ class ComparisonFigureGeneratorBase(FigureGeneratorBase):
             axins.axes.set_yticks([0.99, 1.00])
             axins.set_xlim(0.5, 5.5)
             axins.set_ylim(0.9895, 1.0005)
-            mark_inset(ax, axins, loc1=2, loc2=4, fc="none", ec='0.5', lw='0.5')
+            mark_inset(ax, axins, loc1=2, loc2=4, fc="none", ec='0.5', lw='0.5', ls=":")
 
         plt_filename = f"{geometry}_{namestr}.{FIGURE_FILETYPE}"
         plt_filepath = os.path.join(self.figure_dir, plt_filename)
@@ -893,8 +893,8 @@ class CAMDAFigureGenerator(FigureGeneratorBase):
             line_labels.append(line_label)
 
         # Set figure attributes and save
-        plt.xlabel("Average density [ac / 10,000 NM$^2$]")
-        plt.ylabel("DEP [-]")
+        plt.xlabel("Average density [ac / 10,000 NM$^2$]", fontsize="large")
+        plt.ylabel("DEP [-]", fontsize="large")
         plt.xlim(0, 70)
         plt.ylim(-1, 60)
         # ax.text(48, 53, ("Regression model:\n$DEP\\left(\\rho\\right) = k "
@@ -930,8 +930,8 @@ class CAMDAFigureGenerator(FigureGeneratorBase):
                    ncol=2,
                    bbox_to_anchor=(0.5, 1))
         plt.ylim(0, 6)
-        plt.xlabel("Separation method")
-        plt.ylabel("RMS Error DEP [-]")
+        plt.xlabel("Separation method", fontsize="large")
+        plt.ylabel("RMS Error DEP [-]", fontsize="large")
         plt_filename = f"camda_rms_{geometry}.{FIGURE_FILETYPE}"
         plt_filepath = os.path.join(self.figure_dir, plt_filename)
         plt.savefig(plt_filepath, dpi=300)
