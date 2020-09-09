@@ -50,11 +50,13 @@ def make_batch_figures(timestamp):
     Generate the figures for the batch with given timestamp.
     """
 
-    # BoxPlotFigureGenerator(timestamp)
-    # AREAGeoFigureGenerator(timestamp)
-    # ASASGeoFigureGenerator(timestamp)
-    # ASASConflictFigureGenerator(timestamp)
+    BoxPlotFigureGenerator(timestamp)
+    ASASGeoFigureGenerator(timestamp)
     CAMDAFigureGenerator(timestamp)
+
+    # # Unused
+    # AREAGeoFigureGenerator(timestamp)
+    # ASASConflictFigureGenerator(timestamp)
 
     # # Can be uncommented for violin or strip plot creation
     # ViolinPlotFigureGenerator(timestamp)
